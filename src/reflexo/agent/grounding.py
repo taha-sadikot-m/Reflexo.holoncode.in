@@ -111,6 +111,12 @@ async def hydrate(
     block_links = {str(b.payment_link_id) for b in output.blocks if isinstance(b, PaymentLinkBlock)}
     order_ids = {u for t, i in refs if t == "order" and (u := _uuid(i))} | {UUID(i) for i in block_orders}
     link_ids = {u for t, i in refs if t == "payment_link" and (u := _uuid(i))} | {UUID(i) for i in block_links}
+    # The customer's own in-progress order is live state of this conversation (OPEN ORDER block, tool results):
+    # its amounts back the read-back even when the model forgets to list it (live: total ₹1,100 "not grounded").
+    in_progress = await commerce.open_order(business_id, customer_id) if customer_id is not None else None
+    if in_progress is not None:
+        rec.open_order_status = str(in_progress.status)
+        order_ids.add(in_progress.order_id)
     commerce_facts = await commerce.grounding_amounts(business_id, list(order_ids), list(link_ids))
     rec.amounts_paise |= commerce_facts["amounts"]
     rec.allowed_urls |= commerce_facts["urls"]

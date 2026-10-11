@@ -189,3 +189,52 @@ async def release(conversation_id: UUID, _: Mutating, business_id: Business) -> 
     except LookupError as exc:
         raise problem(404, "NOT_FOUND", str(exc)) from exc
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- chaos (POC_07 §5)
+
+
+@router.get("/chaos")
+async def chaos_overview(_: Authed, business_id: Business) -> dict[str, Any]:
+    return {
+        "actions": [{"kind": k, "expected": admin.chaos.EXPECTED[k]} for k in admin.chaos.KINDS],
+        "flags": await admin.chaos.active_flags(),
+        "recent": await admin.recent_chaos(business_id),
+    }
+
+
+@router.post("/chaos/{kind}")
+async def chaos_run(kind: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+    if kind not in admin.chaos.EXPECTED:
+        raise problem(404, "NOT_FOUND", f"unknown chaos action {kind}")
+    return (await admin.chaos.run(kind, business_id)).asdict()
+
+
+# ---------------------------------------------------------------- simulated actors (POC_07 §3.2)
+
+
+class SimSendBody(BaseModel):
+    actor: int = Field(ge=1, le=99)
+    text: str | None = Field(default=None, max_length=4000)
+    option_id: str | None = Field(default=None, max_length=100)
+    option_title: str | None = Field(default=None, max_length=100)
+
+
+@router.post("/sim/send")
+async def sim_send(body: SimSendBody, _: Mutating, business_id: Business) -> dict[str, Any]:
+    if not body.text and not body.option_id:
+        raise problem(422, "VALIDATION_FAILED", "text or option_id required")
+    result = await admin.sim.customer_says(
+        business_id, body.actor, text_=body.text, option_id=body.option_id, option_title=body.option_title
+    )
+    return {"status": result.status, "external_message_id": result.external_message_id, "wa_id": result.wa_id}
+
+
+@router.get("/sim/thread")
+async def sim_thread(actor: Annotated[int, Query(ge=1, le=99)], _: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.sim.thread(business_id, actor)
+
+
+@router.post("/sim/razorpay/pay/{payment_link_id}")
+async def sim_pay(payment_link_id: UUID, _: Mutating, business_id: Business) -> dict[str, int]:
+    return {"status": await admin.sim.pay_link(business_id, payment_link_id)}

@@ -466,6 +466,33 @@ async def test_plain_text_answer_is_nudged_to_reply(registry: Registry, db: Data
     handle = await turn_for(registry, db, pnid, "919811100010", "hi")
     await desk(registry).run_turn(handle)
     assert await outbound_texts(db, handle.ref.conversation_id) == ["Namaste! Kaise madad karun? 🙂"]
+    assert [a.tool_choice for a in fake.calls] == [None, "reply"]  # only the nudged step is forced
+
+
+async def test_nudged_reply_is_allowed_past_the_call_limit(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live: the prose answer used the last budgeted call; the forced `reply` must still run, not fall back."""
+    _, pnid = await make_bakery(db)
+    search = agent.FakeReply(tool_calls=[ToolCall(id="s", name="catalog_search", args={"query": "truffle"})])
+    fake.queue(PRIMARY, search, search, search, "Truffle 1 kg ₹950 hai")  # 4 calls = the limit, last one prose
+    fake.script(PRIMARY, lambda a: reply("send", "Namaste! Kaise madad karun? 🙂", topic="greeting_smalltalk"))
+    handle = await turn_for(registry, db, pnid, "919811100020", "truffle?")
+    await desk(registry).run_turn(handle)
+    assert await outbound_texts(db, handle.ref.conversation_id) == ["Namaste! Kaise madad karun? 🙂"]
+    assert len(fake.calls) == 5
+
+
+async def test_repair_round_can_be_nudged_too(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:
+    """Live (kill/resume): plain text → nudge → wrong price → repair → plain text again fell back."""
+    _, pnid = await make_bakery(db)
+    fake.queue(PRIMARY, "Truffle ₹950 hai")  # forgot the reply tool
+    fake.queue(PRIMARY, reply("send", "Chocolate truffle 1 kg ₹999 hai", topic="pricing"))  # unbacked price
+    fake.queue(PRIMARY, "Sorry, ₹950 hai")  # forgot the reply tool again in the repair round
+    fake.script(PRIMARY, lambda a: reply("send", "Namaste! Kaise madad karun? 🙂", topic="greeting_smalltalk"))
+    handle = await turn_for(registry, db, pnid, "919811100019", "hi")
+    await desk(registry).run_turn(handle)
+    assert await outbound_texts(db, handle.ref.conversation_id) == ["Namaste! Kaise madad karun? 🙂"]
 
 
 async def test_superseded_turn_sends_nothing(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:

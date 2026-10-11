@@ -104,6 +104,29 @@ _URL = re.compile(
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _PHONE = re.compile(r"(?<![\d])(?:\+?\d[\d\s-]{8,}\d)(?![\d])")
 _TIME = re.compile(r"\b\d{1,2}:\d{2}\b|\b\d{1,2}\.\d{2}\s*(?:am|pm)\b", re.IGNORECASE)
+# Indian PIN code (411038 / 411 038). Live: "Kothrud 411038 mein. Iska total ₹1,100" read the PIN as a price.
+_PIN = re.compile(r"(?<!\d)(?<!\d[,.])[1-9]\d{2}\s?\d{3}(?!\d|[,.]\d)")
+# Reference codes: order numbers "MB-1012", "#1012", invoice "INV2041". Live: "order MB-1012 … Total ₹1,100".
+_CODE = re.compile(r"(?:\b[A-Za-z]{1,6}-?|#)\d+\b")
+# "Your order is confirmed" / "order confirm ho gaya" / "बुक हो गया" — a claim, not a question ("confirm kar doon?")
+# or a future ("confirm ho jayega", "once confirmed"). Live: a draft was announced as "order confirm ho gaya hai".
+_CONFIRMED_CLAIM = re.compile(
+    r"\b(?:is|has been|was|got|now)\s+(?:been\s+)?(?:confirmed|booked)\b"
+    r"|\b(?:order|booking)\s+(?:confirmed|booked)\b"
+    r"|\b(?:confirm(?:ed)?|book|place)\s+(?:ho\s*(?:gaya|gayi|gya|chuka|chuki)|hogaya|hogya|kar\s*(?:diya|di|dia))\b"
+    r"|(?:कन्फर्म|बुक|पक्का)\s*(?:हो\s*(?:गया|गई|चुका)|कर\s*(?:दिया|दी))",
+    re.IGNORECASE,
+)
+# "…is confirmed once paid" (what the prompt asks for after order_confirm) is a condition, not a claim.
+_CONDITION_AFTER = re.compile(
+    r"^\W*(?:once|after|when|as soon as|upon|if|jab|payment\s+(?:ke\s+baad|hote\s+hi|milte\s+hi|hone\s+par))\b",
+    re.IGNORECASE,
+)
+# Hindi word order puts the condition first: "payment ke baad booking confirmed".
+_CONDITION_BEFORE = re.compile(
+    r"(?:\b(?:once|after|when|upon|if|jab)\b|ke\s+baad|hone\s+par|hote\s+hi|milte\s+hi|के\s+बाद)[^.!?\n]*$",
+    re.IGNORECASE,
+)
 PAYMENT_HOSTS = frozenset({"rzp.io", "razorpay.com", "pages.razorpay.com"})
 
 
@@ -146,6 +169,8 @@ def extract_amounts(text: str, quantity_numbers: Iterable[int] = ()) -> list[Amo
             if _is_budget(t, m.start(), m.end()):
                 continue
             found.append(Amount(_value(m.group(1), m.group(2), m.group(3)), m.group(0).strip(), True))
+    for pattern in (_PIN, _CODE):  # after explicit ₹ amounts, so "₹411038" / "Rs500" stay amounts
+        taken += [m.span() for m in pattern.finditer(t) if not _span_overlaps(m.span(), taken)]
     quantities = set(quantity_numbers)
     for m in _BARE.finditer(t):
         if _span_overlaps(m.span(), taken):
@@ -298,7 +323,34 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
             )
         )
 
-    # 6. grounding
+    # 6. order status: never announce an order as confirmed while it is still a draft or awaiting payment
+    if sending and records.open_order_status in ("draft", "awaiting_payment"):
+        claim = next(
+            (
+                m
+                for m in _CONFIRMED_CLAIM.finditer(text)
+                if not _CONDITION_AFTER.match(text[m.end() : m.end() + 40])
+                and not _CONDITION_BEFORE.search(text[max(0, m.start() - 40) : m.start()])
+            ),
+            None,
+        )
+        state = "awaiting payment" if records.open_order_status == "awaiting_payment" else "a draft"
+        checks.append(
+            GateCheck(
+                name="order_status",
+                passed=claim is None,
+                detail=f"claims '{claim.group(0)}' but the order is {state}" if claim else None,
+                guidance=(
+                    f"The order is still {state}, not confirmed. Do not say it is confirmed or booked: read it back "
+                    "and ask them to confirm"
+                    + (" — it confirms once the payment is received." if state == "awaiting payment" else ".")
+                )
+                if claim
+                else None,
+            )
+        )
+
+    # 7. grounding
     if output.action == "send" and output.topic in GROUNDED_TOPICS and not records.valid_refs:
         checks.append(
             GateCheck(
@@ -312,7 +364,7 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
     else:
         checks.append(GateCheck(name="grounding", passed=True))
 
-    # 7. tier rules (rewrite, not fail)
+    # 8. tier rules (rewrite, not fail)
     rewritten: str | None = None
     if output.action == "send":
         if output.topic in HANDOFF_TOPICS or output.flags.angry:

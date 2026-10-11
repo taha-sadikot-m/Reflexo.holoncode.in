@@ -233,12 +233,13 @@ async def _prepare(state: OwnerState, config: RunnableConfig) -> dict[str, Any]:
 async def _model(state: OwnerState, config: RunnableConfig) -> dict[str, Any]:
     deps = _deps(config)
     calls = state.get("model_calls", 0)
-    if calls >= get_settings().max_model_calls_owner:
+    if calls >= get_settings().max_model_calls_owner + (1 if state.get("nudged") else 0):  # see the customer graph
         return {"result": "fallback", "fallback_reason": "model_call_limit"}
     await deps.handle.checkpoint("model")
     llm = GatewayChatModel(gateway=deps.gateway, role="owner_desk", purpose="owner_turn")
+    choice = "reply_owner" if state.get("nudged") else None  # nudged: must finish; see the customer graph
     try:
-        ai = await llm.bind_tools(_tool_dicts()).ainvoke(state["messages"])
+        ai = await llm.bind_tools(_tool_dicts(), tool_choice=choice).ainvoke(state["messages"])
     except ModelError as exc:
         return {"result": "fallback", "fallback_reason": f"model:{exc.code}", "model_calls": calls + 1}
     return {"messages": [ai], "model_calls": calls + 1}

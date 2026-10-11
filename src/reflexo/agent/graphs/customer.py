@@ -107,12 +107,18 @@ async def prepare_node(state: CustomerState, config: RunnableConfig) -> dict[str
 async def model_node(state: CustomerState, config: RunnableConfig) -> dict[str, Any]:
     deps = _deps(config)
     calls = state.get("model_calls", 0)
-    if calls >= get_settings().max_model_calls_customer:
+    # The nudged call only moves an answer the model already wrote into `reply`; refusing it at the limit would
+    # throw that answer away for a holding message (live: guessed id → search → order_start → prose → refused).
+    if calls >= get_settings().max_model_calls_customer + (1 if state.get("nudged") else 0):
         return {"result": "fallback", "fallback_reason": "model_call_limit"}
     await deps.handle.checkpoint("model")
     llm = GatewayChatModel(gateway=deps.gateway, role="customer_desk", purpose="customer_turn")
+    # Auto by default: forcing a tool call on every step (mode ANY) fixed prose answers but pushed Hinglish replies
+    # into Devanagari in live tests. A prose answer is nudged, and the nudged step may only call `reply` — the
+    # model then transcribes its own draft (8/8 live, in the right script).
+    choice = "reply" if state.get("nudged") else None
     try:
-        ai = await llm.bind_tools(_tool_dicts(deps.bound)).ainvoke(state["messages"])
+        ai = await llm.bind_tools(_tool_dicts(deps.bound), tool_choice=choice).ainvoke(state["messages"])
     except ModelError as exc:
         return {"result": "fallback", "fallback_reason": f"model:{exc.code}", "model_calls": calls + 1}
     return {"messages": [ai], "model_calls": calls + 1}
@@ -185,6 +191,7 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         return {
             "messages": [*skipped, ToolMessage(content=msg, tool_call_id=reply_call.id, name="reply")],
             "repair_attempted": True,
+            "nudged": False,  # the repair round may forget the reply tool once too
         }
     p = deps.prepared
     customer = p.conversation.customer
@@ -210,7 +217,8 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         return update | {"messages": skipped, "result": "finalize"}
     if not repaired:
         repair = ToolMessage(content=result.repair_message(), tool_call_id=reply_call.id, name="reply")
-        return update | {"messages": [*skipped, repair], "repair_attempted": True}
+        # live (kill/resume): the repair answer came as plain text and the turn fell back — one more nudge allowed
+        return update | {"messages": [*skipped, repair], "repair_attempted": True, "nudged": False}
     return update | {"messages": skipped, "result": "fallback", "fallback_reason": "gate_failed"}
 
 

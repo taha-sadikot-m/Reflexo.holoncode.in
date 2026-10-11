@@ -30,6 +30,7 @@ class Attempt:
     response_schema: dict[str, Any] | None = None
     first_token: asyncio.Event = field(default_factory=asyncio.Event)
     pre_delay_s: float = 0.0  # chaos: injected before the SDK call
+    tool_choice: str | None = None  # None/"auto" | "any" (must call some tool) | a tool name (must call it)
 
 
 class ModelProvider(Protocol):
@@ -45,6 +46,50 @@ class ModelProvider(Protocol):
 
 def _b64(data: bytes | None) -> str | None:
     return base64.b64encode(data).decode() if data else None
+
+
+# Validation-only keywords. Gemini compiles tool schemas into a constrained-decoding grammar; with these kept the
+# customer tool set fails in ANY mode ("too many states for serving") and the model drifts into prose in AUTO mode.
+# Our own Pydantic validation of every tool call stays authoritative (invalid args → repair round).
+_VALIDATION_ONLY = frozenset(
+    {
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "pattern",
+        "format",
+        "default",
+        "title",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "uniqueItems",
+    }
+)
+
+
+def lean_schema(node: Any) -> Any:
+    """The model-facing projection of a JSON schema: structure, types, enums, consts, required, descriptions."""
+    if isinstance(node, list):
+        return [lean_schema(x) for x in node]
+    if not isinstance(node, dict):
+        return node
+    out: dict[str, Any] = {}
+    for key, value in node.items():
+        if key == "properties" and isinstance(value, dict):
+            out[key] = {name: lean_schema(sub) for name, sub in value.items()}  # property names are data
+        elif key in _VALIDATION_ONLY:
+            continue
+        else:
+            out["anyOf" if key == "oneOf" else key] = lean_schema(value)
+    # A const property is a union tag ("type": "text"). Pydantic models give it a default, so it is not required —
+    # without the default in view the model left it out and the discriminated union rejected the block (live).
+    tags = [k for k, v in out.get("properties", {}).items() if isinstance(v, dict) and "const" in v]
+    if tags:
+        out["required"] = [*out.get("required", []), *(t for t in tags if t not in out.get("required", []))]
+    return out
 
 
 class GeminiProvider:
@@ -125,12 +170,19 @@ class GeminiProvider:
                 t.Tool(
                     function_declarations=[
                         t.FunctionDeclaration(
-                            name=s.name, description=s.description, parameters_json_schema=s.parameters
+                            name=s.name, description=s.description, parameters_json_schema=lean_schema(s.parameters)
                         )
                         for s in attempt.tools
                     ]
                 )
             ]
+            if attempt.tool_choice and attempt.tool_choice != "auto":
+                only = None if attempt.tool_choice == "any" else [attempt.tool_choice]
+                kwargs["tool_config"] = t.ToolConfig(
+                    function_calling_config=t.FunctionCallingConfig(
+                        mode=t.FunctionCallingConfigMode.ANY, allowed_function_names=only
+                    )
+                )
         if attempt.response_schema is not None:
             kwargs["response_mime_type"] = "application/json"
             kwargs["response_json_schema"] = attempt.response_schema

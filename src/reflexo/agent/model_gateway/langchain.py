@@ -103,6 +103,8 @@ class GatewayChatModel(BaseChatModel):
         tool_choice: str | None = None,
         **kwargs: Any,
     ) -> Runnable[LanguageModelInput, AIMessage]:
+        if tool_choice:
+            kwargs["tool_choice"] = tool_choice
         return self.bind(tools=[convert_to_openai_tool(t) for t in tools], **kwargs)
 
     def _generate(
@@ -123,7 +125,9 @@ class GatewayChatModel(BaseChatModel):
     ) -> ChatResult:
         ctx = current_call_ctx.get() or CallCtx(business_id=None, purpose=self.purpose)
         tools = [_tool_spec(t) for t in kwargs.get("tools") or []] or None
-        result = await self.gateway.chat(self.role, to_gateway_messages(messages), tools, ctx=ctx)
+        result = await self.gateway.chat(
+            self.role, to_gateway_messages(messages), tools, ctx=ctx, tool_choice=kwargs.get("tool_choice")
+        )
         message = AIMessage(
             content=result.text,
             tool_calls=[{"name": c.name, "args": c.args, "id": c.id, "type": "tool_call"} for c in result.tool_calls],

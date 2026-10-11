@@ -62,6 +62,12 @@ TRUFFLE = uuid4()
         ("Only Rs 99", [99]),
         ("1000 ke andar options: ₹750", [750]),
         ("Rs.1,100/-", [1100]),
+        ("Kothrud 411038 mein. Iska total ₹1,100 hai", [1100]),  # live: the PIN code was read as a price
+        ("Pune 411 038, total ₹1,100", [1100]),
+        ("total ₹411038", [411038]),  # with a currency marker it is an amount and still checked
+        ("Aapka order MB-1012 draft ho gaya hai. Total ₹1,100", [1100]),  # live: order number read as a price
+        ("order #1012 ka total ₹1,100", [1100]),
+        ("Total Rs500 only", [500]),
     ],
 )
 def test_extract_amounts(text: str, amounts: list[float]) -> None:
@@ -216,3 +222,39 @@ def test_ordinary_sentences_are_not_discounts(text: str) -> None:
 )
 def test_discount_phrasings_are_caught(text: str) -> None:
     assert "discounts" in failed(check(out(text), records(amounts_paise={10000, 5000, 20000, 1500})))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Aapka order confirm ho gaya hai 🎂",  # live: said about a draft
+        "Your order is confirmed!",
+        "Order confirmed, thank you",
+        "Cake book ho gaya hai",
+        "Maine order confirm kar diya hai",
+        "आपका ऑर्डर कन्फर्म हो गया है",
+    ],
+)
+def test_confirmed_claim_on_an_unconfirmed_order_fails(text: str) -> None:
+    for status in ("draft", "awaiting_payment"):
+        r = check(out(text, topic="booking_appointments"), records(open_order_status=status))
+        assert failed(r) == ["order_status"], (text, status)
+    assert check(out(text, topic="booking_appointments"), records(open_order_status=None)).passed  # really confirmed
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kya main order confirm kar doon?",
+        "Payment ke baad order confirm ho jayega",
+        "Once confirmed, we will start baking",
+        "Order abhi confirm nahi hua hai",
+        "Your order is not confirmed yet",
+        "Please confirm the order: Truffle 1 kg ₹950",
+        "Here is your payment link — your order is confirmed once paid.",  # what the prompt asks for
+        "Order confirm ho jayega, payment ke baad booking confirmed",
+        "Your order is confirmed as soon as the payment arrives",
+    ],
+)
+def test_asking_to_confirm_is_not_a_claim(text: str) -> None:
+    assert check(out(text, topic="booking_appointments"), records(open_order_status="draft")).passed, text

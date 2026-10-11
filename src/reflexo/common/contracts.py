@@ -347,7 +347,13 @@ class ModelGatewayPort(Protocol):
     """Provided by agent (model gateway, POC_04 §2.2): hedged, accounted model calls for other modules."""
 
     async def chat(
-        self, role: str, messages: list[ChatMessage], tools: list[ToolSpec] | None = None, *, ctx: CallCtx
+        self,
+        role: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec] | None = None,
+        *,
+        ctx: CallCtx,
+        tool_choice: str | None = None,
     ) -> ChatResult: ...
 
     async def structured(self, role: str, messages: list[ChatMessage], schema: type[_M], *, ctx: CallCtx) -> _M: ...

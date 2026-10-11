@@ -58,6 +58,7 @@ HEARTBEAT_S = 5.0
 DEDICATED_QUEUES = ("voice.call_signal",)
 CHANNELS = {"inbound": "q_inbound", "turns": "q_turns", "outbound": "q_outbound", "jobs": "q_jobs"}
 SWEEP_INTERVAL_S = 5.0
+WARM_CONNECTIONS = 4  # per engine, opened before the first claim (cold connections blew the speculative budget)
 
 
 @dataclass
@@ -93,7 +94,11 @@ class Worker:
 
     # ------------------------------------------------------------------ lifecycle
     async def run(self) -> None:
-        log.info("worker_start", worker=self.id, pools=list(self.pools))
+        started = time.perf_counter()
+        await get_db().warm(WARM_CONNECTIONS)
+        log.info(
+            "worker_start", worker=self.id, pools=list(self.pools), warm_ms=int((time.perf_counter() - started) * 1000)
+        )
         await self._listen()
         loops = [asyncio.create_task(self._pool_loop(p)) for p in self.pools]
         loops.append(asyncio.create_task(self._sweeper()))

@@ -1,0 +1,189 @@
+"""Simulated actors (POC_07 §3.2): provider-shaped, signed payloads into the REAL ingress.
+
+A simulated customer is a fake wa_id on the business's WhatsApp number; the event is flagged simulated, so the
+whole pipeline runs and only the final provider call is swapped for the Lab transport (replies never reach Meta).
+"Pay" posts a correctly signed Razorpay `payment_link.paid` webhook.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import text
+
+import reflexo.gateway.api as gateway
+import reflexo.integrations.api as integrations
+from reflexo.common.config import get_settings
+from reflexo.common.db import ServiceReason, get_db
+from reflexo.common.ids import new_id
+
+SIM_PREFIX = "91999900"  # fake wa_ids: 9199990000 + actor number
+
+
+def actor_wa_id(actor: int) -> str:
+    return f"{SIM_PREFIX}{actor:04d}"
+
+
+@dataclass(frozen=True)
+class SimResult:
+    status: int
+    external_message_id: str
+    wa_id: str
+
+
+async def whatsapp_number(business_id: UUID) -> str:
+    async with get_db().service_session(ServiceReason.ADMIN) as s:
+        pnid: str | None = (
+            await s.execute(
+                text("""SELECT external_account_id FROM channel_connections
+                        WHERE business_id = :b AND channel = 'whatsapp' AND status = 'active' LIMIT 1"""),
+                {"b": business_id},
+            )
+        ).scalar_one_or_none()
+    if pnid is None:
+        raise LookupError("this business has no WhatsApp connection")
+    return pnid
+
+
+def _payload(pnid: str, wa_id: str, name: str, message: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "WABA-SIM",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"phone_number_id": pnid},
+                            "contacts": [{"profile": {"name": name}, "wa_id": wa_id}],
+                            "messages": [{"from": wa_id, "timestamp": str(int(time.time())), **message}],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+
+async def customer_says(
+    business_id: UUID,
+    actor: int,
+    *,
+    text_: str | None = None,
+    option_id: str | None = None,
+    option_title: str | None = None,
+    external_message_id: str | None = None,
+    name: str | None = None,
+) -> SimResult:
+    """One simulated customer message (or button tap) through the signed WhatsApp ingress."""
+    pnid = await whatsapp_number(business_id)
+    wa_id = actor_wa_id(actor)
+    mid = external_message_id or f"wamid.SIM{new_id().hex}"
+    if option_id:
+        message: dict[str, Any] = {
+            "id": mid,
+            "type": "interactive",
+            "interactive": {"type": "button_reply", "button_reply": {"id": option_id, "title": option_title or ""}},
+        }
+    else:
+        message = {"id": mid, "type": "text", "text": {"body": text_ or ""}}
+    raw = json.dumps(_payload(pnid, wa_id, name or f"Sim Customer {actor}", message)).encode()
+    return SimResult(await post_raw(raw), mid, wa_id)
+
+
+async def post_raw(raw: bytes) -> int:
+    """Post exact bytes (a duplicate webhook is the same bytes again) with a valid signature, flagged simulated."""
+    result = await gateway.ingest_webhook(
+        "meta_whatsapp",
+        {"x-hub-signature-256": gateway.sign_meta(raw), "x-reflexo-simulated": "1", "content-type": "application/json"},
+        raw,
+        {},
+    )
+    return result.status_code
+
+
+async def customer_message_bytes(business_id: UUID, actor: int, text_: str, external_message_id: str) -> bytes:
+    pnid = await whatsapp_number(business_id)
+    wa_id = actor_wa_id(actor)
+    message = {"id": external_message_id, "type": "text", "text": {"body": text_}}
+    return json.dumps(_payload(pnid, wa_id, f"Sim Customer {actor}", message)).encode()
+
+
+async def pay_link(business_id: UUID, payment_link_id: UUID) -> int:
+    """Signed Razorpay test webhook for one of our payment links (the Lab's "Pay" button)."""
+    async with get_db().tenant_session(business_id) as s:
+        link = (
+            await s.execute(
+                text("SELECT id, provider_link_id, amount_paise FROM payment_links WHERE id = :id"),
+                {"id": payment_link_id},
+            )
+        ).one()
+    body = {
+        "event": "payment_link.paid",
+        "created_at": int(time.time()),
+        "payload": {
+            "payment_link": {
+                "entity": {
+                    "id": link.provider_link_id,
+                    "reference_id": str(link.id),
+                    "status": "paid",
+                    "amount_paid": link.amount_paise,
+                }
+            },
+            "payment": {
+                "entity": {"id": f"pay_SIM{new_id().hex[:14]}", "amount": link.amount_paise, "status": "captured"}
+            },
+        },
+    }
+    raw = json.dumps(body).encode()
+    secret = get_settings().razorpay_webhook_secret.get_secret_value()
+    headers = {"x-razorpay-signature": integrations.sign(raw, secret), "x-razorpay-event-id": f"evt_SIM{new_id().hex}"}
+    return (await integrations.ingest_razorpay(headers, raw)).status_code
+
+
+async def thread(business_id: UUID, actor: int, limit: int = 50) -> dict[str, Any]:
+    """What the simulated customer's phone shows: their messages and the rendered replies (provider payloads)."""
+    async with get_db().tenant_session(business_id) as s:
+        conv = (
+            await s.execute(
+                text("""SELECT id FROM conversations WHERE thread_key = :t AND simulated ORDER BY created_at DESC
+                        LIMIT 1"""),
+                {"t": actor_wa_id(actor)},
+            )
+        ).scalar_one_or_none()
+        if conv is None:
+            return {"conversation_id": None, "items": []}
+        inbound = (
+            await s.execute(
+                text("""SELECT created_at, content_text, interactive_reply FROM messages
+                        WHERE conversation_id = :c AND direction = 'inbound' ORDER BY created_at DESC LIMIT :n"""),
+                {"c": conv, "n": limit},
+            )
+        ).all()
+        outbound = (
+            await s.execute(
+                text("""SELECT created_at, rendered_payload, status FROM outbound_messages
+                        WHERE conversation_id = :c ORDER BY created_at DESC, part_index LIMIT :n"""),
+                {"c": conv, "n": limit},
+            )
+        ).all()
+    items = [
+        {
+            "at": r.created_at.isoformat(),
+            "from": "customer",
+            "text": r.content_text,
+            "option": (r.interactive_reply or {}).get("title"),
+        }
+        for r in inbound
+    ] + [
+        {"at": r.created_at.isoformat(), "from": "business", "payload": r.rendered_payload, "status": str(r.status)}
+        for r in outbound
+    ]
+    items.sort(key=lambda i: str(i["at"]))
+    return {"conversation_id": str(conv), "items": items[-limit:]}

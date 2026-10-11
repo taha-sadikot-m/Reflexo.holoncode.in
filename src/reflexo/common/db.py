@@ -8,6 +8,7 @@ Two roles:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from enum import StrEnum
@@ -66,6 +67,17 @@ class Database:
         async with self._service_sessions() as session, session.begin():
             log.debug("service_session", reason=str(reason))
             yield session
+
+    async def warm(self, connections: int) -> None:
+        """Open `connections` pooled connections per engine before taking traffic. Cold, the first tenant query
+        took ~180 ms and blew the 120 ms speculative-retrieval budget on the first turn after every restart."""
+
+        async def touch(engine: AsyncEngine) -> None:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+                await asyncio.sleep(0.05)  # hold it so the next touch opens a new connection
+
+        await asyncio.gather(*(touch(e) for e in (self.app_engine, self.service_engine) for _ in range(connections)))
 
     async def dispose(self) -> None:
         await self.app_engine.dispose()

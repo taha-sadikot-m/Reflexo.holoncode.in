@@ -106,6 +106,7 @@ async def test_ambiguous_size_is_asked_live(registry: Registry, db: Database) ->
 async def test_stats_and_add_item_live(registry: Registry, db: Database) -> None:
     shop = await bakery(db)
     reply, tools, _ = await owner_turn(registry, db, shop, "aaj kitne orders aaye?")
+    print("stats reply:", reply)
     assert "business_stats" in tools or "orders_list" in tools
     assert any(w in reply.lower() for w in ("0", "koi", "no ", "none", "nahi"))  # "Aaj koi order nahi aaya"
     reply, tools, _ = await owner_turn(registry, db, shop, "naya item add karo: Lemon Tart ₹380")

@@ -12,6 +12,7 @@ import asyncio
 import copy
 import dataclasses
 import json
+import os
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -22,8 +23,9 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from reflexo.common.db import get_db
+from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.enums import PipelineEventStatus
+from reflexo.common.flags import flag
 from reflexo.common.llm import ToolCall, ToolSpec
 from reflexo.common.logging import get_logger
 from reflexo.common.xray import emit
@@ -181,6 +183,8 @@ async def run_tool(call: ToolCall, ctx: ToolContext, bound: set[str]) -> dict[st
                 result = err(
                     "TOOL_FAILED", type(exc).__name__, retryable=True, guidance="Try once more or reply without it."
                 )
+    if result["ok"]:
+        await _chaos_kill_after(call.name)
     await emit(
         "tool_call",
         PipelineEventStatus.OK if result["ok"] else PipelineEventStatus.ERROR,
@@ -192,6 +196,20 @@ async def run_tool(call: ToolCall, ctx: ToolContext, bound: set[str]) -> dict[st
         code=None if result["ok"] else result["error"]["code"],
     )
     return result
+
+
+async def _chaos_kill_after(tool_name: str) -> None:
+    """Chaos "kill worker mid-reply" (POC_07 §5): a one-shot flag hard-kills this process right after the named tool
+    finished — the turn must resume on another attempt from its checkpoint, without repeating side effects."""
+    armed = await flag("kill_after_tool")
+    if not isinstance(armed, dict) or armed.get("tool") != tool_name:
+        return
+    async with get_db().service_session(ServiceReason.HEALTH) as s:
+        won = (await s.execute(text("DELETE FROM runtime_flags WHERE key = 'kill_after_tool' RETURNING key"))).first()
+    if won is None:
+        return  # another worker took it
+    log.warning("chaos_kill_worker", tool=tool_name)
+    os._exit(137)
 
 
 async def _run_effect(td: ToolDef, ctx: ToolContext, args: BaseModel) -> Any:

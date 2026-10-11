@@ -64,6 +64,7 @@ class ModelGateway:
         *,
         response_schema: dict[str, Any] | None = None,
         validate: Validator | None = None,
+        tool_choice: str | None = None,
     ) -> ChatResult:
         cfg = self.config.role(role)
         started = time.perf_counter()
@@ -72,7 +73,7 @@ class ModelGateway:
             span.set_attribute("reflexo.model", cfg.primary)
             span.set_attribute("reflexo.purpose", ctx.purpose)
             try:
-                result = await self._hedged(cfg, messages, tools, response_schema, validate)
+                result = await self._hedged(cfg, messages, tools, response_schema, validate, tool_choice)
             except ModelError as err:
                 span.set_attribute("reflexo.error", err.code)
                 await emit(
@@ -124,10 +125,19 @@ class ModelGateway:
         tools: list[ToolSpec] | None,
         response_schema: dict[str, Any] | None,
         validate: Validator | None,
+        tool_choice: str | None = None,
     ) -> ChatResult:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + cfg.timeout_ms / 1000
-        primary = Attempt(cfg.primary, messages, tools, cfg, response_schema, pre_delay_s=await _chaos_delay_s())
+        primary = Attempt(
+            cfg.primary,
+            messages,
+            tools,
+            cfg,
+            response_schema,
+            pre_delay_s=await _chaos_delay_s(),
+            tool_choice=tool_choice,
+        )
         tasks: dict[asyncio.Task[ChatResult], str] = {
             asyncio.create_task(self._attempt(primary, validate)): cfg.primary
         }
@@ -139,7 +149,7 @@ class ModelGateway:
             nonlocal fallback_started
             assert cfg.fallback is not None
             fallback_started = True
-            attempt = Attempt(cfg.fallback, messages, tools, cfg, response_schema)
+            attempt = Attempt(cfg.fallback, messages, tools, cfg, response_schema, tool_choice=tool_choice)
             tasks[asyncio.create_task(self._attempt(attempt, validate))] = cfg.fallback
 
         try:
@@ -183,9 +193,17 @@ class ModelGateway:
 
     # ---------------------------------------------------------------- public API (ModelGatewayPort)
     async def chat(
-        self, role: str, messages: list[ChatMessage], tools: list[ToolSpec] | None = None, *, ctx: CallCtx
+        self,
+        role: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec] | None = None,
+        *,
+        ctx: CallCtx,
+        tool_choice: str | None = None,
     ) -> ChatResult:
-        return await self._call(role, messages, tools, ctx)
+        """`tool_choice`: None/"auto" lets the model answer in text; "any" requires a tool call; a tool name
+        requires that tool. Agent graphs that must end in a tool (`reply`) pass "any"."""
+        return await self._call(role, messages, tools, ctx, tool_choice=tool_choice)
 
     async def structured(self, role: str, messages: list[ChatMessage], schema: type[M], *, ctx: CallCtx) -> M:
         """JSON-mode call validated against `schema`. An invalid answer counts as a failed attempt (so the

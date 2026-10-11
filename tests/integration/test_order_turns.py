@@ -211,3 +211,35 @@ async def test_failed_turn_while_owner_question_open_does_not_ask_again(
     assert questions == 1  # live bug: "any update" became question 3162
     assert notes.sent[1][0] == "question_followup" and '"any update?"' in notes.sent[1][1]
     assert "still" in (await outbound_texts(db, first.ref.conversation_id))[-1].lower()
+
+
+async def test_read_back_of_the_open_order_is_grounded_without_listing_it(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live: the read-back stated the draft total but listed only the variant, and the gate refused the total."""
+    bid, pnid = await make_bakery(db)
+    wa = f"9198{new_id().int % 10**8:08d}"
+    fake.script(PRIMARY, lambda a: reply("send", "Namaste! 1 kg truffle ₹950 hai.", topic="pricing"))
+    first = await turn_for(registry, db, pnid, wa, "1 kg chocolate truffle chahiye")
+    await desk(registry).run_turn(first)
+    conv = first.ref.conversation_id
+    truffle = next(c for c in await knowledge.search_catalog(bid, "chocolate truffle", k=5) if "Truffle" in c.name)
+    kg = next(v for v in truffle.variants if v.name == "1 kg")
+    order = await commerce.start_order(
+        bid,
+        await customer_of(db, conv),
+        conv,
+        [commerce.ItemRef(offering_id=truffle.offering_id, variant_id=kg.variant_id, quantity=2)],
+    )
+    total = order.total_paise // 100
+    assert order.total_paise != kg.price_paise  # only the order backs this amount
+    text_ = f"Order note kar liya: 2 x truffle 1 kg, total ₹{total:,}. Delivery kab chahiye?"
+    fake.script(
+        PRIMARY,
+        lambda a: reply(
+            "send", text_, topic="booking_appointments", refs=[{"type": "variant", "id": str(kg.variant_id)}]
+        ),
+    )
+    second = await turn_for(registry, db, pnid, wa, "haan")
+    await desk(registry).run_turn(second)
+    assert (await outbound_texts(db, conv))[-1] == text_

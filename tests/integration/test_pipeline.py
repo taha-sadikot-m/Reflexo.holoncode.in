@@ -37,6 +37,7 @@ from reflexo.pipeline.worker import Worker
 from tests.factories import Tenant, make_inbound_message, make_outbound, make_tenant
 
 pytestmark = pytest.mark.integration
+ALL = 100_000  # the session database collects queued parts from other tests; claim past them, filter to ours
 
 
 @pytest.fixture
@@ -193,20 +194,20 @@ async def test_crashed_turn_is_recovered_then_exhausted(db: Database, registry: 
 async def test_outbound_parts_are_strictly_ordered(db: Database) -> None:
     t = await make_tenant(db)
     _, parts = await make_outbound(db, t, parts=3)
-    claimed = [r for r in await outbound.claim("w1", 30, 50) if r.conversation_id == t.conversation_id]
+    claimed = [r for r in await outbound.claim("w1", 30, ALL) if r.conversation_id == t.conversation_id]
     assert [r.id for r in claimed] == [parts[0]]
     assert await outbound.apply_result(claimed[0], "w1", SendResult(SendStatus.SENT, "p-0")) == "sent"
-    claimed = [r for r in await outbound.claim("w1", 30, 50) if r.conversation_id == t.conversation_id]
+    claimed = [r for r in await outbound.claim("w1", 30, ALL) if r.conversation_id == t.conversation_id]
     assert [r.id for r in claimed] == [parts[1]]
 
 
 async def test_unknown_outcome_waits_for_status_then_confirms(db: Database) -> None:
     t = await make_tenant(db)
     _, parts = await make_outbound(db, t, parts=1)
-    row = next(r for r in await outbound.claim("w1", 30, 50) if r.id == parts[0])
+    row = next(r for r in await outbound.claim("w1", 30, ALL) if r.id == parts[0])
     result = SendResult(SendStatus.UNKNOWN, provider_message_id="pm-1", error_message="read timeout")
     assert await outbound.apply_result(row, "w1", result) == "unconfirmed"
-    assert not [r for r in await outbound.claim("w1", 30, 50) if r.id == parts[0]]  # waits ~10 s
+    assert not [r for r in await outbound.claim("w1", 30, ALL) if r.id == parts[0]]  # waits ~10 s
     # The adapter persisted the provider id before timing out; the delivery webhook now confirms it.
     async with db.service_session(ServiceReason.ADMIN) as s:
         await s.execute(
@@ -218,12 +219,12 @@ async def test_unknown_outcome_waits_for_status_then_confirms(db: Database) -> N
 async def test_unknown_outcome_no_retry_when_provider_forbids(db: Database) -> None:
     t = await make_tenant(db)
     _, parts = await make_outbound(db, t, parts=1)
-    row = next(r for r in await outbound.claim("w1", 30, 50) if r.id == parts[0])
+    row = next(r for r in await outbound.claim("w1", 30, ALL) if r.id == parts[0])
     result = SendResult(SendStatus.UNKNOWN, error_message="timeout", retry_after_unknown_allowed=False)
     await outbound.apply_result(row, "w1", result)
     async with db.service_session(ServiceReason.ADMIN) as s:
         await s.execute(text("UPDATE outbound_messages SET next_attempt_at = now() WHERE id = :id"), {"id": parts[0]})
-    assert not [r for r in await outbound.claim("w1", 30, 50) if r.id == parts[0]]  # final: never re-sent
+    assert not [r for r in await outbound.claim("w1", 30, ALL) if r.id == parts[0]]  # final: never re-sent
 
 
 # ------------------------------------------------------------------ domain events

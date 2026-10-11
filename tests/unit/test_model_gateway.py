@@ -15,7 +15,7 @@ from reflexo.agent.model_gateway import gateway as gateway_mod
 from reflexo.agent.model_gateway.config import EmbeddingConfig, ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_messages
-from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider
+from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, lean_schema
 from reflexo.common.llm import CallCtx, ChatMessage, ModelError, ToolCall, ToolSpec, current_call_ctx
 
 
@@ -303,6 +303,59 @@ def test_gemini_contents_and_config() -> None:
     assert cfg.thinking_config.thinking_budget == 0
     assert cfg.automatic_function_calling.disable is True
     assert cfg.tools[0].function_declarations[0].name == "catalog_search"
+
+
+def test_lean_schema_keeps_structure_drops_validation_keywords() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "minLength": 1, "maxLength": 80, "description": "shown on the button"},
+            "format": {"type": "string", "enum": ["a", "b"], "default": "a"},
+            "blocks": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {"oneOf": [{"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}}}]},
+            },
+        },
+        "required": ["title"],
+    }
+    assert lean_schema(schema) == {
+        "type": "object",
+        "properties": {  # property names that collide with keywords are data and survive
+            "title": {"type": "string", "description": "shown on the button"},
+            "format": {"type": "string", "enum": ["a", "b"]},
+            "blocks": {
+                "type": "array",
+                "items": {"anyOf": [{"type": "object", "properties": {"id": {"type": "string"}}}]},
+            },
+        },
+        "required": ["title"],
+    }
+
+
+def test_lean_schema_requires_union_tags() -> None:
+    block = {"type": "object", "properties": {"type": {"const": "text", "default": "text"}, "text": {"type": "string"}}}
+    assert lean_schema(block | {"required": ["text"]})["required"] == ["text", "type"]
+    assert lean_schema(block)["required"] == ["type"]
+
+
+def test_gemini_tool_choice_maps_to_function_calling_config() -> None:
+    p = GeminiProvider("test-key")
+    tools = [ToolSpec(name="reply", description="d", parameters={"type": "object", "properties": {}})]
+    cfg = RoleConfig(primary="p")
+    auto = p._config(Attempt("p", MSG, tools, cfg), None)
+    assert auto.tool_config is None
+    forced = p._config(Attempt("p", MSG, tools, cfg, tool_choice="reply"), None).tool_config.function_calling_config
+    assert forced.mode == "ANY" and forced.allowed_function_names == ["reply"]
+    anyc = p._config(Attempt("p", MSG, tools, cfg, tool_choice="any"), None).tool_config.function_calling_config
+    assert anyc.mode == "ANY" and anyc.allowed_function_names is None
+
+
+async def test_tool_choice_reaches_every_attempt(gw: ModelGateway, fake: FakeProvider) -> None:
+    fake.reply("p", FakeReply(tool_calls=[ToolCall(id="1", name="catalog_search", args={"query": "x"})]))
+    llm = GatewayChatModel(gateway=gw, role="nohedge").bind_tools([catalog_search], tool_choice="catalog_search")
+    await llm.ainvoke([HumanMessage("hi")])
+    assert [a.tool_choice for a in fake.calls] == ["catalog_search"]
 
 
 def test_gemini_error_mapping() -> None:

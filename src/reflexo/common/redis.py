@@ -42,7 +42,7 @@ class SafeRedis:
         return self._disabled
 
     async def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
-        if self._disabled:
+        if self._disabled or await _chaos_disabled():
             raise RedisUnavailable("redis disabled")
         try:
             return await getattr(self._client, method)(*args, **kwargs)
@@ -72,3 +72,13 @@ def get_redis() -> SafeRedis:
 def set_redis(r: SafeRedis | None) -> None:
     global _redis
     _redis = r
+
+
+async def _chaos_disabled() -> bool:
+    """Chaos "Redis down": every Redis use fails over to its Postgres path (flags are read from Postgres)."""
+    from reflexo.common.flags import flag
+
+    try:
+        return bool(await flag("redis_disabled", False))
+    except Exception:  # the flag store itself must never take Redis users down
+        return False

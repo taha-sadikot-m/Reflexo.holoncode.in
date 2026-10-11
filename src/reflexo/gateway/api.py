@@ -296,3 +296,13 @@ async def set_media_description(business_id: UUID, media_object_id: UUID, descri
 
 
 __all__ += ["file_kind", "set_media_description"]
+
+
+def sign_meta(raw_body: bytes) -> str:
+    """X-Hub-Signature-256 for a Meta-shaped payload (Simulation Lab: simulated actors use the real ingress)."""
+    from reflexo.gateway.adapters.meta_common import sign
+
+    return sign(raw_body, get_settings().meta_app_secret.get_secret_value())
+
+
+__all__ += ["sign_meta"]
