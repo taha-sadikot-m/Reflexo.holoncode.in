@@ -48,6 +48,11 @@ HANDOFF_ACK = {
     "hi": "मैं अभी टीम को बता रही हूँ 🙏 वे जल्दी आपसे बात करेंगे।",
     "en": "I'm letting the team know right away 🙏 They'll get back to you shortly.",
 }
+STILL_CHECKING = {
+    "hi-Latn": "Main abhi bhi team se confirm kar rahi hoon 🙏 Jaise hi jawab aata hai, batati hoon.",
+    "hi": "मैं अभी भी टीम से पूछ रही हूँ 🙏 जवाब आते ही बताती हूँ।",
+    "en": "I'm still checking with the team 🙏 I'll get back to you as soon as I hear from them.",
+}
 TIER = {"send": "t0", "no_reply": "t0", "ask_owner": "t1", "fallback": "t1", "handoff": "t2"}
 OUTCOME = {
     "send": TurnOutcome.REPLIED,
@@ -220,6 +225,8 @@ class CustomerDesk:
                 if originally_handoff and output
                 else [{"type": "text", "text": HANDOFF_ACK.get(language, HANDOFF_ACK["hi-Latn"])}]
             )
+        elif action == "fallback" and prepared.open_question:
+            blocks = [{"type": "text", "text": STILL_CHECKING.get(language, STILL_CHECKING["hi-Latn"])}]
         elif action in ("ask_owner", "fallback"):
             blocks = [{"type": "text", "text": holding_text(settings, language)}]
             draft = (output.owner_question if output and action == "ask_owner" else None) or OwnerQuestionDraft(
@@ -304,7 +311,7 @@ class CustomerDesk:
             model_calls=ctx.stats.model_calls,
             hedged=ctx.stats.hedged,
         )
-        await self._notify(ref.business_id, action, conv, customer, prepared.inbound_text, draft, question)
+        await self._notify(ref.business_id, action, conv, customer, prepared.inbound_text, draft, question, prepared)
 
     async def _notify(
         self,
@@ -315,18 +322,30 @@ class CustomerDesk:
         inbound_text: str,
         draft: OwnerQuestionDraft | None,
         question: tuple[UUID, str] | None,
+        prepared: PreparedContext | None,
     ) -> None:
         notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
         if notifier is None or action not in ("handoff", "ask_owner", "fallback"):
             return
-        who = customer.display_name or "A customer"
+        context = owner_context(conv, customer, prepared)
         if question and draft:
             qid, code = question
             guess = f"\nMy guess: {draft.ai_guess}" if draft.ai_guess else ""
-            body = f'❓ *{who} asks:* "{draft.question}"{guess}\nReply: `{code} <answer>`'
+            why = "I couldn't handle this message myself." if action == "fallback" else "I don't have this answer."
+            body = f'❓ *Question {code}* — {why}\n"{draft.question}"{guess}\n\n{context}\n\nReply: `{code} <answer>`'
             await notifier.notify(business_id, "question", body, dedupe_key=f"oq:{qid}", priority=PriorityClass.P1)
+        elif action == "fallback" and prepared and prepared.open_question:
+            code = prepared.open_question["code"]
+            body = f'🔁 *Follow-up on question {code}*: "{inbound_text[:300]}"\n\n{context}'
+            await notifier.notify(
+                business_id,
+                "question_followup",
+                body,
+                dedupe_key=f"oqf:{conv.id}:{int(time.time() // 600)}",
+                priority=PriorityClass.P1,
+            )
         else:
-            body = f'🙋 *{who} needs you* on {conv.channel.replace("_", " ")}: "{inbound_text[:300]}"'
+            body = f"🙋 *Customer needs you* — please reply to them on {conv.channel.replace('_', ' ')}.\n\n{context}"
             await notifier.notify(
                 business_id,
                 "handoff",
@@ -381,4 +400,21 @@ class CustomerDesk:
                 sla_min=int(settings.get("owner_question_sla_min") or 15),
             )
         log.warning("turn_fallback", turn_id=str(ref.turn_id), reason=reason)
-        await self._notify(ref.business_id, "fallback", conv, conv.customer, raw, draft, question)
+        await self._notify(ref.business_id, "fallback", conv, conv.customer, raw, draft, question, None)
+
+
+def owner_context(
+    conv: gateway.ConversationView, customer: gateway.CustomerView, prepared: PreparedContext | None
+) -> str:
+    """What the owner needs to act without opening the panel: who, where, the open order and the last messages."""
+    who = customer.display_name or "Customer"
+    phone = f" ({customer.phone_e164})" if customer.phone_e164 else ""
+    lines = [f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"]
+    order = prepared.open_order if prepared else None
+    if order:
+        items = ", ".join(f"{ln['qty']} × {ln['item']}" for ln in order.get("lines", []))
+        lines.append(f"🧾 Order {order['order_number']} ({order['status']}): {items} — total {order['total']}")
+    if prepared and prepared.recent_lines:
+        lines.append("💬 Recent:")
+        lines += [f"  {line[:200]}" for line in prepared.recent_lines[-4:]]
+    return "\n".join(lines)

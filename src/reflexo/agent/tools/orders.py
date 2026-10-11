@@ -46,6 +46,24 @@ def _uuid(value: str, name: str) -> UUID:
         raise ToolError("INVALID_ARGS", f"bad {name}", guidance=f"Use the {name} returned by the order tools.") from exc
 
 
+async def _open_order_id(ctx: ToolContext, value: str) -> UUID:
+    """Changes only touch this customer's order in progress; a wrong or placeholder id gets the right one back."""
+    if ctx.customer_id is None:
+        raise ToolError("NOT_APPLICABLE", "no customer in this conversation")
+    current = await commerce.open_order(ctx.business_id, ctx.customer_id)
+    if current is None:
+        raise ToolError(
+            "NOT_FOUND", "no order in progress", guidance="Start the order with order_start (items + details)."
+        )
+    if value.strip().lower() != str(current.order_id):
+        raise ToolError(
+            "INVALID_ARGS",
+            f"order_id '{value[:40]}' is not the customer's order in progress",
+            guidance=f"Use order_id {current.order_id} (order {current.order_number}) and call the tool again.",
+        )
+    return current.order_id
+
+
 def _guide(view: commerce.OrderView) -> dict[str, Any]:
     out = view.tool_view()
     out["reference"] = {"type": "order", "id": str(view.order_id)}
@@ -116,7 +134,7 @@ async def order_update(ctx: ToolContext, args: OrderUpdateArgs, s: AsyncSession)
     view = await _call(
         commerce.update_order(
             ctx.business_id,
-            _uuid(args.order_id, "order_id"),
+            await _open_order_id(ctx, args.order_id),
             add_items=_items(args.add_items) if args.add_items else None,
             remove_line_ids=[_uuid(x, "line_id") for x in args.remove_line_ids] or None,
             details=args.details or None,
@@ -138,7 +156,7 @@ async def order_confirm(ctx: ToolContext, args: OrderConfirmArgs, s: AsyncSessio
     the business allows it for this total. May decline (capacity full, COD not allowed) with alternatives."""
     result = await _call(
         commerce.confirm_order(
-            ctx.business_id, _uuid(args.order_id, "order_id"), args.payment_method, idem=ctx.idem("confirm")
+            ctx.business_id, await _open_order_id(ctx, args.order_id), args.payment_method, idem=ctx.idem("confirm")
         )
     )
     out: dict[str, Any] = {"status": result.status, "order": _guide(result.order)}

@@ -478,5 +478,18 @@ async def order_status(business_id: UUID, customer_id: UUID, order_number: str |
         return await view(s, oid) if oid else None
 
 
+async def open_order(business_id: UUID, customer_id: UUID) -> OrderView | None:
+    """The customer's order still in progress (draft or awaiting payment): what the next turn continues."""
+    async with get_db().tenant_session(business_id) as s:
+        oid = (
+            await s.execute(
+                text("""SELECT id FROM orders WHERE customer_id = :c AND status IN ('draft', 'awaiting_payment')
+                        ORDER BY created_at DESC LIMIT 1"""),
+                {"c": customer_id},
+            )
+        ).scalar_one_or_none()
+        return await view(s, oid) if oid else None
+
+
 def summary_lines(v: OrderView) -> list[str]:
     return [f"{ln.quantity} × {ln.name} — {format_inr(ln.line_total_paise)}" for ln in v.lines]

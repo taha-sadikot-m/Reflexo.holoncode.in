@@ -7,12 +7,16 @@ then the dynamic part (customer → speculative cards → conversation → now).
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import text
+
+import reflexo.commerce.api as commerce
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent import language as lang
@@ -37,6 +41,9 @@ class PreparedContext:
     profile_version: int
     speculative_cards: list[dict[str, Any]] = field(default_factory=list)
     timings_ms: dict[str, int] = field(default_factory=dict)
+    open_order: dict[str, Any] | None = None  # compact tool view of the customer's draft/awaiting-payment order
+    open_question: dict[str, Any] | None = None  # owner question still unanswered for this conversation
+    recent_lines: list[str] = field(default_factory=list)  # last messages, formatted (owner notifications)
 
 
 def _fmt_message(m: gateway.MessageView, tz: str) -> str:
@@ -72,17 +79,25 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         message_ids = list(dict.fromkeys(ref.message_ids))
         inbound = await gateway.messages_by_ids(s, message_ids)
         history = await gateway.recent_messages(s, ref.conversation_id, limit=HISTORY, exclude=message_ids)
+        pending = (
+            await s.execute(
+                text("""SELECT short_code, question, asked_at FROM owner_questions
+                        WHERE conversation_id = :c AND status = 'open' ORDER BY asked_at DESC LIMIT 1"""),
+                {"c": ref.conversation_id},
+            )
+        ).first()
     inbound_text = "\n".join(m.text for m in inbound if m.text).strip()
     customer_id = conv.customer.id if conv.customer else None
 
     # speculative retrieval starts first so its two queries get pool connections before the other loads
     spec_task = asyncio.create_task(knowledge.speculative(ref.business_id, inbound_text, customer_id=customer_id))
     await asyncio.sleep(0)
-    profile, settings, qas, biz_profile = await asyncio.gather(
+    profile, settings, qas, biz_profile, order = await asyncio.gather(
         knowledge.profile_block(ref.business_id),
         knowledge.business_settings(ref.business_id),
         knowledge.qa_block(ref.business_id),
         knowledge.get_profile(ref.business_id),
+        commerce.open_order(ref.business_id, customer_id) if customer_id else _none(),
     )
     spec = await spec_task
 
@@ -116,15 +131,40 @@ async def prepare(ref: TurnRef) -> PreparedContext:
     default_language = customer.language if customer and customer.language else settings.get("default_language")
     language_guess = lang.detect(inbound_text, default=str(default_language or "hi-Latn"))
     now_local = to_business_tz(utcnow(), tz)
+    order_view = order.tool_view() if order else None
+    open_order_block = (
+        "# OPEN ORDER (in progress — use this order_id with the order tools; reference it as order:<order_id>)\n"
+        + json.dumps(order_view, ensure_ascii=False)
+        if order_view
+        else ""
+    )
+    open_question = (
+        {
+            "code": pending.short_code,
+            "question": pending.question,
+            "asked": to_business_tz(pending.asked_at, tz).strftime("%d %b %H:%M"),
+        }
+        if pending
+        else None
+    )
+    waiting_block = (
+        f'# WAITING ON THE OWNER\nAsked at {open_question["asked"]}: "{open_question["question"]}". If the '
+        "customer only asks for an update, say you are still checking with the team (action=send); do not ask the "
+        "owner again."
+        if open_question
+        else ""
+    )
     dynamic = "\n\n".join(
         [
             "# CUSTOMER\n"
-            f"name: {customer.display_name if customer and customer.display_name else 'unknown'}; "
-            f"language seen: {language_guess}; facts: {facts}",
+            f"name: {customer.display_name if customer and customer.display_name else 'unknown'}; facts: {facts}\n"
+            f"language of the latest message: {language_guess} (reply in this language and script)",
             "# CATALOG CARDS (live prices; reference variant/offering ids you use)\n" + _cards_block(cards),
             "# CONVERSATION SO FAR\n"
             + (f"summary: {conv.summary}\n" if conv.summary else "")
             + ("\n".join(_fmt_message(m, tz) for m in history) or "(new conversation)"),
+            *([open_order_block] if open_order_block else []),
+            *([waiting_block] if waiting_block else []),
             "# NOW — new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
             f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
             "Reply by calling `reply`.",
@@ -141,7 +181,14 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         profile_version=profile.version,
         speculative_cards=cards,
         timings_ms={"prepare": int((time.perf_counter() - started) * 1000), "speculative": spec.elapsed_ms},
+        open_order=order_view,
+        open_question=open_question,
+        recent_lines=[_fmt_message(m, tz) for m in [*history, *inbound]][-6:],
     )
+
+
+async def _none() -> None:
+    return None
 
 
 def holding_text(settings: dict[str, Any], language: str) -> str:
