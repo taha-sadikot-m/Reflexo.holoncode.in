@@ -10,6 +10,11 @@ from pathlib import Path
 
 import pytest
 
+if sys.platform == "win32":  # psycopg async (LangGraph checkpointer) needs the selector loop on Windows
+    import asyncio
+
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 REPO = Path(__file__).resolve().parent.parent
 OWNER_PW, APP_PW, SERVICE_PW = "owner_test", "app_test", "service_test"
 
@@ -65,11 +70,26 @@ def pg() -> Iterator[PgUrls]:
 
 @pytest.fixture(scope="session")
 async def db(pg: PgUrls) -> AsyncIterator[object]:
+    from reflexo.common.config import get_settings
     from reflexo.common.db import Database, set_db
 
     database = Database(pg.app, pg.service, pool_size=5)
     set_db(database)
+    # components that open their own connections (LangGraph checkpointer) read the URLs from settings
+    saved = {k: os.environ.get(k) for k in ("REFLEXO_DATABASE_URL", "REFLEXO_DATABASE_SERVICE_URL")}
+    os.environ["REFLEXO_DATABASE_URL"] = pg.app
+    os.environ["REFLEXO_DATABASE_SERVICE_URL"] = pg.service
+    get_settings.cache_clear()
     yield database
+    from reflexo.agent.checkpointer import close_checkpointer
+
+    await close_checkpointer()
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+    get_settings.cache_clear()
     set_db(None)
     await database.dispose()
 

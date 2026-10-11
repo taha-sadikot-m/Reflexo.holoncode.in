@@ -5,8 +5,12 @@ Business profile, order detail schemas, offerings, Q&A, change sets, search, imp
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
+from typing import Any
 from uuid import UUID
+
+from sqlalchemy import text
 
 from reflexo.common.contracts import BlockHydrator, EmbedderPort, JobEnqueuer, JobHandlerRegistry, JobRow
 from reflexo.common.db import get_db
@@ -46,16 +50,22 @@ __all__ = [
     "apply",
     "apply_now",
     "begin",
+    "business_settings",
     "canonical_size",
+    "cards_for",
     "delivery_quote",
+    "detail_schemas",
     "earliest_delivery_date",
     "get_card",
+    "get_profile",
+    "get_qa",
     "is_open",
     "match_image_description",
     "next_open",
     "parse_query",
     "preview",
     "profile_block",
+    "qa_block",
     "register",
     "reindex_business",
     "revert",
@@ -164,3 +174,86 @@ async def earliest_delivery_date(
     business_id: UUID, at: datetime | None = None, notice_hours: int | None = None
 ) -> date:
     return profile.earliest_delivery_date(await profile.load(business_id), at, notice_hours)
+
+
+# ---------------------------------------------------------------- read models for desks and the output gate
+
+
+async def cards_for(
+    business_id: UUID, offering_ids: Sequence[UUID] = (), variant_ids: Sequence[UUID] = ()
+) -> list[CatalogCard]:
+    """Active cards for the given offerings plus the offerings owning the given variants (RLS-scoped)."""
+    async with get_db().tenant_session(business_id) as s:
+        ids = set(offering_ids)
+        if variant_ids:
+            rows = await s.execute(
+                text("SELECT offering_id FROM offering_variants WHERE id = ANY(:ids) AND status = 'active'"),
+                {"ids": list(variant_ids)},
+            )
+            ids |= set(rows.scalars())
+        return list((await search.get_cards(s, list(ids))).values()) if ids else []
+
+
+async def get_qa(business_id: UUID, qa_ids: Sequence[UUID], customer_id: UUID | None = None) -> list[KnowledgeHit]:
+    """Q&A entries visible to this customer (same scope rules as search)."""
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id, question, answer, scope FROM qa_entries
+                        WHERE id = ANY(:ids) AND status = 'active'
+                          AND (scope = 'global' OR (scope = 'customer' AND customer_id = :cust)
+                               OR (scope = 'temporary' AND valid_until > now()))"""),
+                {"ids": list(qa_ids), "cust": customer_id},
+            )
+        ).all()
+    return [
+        KnowledgeHit(entity_type="qa", entity_id=r.id, title=r.question, text=r.answer, scope=str(r.scope))
+        for r in rows
+    ]
+
+
+async def get_profile(business_id: UUID) -> BusinessProfile:
+    return (await profile.load(business_id)).profile
+
+
+async def qa_block(business_id: UUID, max_chars: int = 12000) -> list[KnowledgeHit]:
+    """All global Q&A when small enough to put in the prompt (≈ 3k tokens); otherwise [] (use search)."""
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id, question, answer FROM qa_entries WHERE status = 'active' AND scope = 'global'
+                        ORDER BY created_at LIMIT 200"""),
+            )
+        ).all()
+    if sum(len(r.question) + len(r.answer) for r in rows) > max_chars:
+        return []
+    return [KnowledgeHit(entity_type="qa", entity_id=r.id, title=r.question, text=r.answer) for r in rows]
+
+
+async def business_settings(business_id: UUID) -> dict[str, Any]:
+    """Name, default language and `businesses.settings` (holding messages, COD rule, SLA...)."""
+    async with get_db().tenant_session(business_id) as s:
+        row = (
+            await s.execute(
+                text("SELECT name, default_language, timezone, settings FROM businesses WHERE id = :b"),
+                {"b": business_id},
+            )
+        ).one()
+    return {
+        "name": row.name,
+        "default_language": row.default_language,
+        "timezone": row.timezone,
+        **(row.settings or {}),
+    }
+
+
+async def detail_schemas(business_id: UUID) -> list[dict[str, Any]]:
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text(
+                    "SELECT id, name, applies_to, fields FROM order_detail_schemas WHERE status = 'active' ORDER BY name"
+                )
+            )
+        ).all()
+    return [{"id": str(r.id), "name": r.name, "applies_to": r.applies_to, "fields": r.fields} for r in rows]

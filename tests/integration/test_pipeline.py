@@ -85,12 +85,12 @@ async def test_jobs_dedupe_retry_and_dead_letter(db: Database, registry: Registr
     assert jid is not None
     assert await jobs.enqueue("test.queue", {"x": 1}, dedupe_key=key) is None  # deduped while pending
 
-    claimed = [j for j in await jobs.claim("w1", 30, 50) if j.id == jid]
+    claimed = [j for j in await jobs.claim("w1", 30, 100_000) if j.id == jid]  # other tests leave jobs pending
     assert claimed and claimed[0].attempts == 1
     assert await jobs.fail(claimed[0], "w1", "boom") == "pending"
     async with db.service_session(ServiceReason.ADMIN) as s:
         await s.execute(text("UPDATE jobs SET run_after = now() WHERE id = :id"), {"id": jid})
-    again = [j for j in await jobs.claim("w1", 30, 50) if j.id == jid]
+    again = [j for j in await jobs.claim("w1", 30, 100_000) if j.id == jid]
     assert again and again[0].attempts == 2
     assert await jobs.fail(again[0], "w1", "boom") == "dead"
 

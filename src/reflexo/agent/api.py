@@ -5,13 +5,14 @@ LangGraph desks (customer, owner, builder), tools, output gate, ask-owner, model
 
 from __future__ import annotations
 
+from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
 from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_messages
 from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, ModelProvider
 from reflexo.agent.runs import record_run
 from reflexo.common.config import get_settings
-from reflexo.common.contracts import EmbedderPort, ModelGatewayPort
+from reflexo.common.contracts import EmbedderPort, ModelGatewayPort, TurnRunnerPort
 from reflexo.common.llm import ChatResult, MediaInput, ModelError
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
@@ -69,6 +70,7 @@ def register(registry: Registry, provider: ModelProvider | None = None) -> None:
     registry.provide(ModelGatewayPort, _gateway)  # type: ignore[type-abstract]
     if not isinstance(provider, _UnconfiguredProvider):
         registry.provide(EmbedderPort, GatewayEmbedder(_gateway))  # type: ignore[type-abstract]
+    registry.provide(TurnRunnerPort, CustomerDesk(registry, _gateway))  # type: ignore[type-abstract]
 
 
 def gateway() -> ModelGateway:

@@ -13,6 +13,7 @@ import contextlib
 import functools
 import os
 import socket
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -339,7 +340,8 @@ def main() -> None:
             worker.stop()
 
     with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(_run())
+        # psycopg (LangGraph checkpointer) cannot run on Windows' default Proactor loop
+        asyncio.run(_run(), loop_factory=asyncio.SelectorEventLoop if sys.platform == "win32" else None)
 
 
 if __name__ == "__main__":

@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     models_config: str = "config/models.yaml"
 
+    # desks (POC_04 §13)
+    agent_checkpointer: Literal["postgres", "memory"] = "postgres"
+    max_model_calls_customer: int = 4
+    max_tool_calls_customer: int = 8
+
     # knowledge / search (POC_05 §6)
     search_k: int = 5
     search_trgm_threshold: float = Field(default=0.3, ge=0.05, le=1.0)

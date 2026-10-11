@@ -29,21 +29,43 @@ from reflexo.gateway.connections import ConnectionInfo, find_connection, get_con
 from reflexo.gateway.inbound import GatewayInbound
 from reflexo.gateway.media import MediaSigner, media_path, register_jobs, store_media
 from reflexo.gateway.outbound import EnqueueResult, Outbound
+from reflexo.gateway.views import (
+    ConversationView,
+    CustomerView,
+    MessageView,
+    add_customer_facts,
+    capability_summary,
+    conversation_view,
+    mark_needs_attention,
+    messages_by_ids,
+    recent_messages,
+    set_customer_language,
+)
 from reflexo.pipeline.api import store_inbox_event
 
 __all__ = [
     "ConnectionInfo",
+    "ConversationView",
+    "CustomerView",
     "EnqueueResult",
     "IngestResult",
+    "MessageView",
+    "add_customer_facts",
+    "capability_summary",
+    "conversation_view",
     "find_connection",
     "get_connection",
     "ingest_webhook",
     "issue_link_code",
+    "mark_needs_attention",
     "media_path",
     "media_signer",
+    "messages_by_ids",
     "outbound",
+    "recent_messages",
     "register",
     "resolve_customer",
+    "set_customer_language",
     "store_media",
 ]
 
