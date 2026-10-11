@@ -117,6 +117,7 @@ class TurnRef:
     inherited_turn_ids: list[UUID]
     attempts: int
     hints: dict[str, Any] = field(default_factory=dict)
+    trace_context: dict[str, Any] | None = None  # trace of the first inbound message (one trace end to end)
 
 
 OutboundWriter = Callable[[AsyncSession], Awaitable[None]]

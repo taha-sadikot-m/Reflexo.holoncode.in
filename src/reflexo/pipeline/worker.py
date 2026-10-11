@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import contextlib
 import functools
+import json
 import os
 import socket
 import sys
@@ -42,6 +43,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
 from reflexo.common.ratelimit import RateLimiter
+from reflexo.common.timeutil import utcnow
 from reflexo.common.tracing import resume_trace, tracer
 from reflexo.common.xray import emit
 from reflexo.pipeline import inbox, outbound
@@ -51,6 +53,7 @@ from reflexo.pipeline.turns import PipelineTurnHandle, TurnService
 log = get_logger(__name__)
 
 POOLS = ("inbound", "turns", "outbound", "jobs")
+HEARTBEAT_S = 5.0
 CHANNELS = {"inbound": "q_inbound", "turns": "q_turns", "outbound": "q_outbound", "jobs": "q_jobs"}
 SWEEP_INTERVAL_S = 5.0
 
@@ -92,6 +95,7 @@ class Worker:
         await self._listen()
         loops = [asyncio.create_task(self._pool_loop(p)) for p in self.pools]
         loops.append(asyncio.create_task(self._sweeper()))
+        loops.append(asyncio.create_task(self._heartbeat()))
         await self._stop.wait()
         for t in loops:
             t.cancel()
@@ -102,6 +106,29 @@ class Worker:
 
     def stop(self) -> None:
         self._stop.set()
+
+    async def _heartbeat(self) -> None:
+        """Liveness for the admin Overview: one row per worker, refreshed every few seconds."""
+        started = utcnow()
+        while not self._stop.is_set():
+            try:
+                async with get_db().service_session(ServiceReason.HEALTH) as s:
+                    await s.execute(
+                        text("""INSERT INTO worker_heartbeats (worker_id, service, pools, started_at, beat_at, stats)
+                                VALUES (:id, 'worker', :pools, :started, now(), CAST(:stats AS jsonb))
+                                ON CONFLICT (worker_id) DO UPDATE SET beat_at = now(), stats = EXCLUDED.stats"""),
+                        {
+                            "id": self.id,
+                            "pools": list(self.pools),
+                            "started": started,
+                            "stats": json.dumps({"in_flight": len(self._tasks)}),
+                        },
+                    )
+                    await s.execute(text("DELETE FROM worker_heartbeats WHERE beat_at < now() - interval '1 hour'"))
+            except Exception:
+                log.exception("heartbeat_failed")
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._stop.wait(), timeout=HEARTBEAT_S)
 
     async def drain(self, timeout_s: float) -> None:
         if self._tasks:
@@ -173,15 +200,18 @@ class Worker:
     async def _run_turn(self, runner: TurnRunnerPort, ref: TurnRef) -> None:
         handle = PipelineTurnHandle(ref, self.id, self.turns)
         started = time.perf_counter()
-        await emit(
-            "turn_started",
-            PipelineEventStatus.START,
-            business_id=ref.business_id,
-            conversation_id=ref.conversation_id,
-            turn_id=ref.turn_id,
-            attempt=ref.attempts,
-        )
-        with tracer().start_as_current_span("reflexo.turn", attributes={"reflexo.turn_id": str(ref.turn_id)}):
+        with (
+            resume_trace(ref.trace_context),
+            tracer().start_as_current_span("reflexo.turn", attributes={"reflexo.turn_id": str(ref.turn_id)}),
+        ):
+            await emit(
+                "turn_started",
+                PipelineEventStatus.START,
+                business_id=ref.business_id,
+                conversation_id=ref.conversation_id,
+                turn_id=ref.turn_id,
+                attempt=ref.attempts,
+            )
             try:
                 await runner.run_turn(handle)
             except Superseded:
@@ -213,14 +243,14 @@ class Worker:
                     error=type(exc).__name__,
                 )
                 return
-        await emit(
-            "turn_finished",
-            PipelineEventStatus.OK,
-            business_id=ref.business_id,
-            conversation_id=ref.conversation_id,
-            turn_id=ref.turn_id,
-            duration_ms=int((time.perf_counter() - started) * 1000),
-        )
+            await emit(
+                "turn_finished",
+                PipelineEventStatus.OK,
+                business_id=ref.business_id,
+                conversation_id=ref.conversation_id,
+                turn_id=ref.turn_id,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
 
     async def _fallback(self, runner: TurnRunnerPort, ref: TurnRef, reason: str) -> None:
         try:

@@ -107,6 +107,9 @@ TEST_SECRETS = {
     "REFLEXO_WA_DISPLAY_NUMBER": "+919800000000",
     "REFLEXO_WA_ORDER_UPDATE_TEMPLATE": "order_update",
     "REFLEXO_PUBLIC_BASE_URL": "https://reflexo.test",
+    "REFLEXO_ADMIN_USER": "admin",
+    "REFLEXO_ADMIN_PASSWORD": "test-admin-password",
+    "REFLEXO_ADMIN_SESSION_SECRET": "test-admin-session-secret-0123456789",
 }
 
 

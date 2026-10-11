@@ -35,7 +35,9 @@ def holding_key(turn_id: UUID) -> str:
     return f"turn:{turn_id}:holding"
 
 
-_TURN_COLUMNS = "id, business_id, conversation_id, desk, priority, message_ids, inherited_turn_ids, attempts, hints"
+_TURN_COLUMNS = (
+    "id, business_id, conversation_id, desk, priority, message_ids, inherited_turn_ids, attempts, hints, trace_context"
+)
 
 
 def _ref(row: Any) -> TurnRef:
@@ -49,6 +51,7 @@ def _ref(row: Any) -> TurnRef:
         inherited_turn_ids=list(row.inherited_turn_ids),
         attempts=row.attempts,
         hints=dict(row.hints or {}),
+        trace_context=row.trace_context,
     )
 
 

@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     models_config: str = "config/models.yaml"
 
+    # admin panel (POC_07 §1)
+    admin_user: str = "admin"
+    admin_password: SecretStr = SecretStr("admin-dev-password")
+    admin_session_secret: SecretStr = SecretStr("dev-admin-session-secret")
+    admin_session_hours: int = 8
+
     # desks (POC_04 §13)
     agent_checkpointer: Literal["postgres", "memory"] = "postgres"
     max_model_calls_customer: int = 4
@@ -93,10 +99,6 @@ class Settings(BaseSettings):
     search_k: int = 5
     search_trgm_threshold: float = Field(default=0.3, ge=0.05, le=1.0)
     speculative_budget_ms: int = 120
-
-    # Admin panel
-    admin_user: str = "admin"
-    admin_password: SecretStr = SecretStr("change-me")
 
     # Seed identities (used by scripts/seed.py; real values come from .env)
     seed_owner_wa_e164: str = "+919999900000"
@@ -115,7 +117,7 @@ class Settings(BaseSettings):
             return self
         weak = [
             name
-            for name in ("media_url_secret", "simulator_secret")
+            for name in ("media_url_secret", "simulator_secret", "admin_password", "admin_session_secret")
             if len(v := getattr(self, name).get_secret_value()) < 16 or "change-me" in v or v.startswith("dev-")
         ]
         if weak:

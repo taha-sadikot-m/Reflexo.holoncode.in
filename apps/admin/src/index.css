@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Visual tokens harvested from the old DesignSystem.jsx (H16); the panel itself is new. */
+@theme {
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-ink: #12111a;
+  --color-indigo: #1e1c30;
+  --color-twilight: #2d2a4a;
+  --color-marigold: #ff9e1b;
+  --color-saffron: #e88a15;
+  --color-blossom: #fff4e0;
+  --color-signal: #6c5ce7;
+  --color-signal-l: #eceaff;
+  --color-verdant: #00c88c;
+  --color-verdant-l: #e0fff6;
+  --color-ember: #f45c4a;
+  --color-ember-l: #fff0ee;
+  --color-sun: #f0b429;
+  --color-sun-l: #fffae0;
+  --color-parchment: #fbf9f5;
+  --color-bone: #f2efe9;
+  --color-sand: #e0ddd6;
+  --color-stone: #9e9b94;
+  --color-dusk: #615e58;
+  --color-soot: #201f1c;
+
+  /* stage families (POC_07 §1) */
+  --color-st-ingress: #8a8780;
+  --color-st-identity: #3b82f6;
+  --color-st-automation: #8b5cf6;
+  --color-st-agent: #f59e0b;
+  --color-st-tool: #14b8a6;
+  --color-st-gate: #10b981;
+  --color-st-outbound: #6366f1;
+  --color-st-voice: #ec4899;
+  --color-st-workflow: #7c3aed;
+  --color-st-error: #f45c4a;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-parchment font-sans text-soot antialiased dark:bg-ink dark:text-bone;
+}
+.font-display {
+  letter-spacing: -0.02em;
+}

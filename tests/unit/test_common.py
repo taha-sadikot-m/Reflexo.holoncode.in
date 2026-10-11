@@ -103,7 +103,27 @@ def test_demo_env_refuses_placeholder_secrets() -> None:
     from reflexo.common.config import Settings
 
     with pytest.raises(ValidationError, match="REFLEXO_MEDIA_URL_SECRET"):
-        Settings(env="demo", media_url_secret="dev-media-secret-change-me", simulator_secret="x" * 32)
-    ok = Settings(env="demo", media_url_secret="m" * 32, simulator_secret="s" * 32)
+        Settings(
+            env="demo",
+            media_url_secret="dev-media-secret-change-me",
+            simulator_secret="x" * 32,
+            admin_password="p" * 20,
+            admin_session_secret="a" * 32,
+        )
+    ok = Settings(
+        env="demo",
+        media_url_secret="m" * 32,
+        simulator_secret="s" * 32,
+        admin_password="p" * 20,
+        admin_session_secret="a" * 32,
+    )
+    with pytest.raises(ValidationError, match="REFLEXO_ADMIN_PASSWORD"):
+        Settings(
+            env="demo",
+            media_url_secret="m" * 32,
+            simulator_secret="s" * 32,
+            admin_password="change-me",
+            admin_session_secret="a" * 32,
+        )
     assert ok.env == "demo"
     assert Settings(env="dev").media_url_secret.get_secret_value()  # dev keeps working defaults

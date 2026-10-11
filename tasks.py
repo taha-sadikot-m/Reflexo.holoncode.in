@@ -7,6 +7,9 @@ Tasks:
   seed          load seeds (default mode: onboarding); `seed --full`
   demo-reset    wipe + reseed the demo businesses; `demo-reset --full`
   api           run the HTTP API with reload
+  worker        run the pipeline worker (all pools)
+  admin-dev     admin panel dev server (http://localhost:5173/admin/)
+  admin-build   build the admin panel into apps/admin/dist (served at http://localhost:8080/admin/)
   dev           up + migrate + api
   test          pytest (unit + integration; integration needs Docker)
   lint          ruff check + ruff format --check + module boundaries + guards
@@ -21,9 +24,10 @@ import sys
 import time
 
 
-def run(*cmd: str) -> None:
+def run(*cmd: str, cwd: str | None = None) -> None:
     print("+", " ".join(cmd), flush=True)
-    rc = subprocess.call(list(cmd))
+    # npm is a .cmd shim on Windows, which subprocess only finds through the shell
+    rc = subprocess.call(list(cmd), cwd=cwd, shell=sys.platform == "win32" and cmd[0] == "npm")
     if rc != 0:
         sys.exit(rc)
 
@@ -61,6 +65,13 @@ def main(argv: list[str]) -> None:
         run(py, "scripts/seed.py", "reset", *args)
     elif task == "api":
         run(py, "-m", "uvicorn", "reflexo.api.main:app", "--reload", "--port", "8080")
+    elif task == "worker":
+        run(py, "-m", "reflexo.pipeline.worker", *args)
+    elif task == "admin-dev":  # Vite dev server on :5173, proxies /admin/api to :8080
+        run("npm", "run", "dev", cwd="apps/admin")
+    elif task == "admin-build":  # builds apps/admin/dist (served by the API at /admin locally, Caddy in the demo)
+        run("npm", "ci", "--no-audit", "--no-fund", cwd="apps/admin")
+        run("npm", "run", "build", cwd="apps/admin")
     elif task == "dev":
         main(["up"])
         main(["migrate"])

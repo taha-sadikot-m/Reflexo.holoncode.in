@@ -14,6 +14,7 @@ from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.redis import RedisUnavailable, get_redis
+from reflexo.common.timeutil import utcnow
 from reflexo.common.tracing import current_trace_id
 
 log = get_logger(__name__)
@@ -67,6 +68,7 @@ async def emit(
             "conversation_id": str(conversation_id) if conversation_id else None,
             "turn_id": str(turn_id) if turn_id else None,
             "attrs": attrs,
+            "at": utcnow().isoformat(),
         },
         default=str,
     )

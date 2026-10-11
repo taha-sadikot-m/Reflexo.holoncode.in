@@ -23,6 +23,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
 from reflexo.common.redis import RedisUnavailable, get_redis
+from reflexo.common.tracing import current_trace_context
 from reflexo.gateway import policy
 from reflexo.gateway.adapters.base import ChannelAdapter, RenderContext
 from reflexo.gateway.adapters.simulator import deliver_to_lab
@@ -164,15 +165,17 @@ class Outbound:
         )
         part_ids: list[UUID] = []
         not_before = decision.defer_until
+        trace = json.dumps(current_trace_context())  # sends continue the trace that produced them
         for i, payload in enumerate(payloads):
             pid = new_id()
             part_ids.append(pid)
             await s.execute(
                 text("""
                 INSERT INTO outbound_messages (id, business_id, message_id, conversation_id, channel_connection_id,
-                                               part_index, idempotency_key, rendered_payload, priority, next_attempt_at)
+                                               part_index, idempotency_key, rendered_payload, priority, next_attempt_at,
+                                               trace_context)
                 VALUES (:id, :b, :m, :c, :cc, :i, :k, CAST(:p AS jsonb), CAST(:prio AS priority_class),
-                        COALESCE(:nb, now()))
+                        COALESCE(:nb, now()), CAST(:trace AS jsonb))
                 ON CONFLICT (idempotency_key) DO NOTHING"""),
                 {
                     "id": pid,
@@ -185,6 +188,7 @@ class Outbound:
                     "p": json.dumps(payload, ensure_ascii=False),
                     "prio": str(priority),
                     "nb": not_before,
+                    "trace": trace,
                 },
             )
         if rendered.options:
