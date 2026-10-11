@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     # Simulator (signed provider-shaped payloads from the Simulation Lab)
     simulator_secret: SecretStr = SecretStr("dev-simulator-secret")
 
+    # knowledge / search (POC_05 §6)
+    search_k: int = 5
+    search_trgm_threshold: float = Field(default=0.3, ge=0.05, le=1.0)
+    speculative_budget_ms: int = 120
+
     # Admin panel
     admin_user: str = "admin"
     admin_password: SecretStr = SecretStr("change-me")

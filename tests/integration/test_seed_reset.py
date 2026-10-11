@@ -48,3 +48,15 @@ async def test_reset_onboarding_then_full_is_repeatable(db: Database) -> None:
     assert (await _counts(db, "meeras-bakes"))["offerings"] == 6
     evalb = await _counts(db, "eval-bakes")
     assert evalb["offerings"] == 6 and evalb["connections"] == 1
+
+
+async def test_seeded_businesses_are_searchable(db: Database) -> None:
+    import reflexo.knowledge.api as knowledge
+
+    report = await reset(db, "full")
+    meera = report.businesses["meeras-bakes"]
+    assert (await knowledge.search_catalog(meera, "choclate trufle"))[0].name == "Chocolate Truffle Cake"
+    hits = await knowledge.search_knowledge(meera, "UPI chalega?")
+    assert hits and "UPI" in hits[0].text
+    kurti = report.businesses["kurti-kraft"]
+    assert await knowledge.search_catalog(kurti, "kurti")

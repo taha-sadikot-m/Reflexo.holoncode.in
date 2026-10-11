@@ -277,3 +277,25 @@ class OwnerNotifyPort(Protocol):
         priority: PriorityClass = PriorityClass.P1,
         member_id: UUID | None = None,
     ) -> None: ...
+
+
+class EmbedderPort(Protocol):
+    """Provided by agent's model gateway (WP-05): text embeddings (768 dims) for search."""
+
+    model: str
+
+    async def embed(self, texts: list[str], *, task: str) -> list[list[float]]: ...  # task: "query" | "document"
+
+
+class CommerceViewsPort(Protocol):
+    """Provided by commerce: views for payment-link and order-summary blocks (BlockHydrator delegates here)."""
+
+    async def payment_link(self, business_id: UUID, payment_link_id: UUID) -> Any: ...
+
+    async def order_summary(self, business_id: UUID, order_id: UUID) -> Any: ...
+
+
+class MediaUrlPort(Protocol):
+    """Provided by gateway: short-lived signed public URL for a stored media object."""
+
+    def url_for(self, media_object_id: UUID) -> str: ...

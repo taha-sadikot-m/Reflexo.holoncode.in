@@ -21,6 +21,7 @@ import yaml
 from sqlalchemy import CursorResult, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import reflexo.knowledge.api as knowledge
 from reflexo.common.config import Settings, get_settings
 from reflexo.common.db import Database, ServiceReason
 from reflexo.common.ids import new_id
@@ -246,6 +247,8 @@ async def load(db: Database, mode: Mode = "onboarding", settings: Settings | Non
     async with db.service_session(ServiceReason.SEED) as s:
         for seed, full in seeds:
             report.businesses[seed["slug"]] = await _load_business(s, seed, full=full, settings=settings)
+    for business_id in report.businesses.values():
+        await knowledge.reindex_business(business_id)  # search documents (text now, embeddings via job)
     report.seconds = time.perf_counter() - started
     log.info("seed_loaded", mode=mode, businesses=list(report.businesses), seconds=round(report.seconds, 2))
     return report

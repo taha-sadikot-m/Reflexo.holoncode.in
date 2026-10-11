@@ -15,7 +15,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reflexo.common.config import get_settings
-from reflexo.common.contracts import InboundProcessorPort, OutboundSenderPort
+from reflexo.common.contracts import InboundProcessorPort, MediaUrlPort, OutboundSenderPort
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
@@ -73,6 +73,7 @@ def register(registry: Registry) -> None:
     inbound = GatewayInbound(registry, adapters(), _outbound)
     registry.provide(InboundProcessorPort, inbound)  # type: ignore[type-abstract]
     registry.provide(OutboundSenderPort, _outbound)  # type: ignore[type-abstract]
+    registry.provide(MediaUrlPort, _signer)  # type: ignore[type-abstract]
     register_jobs(registry, adapters())
 
 
