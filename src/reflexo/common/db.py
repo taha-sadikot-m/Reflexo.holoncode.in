@@ -30,6 +30,7 @@ class ServiceReason(StrEnum):
     QUEUE_CLAIM = "queue_claim"
     INTEGRATION_ROUTING = "integration_routing"
     VOICE_SESSION_START = "voice_session_start"
+    VOICE = "voice"  # voice-bridge: call sessions by provider call id, restart recovery (no tenant known yet)
     ADMIN = "admin"
     PIPELINE_EVENTS = "pipeline_events"
     SEED = "seed"

@@ -76,7 +76,9 @@ class GatewayInbound:
             await self._process_one(ev, event)
 
     async def _process_one(self, ev: NormalizedEvent, inbox: InboxEvent) -> None:
-        conn = await find_connection(ev.provider, ev.route_key, ev.channel)
+        # WhatsApp calls arrive on the number's WhatsApp connection (the call channel is `voice`, the account is not)
+        lookup_channel = "whatsapp" if ev.kind == "call" and ev.provider == "meta_whatsapp" else ev.channel
+        conn = await find_connection(ev.provider, ev.route_key, lookup_channel)
         if conn is None:
             log.warning(
                 "unknown_connection", provider=str(ev.provider), route_key=ev.route_key, channel=str(ev.channel)

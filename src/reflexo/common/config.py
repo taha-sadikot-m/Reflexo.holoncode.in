@@ -90,6 +90,22 @@ class Settings(BaseSettings):
     admin_session_secret: SecretStr = SecretStr("dev-admin-session-secret")
     admin_session_hours: int = 8
 
+    # voice (POC_04 §10, §13)
+    livekit_url: str = ""
+    livekit_api_key: str = ""
+    livekit_api_secret: SecretStr = SecretStr("")
+    deepgram_api_key: SecretStr = SecretStr("")
+    stt_model: str = "nova-3"
+    stt_language: str = "multi"
+    tts_model: str = "aura-2-asteria-en"
+    voice_model: str = "gemini-2.5-flash-lite"  # streaming voice LLM (LiveKit Google plugin)
+    voice_agent_name: str = "reflexo-voice"
+    voice_agent_join_timeout_s: float = 10.0  # wait for the agent's audio before Graph `accept`
+    voice_endpointing_min_s: float = 0.45
+    voice_endpointing_max_s: float = 2.0
+    voice_silence_hangup_s: int = 30
+    voice_max_concurrent_calls: int = 5
+
     # desks (POC_04 §13)
     agent_checkpointer: Literal["postgres", "memory"] = "postgres"
     max_model_calls_customer: int = 4

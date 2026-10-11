@@ -54,6 +54,8 @@ log = get_logger(__name__)
 
 POOLS = ("inbound", "turns", "outbound", "jobs")
 HEARTBEAT_S = 5.0
+# queues owned by a dedicated process (the voice-bridge holds live WebRTC calls in memory)
+DEDICATED_QUEUES = ("voice.call_signal",)
 CHANNELS = {"inbound": "q_inbound", "turns": "q_turns", "outbound": "q_outbound", "jobs": "q_jobs"}
 SWEEP_INTERVAL_S = 5.0
 
@@ -299,7 +301,9 @@ class Worker:
 
     # ------------------------------------------------------------------ jobs
     async def tick_jobs(self) -> None:
-        for job in await self.jobs.claim(self.id, self.config["jobs"].lease_s, self._free("jobs")):
+        for job in await self.jobs.claim(
+            self.id, self.config["jobs"].lease_s, self._free("jobs"), exclude=DEDICATED_QUEUES
+        ):
             await self._spawn("jobs", functools.partial(self._run_job, job))
 
     async def _run_job(self, job: Any) -> None:

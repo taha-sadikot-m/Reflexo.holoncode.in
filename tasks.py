@@ -8,6 +8,8 @@ Tasks:
   demo-reset    wipe + reseed the demo businesses; `demo-reset --full`
   api           run the HTTP API with reload
   worker        run the pipeline worker (all pools)
+  voice-bridge  run the voice-bridge (WhatsApp WebRTC <-> LiveKit)
+  voice-agent   run the LiveKit voice agent worker (`voice-agent dev` for verbose local runs)
   admin-dev     admin panel dev server (http://localhost:5173/admin/)
   admin-build   build the admin panel into apps/admin/dist (served at http://localhost:8080/admin/)
   dev           up + migrate + api
@@ -67,6 +69,10 @@ def main(argv: list[str]) -> None:
         run(py, "-m", "uvicorn", "reflexo.api.main:app", "--reload", "--port", "8080")
     elif task == "worker":
         run(py, "-m", "reflexo.pipeline.worker", *args)
+    elif task == "voice-bridge":  # owns live WhatsApp WebRTC calls
+        run(py, "-m", "reflexo.voice.bridge_worker")
+    elif task == "voice-agent":  # LiveKit Agents worker `reflexo-voice` (dev | start)
+        run(py, "-m", "reflexo.voice.agent_worker", *(args or ["start"]))
     elif task == "admin-dev":  # Vite dev server on :5173, proxies /admin/api to :8080
         run("npm", "run", "dev", cwd="apps/admin")
     elif task == "admin-build":  # builds apps/admin/dist (served by the API at /admin locally, Caddy in the demo)

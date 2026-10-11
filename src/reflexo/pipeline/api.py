@@ -14,6 +14,7 @@ from reflexo.common.contracts import (
     DomainEventWriter,
     JobEnqueuer,
     JobHandlerRegistry,
+    JobQueuePort,
     JobRow,
     TurnRunnerPort,
     TurnScheduler,
@@ -37,6 +38,7 @@ def register(registry: Registry) -> None:
     registry.provide(Jobs, jobs)
     registry.provide(TurnService, turns)
     registry.provide(JobEnqueuer, jobs)  # type: ignore[type-abstract]
+    registry.provide(JobQueuePort, jobs)  # type: ignore[type-abstract]
     registry.provide(JobHandlerRegistry, jobs)  # type: ignore[type-abstract]
     registry.provide(DomainEventWriter, events)  # type: ignore[type-abstract]
     registry.provide(TurnScheduler, turns)  # type: ignore[type-abstract]

@@ -320,3 +320,21 @@ class ModelGatewayPort(Protocol):
     ) -> _M: ...
 
     async def embed(self, texts: list[str], *, task: str, ctx: CallCtx | None = None) -> list[list[float]]: ...
+
+
+class JobQueuePort(Protocol):
+    """Provided by pipeline: claim/complete/fail jobs (a dedicated process, e.g. the voice-bridge, owns queues)."""
+
+    async def claim(
+        self,
+        worker: str,
+        lease_s: int,
+        limit: int,
+        *,
+        only: list[str] | None = None,
+        exclude: list[str] | None = None,
+    ) -> list[JobRow]: ...
+
+    async def complete(self, job: JobRow, worker: str) -> None: ...
+
+    async def fail(self, job: JobRow, worker: str, error: str) -> str: ...

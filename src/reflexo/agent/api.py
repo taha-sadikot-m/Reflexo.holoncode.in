@@ -10,7 +10,9 @@ from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_mo
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
 from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_messages
 from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, ModelProvider
+from reflexo.agent.output_gate import extract_amounts
 from reflexo.agent.runs import record_run
+from reflexo.agent.tools.base import ToolContext, run_tool
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import EmbedderPort, ModelGatewayPort, TurnRunnerPort
 from reflexo.common.llm import ChatResult, MediaInput, ModelError
@@ -84,3 +86,7 @@ def langchain_model(role: str, purpose: str = "graph") -> GatewayChatModel:
 
 
 __all__ += ["ChatResult", "GeminiProvider", "MediaInput", "ModelError", "ModelProvider", "langchain_model"]
+
+# Shared tools the voice desk binds (POC_04 §10.4); voice-only tools (end_call, send_to_chat...) live in voice.
+VOICE_TOOLS = ("catalog_search", "catalog_get", "knowledge_lookup", "delivery_quote")
+__all__ += ["VOICE_TOOLS", "ToolContext", "extract_amounts", "run_tool"]

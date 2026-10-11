@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -96,7 +97,16 @@ class Jobs:
             await s.execute(sql, {"q": queue, "k": dedupe_key})
 
     # -- worker side
-    async def claim(self, worker: str, lease_s: int, limit: int) -> list[JobRow]:
+    async def claim(
+        self,
+        worker: str,
+        lease_s: int,
+        limit: int,
+        *,
+        only: Sequence[str] | None = None,
+        exclude: Sequence[str] | None = None,
+    ) -> list[JobRow]:
+        """Claim due jobs. `only`/`exclude` let a dedicated process own some queues (voice-bridge)."""
         if limit <= 0:
             return []
         async with get_db().service_session(ServiceReason.QUEUE_CLAIM) as s:
@@ -107,9 +117,17 @@ class Jobs:
                                 lease_until = now() + make_interval(secs => :lease),
                                 attempts = attempts + 1
                 WHERE id IN (SELECT id FROM jobs WHERE status = 'pending' AND run_after <= now()
+                               AND (CAST(:only AS text[]) IS NULL OR queue = ANY(CAST(:only AS text[])))
+                               AND (CAST(:excl AS text[]) IS NULL OR NOT (queue = ANY(CAST(:excl AS text[]))))
                              ORDER BY priority, run_after LIMIT :n FOR UPDATE SKIP LOCKED)
                 RETURNING id, business_id, queue, payload, attempts, max_attempts, trace_context"""),
-                    {"w": worker, "lease": lease_s, "n": limit},
+                    {
+                        "w": worker,
+                        "lease": lease_s,
+                        "n": limit,
+                        "only": list(only) if only is not None else None,
+                        "excl": list(exclude) if exclude is not None else None,
+                    },
                 )
             ).all()
         return [

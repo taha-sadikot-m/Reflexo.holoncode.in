@@ -25,7 +25,7 @@ from reflexo.gateway.adapters.meta_messaging import InstagramAdapter, MessengerA
 from reflexo.gateway.adapters.meta_whatsapp import WhatsAppAdapter
 from reflexo.gateway.adapters.simulator import SimulatorAdapter
 from reflexo.gateway.adapters.telegram import TelegramAdapter
-from reflexo.gateway.connections import ConnectionInfo, find_connection, get_connection
+from reflexo.gateway.connections import ConnectionInfo, credentials, find_connection, get_connection
 from reflexo.gateway.inbound import GatewayInbound
 from reflexo.gateway.media import MediaSigner, media_path, register_jobs, store_media
 from reflexo.gateway.outbound import EnqueueResult, Outbound
@@ -188,3 +188,34 @@ async def resolve_customer(
 ) -> tuple[UUID, bool]:
     """Identity lookup/creation for internal callers (voice caller = same WhatsApp user, POC_03 §5.1)."""
     return await identity.resolve_customer(s, business_id, channel, external_id, display_name, None)
+
+
+# ---------------------------------------------------------------- calls (voice-bridge, POC_03 §5.1)
+
+
+async def resolve_caller(
+    s: AsyncSession, conn: ConnectionInfo, wa_id: str, display_name: str | None = None
+) -> identity.ResolvedSender:
+    """A WhatsApp caller is the same person as the WhatsApp chat sender: same customer, same chat conversation
+    (the call is linked to it), and owner bindings apply exactly as for messages."""
+    from datetime import UTC, datetime
+
+    from reflexo.common.enums import ChannelProvider, ChannelType
+    from reflexo.gateway.adapters.meta_common import wa_id_to_e164
+    from reflexo.gateway.normalized import NormalizedEvent
+
+    ev = NormalizedEvent(
+        kind="call",
+        provider=ChannelProvider(conn.provider),
+        channel=ChannelType(conn.channel),
+        route_key=conn.external_account_id,
+        occurred_at=datetime.now(UTC),
+        thread_key=wa_id,
+        sender_external_id=wa_id_to_e164(wa_id),
+        sender_display_name=display_name,
+    )
+    return await identity.resolve(s, conn, ev, simulated=False)
+
+
+__all__ += ["ResolvedSender", "credentials", "resolve_caller"]
+ResolvedSender = identity.ResolvedSender
