@@ -187,3 +187,57 @@ async def test_gate_passes_tool_calls_and_flushes_text_first() -> None:
     tool = _Chunk(_Delta(tool_calls=["catalog_search"]))
     out = await _collect([_Chunk(_Delta("Ek second, ")), tool, "dekhti hoon."], set())
     assert out[0] == "Ek second, " and out[1] is tool and out[2] == "dekhti hoon."
+
+
+# ---------------------------------------------------------------- outbound pacing (choppy-audio regression)
+
+
+def test_paced_buffer_frames_and_prebuffer() -> None:
+    from reflexo.voice.bridge_webrtc import FRAME_BYTES, AudioMetrics, PacedAudioBuffer
+
+    m = AudioMetrics()
+    buf = PacedAudioBuffer(m)
+    ten_ms = b"\x01\x00" * 480  # LiveKit delivers 10 ms frames
+    buf.push(ten_ms * 2)  # 20 ms buffered: below the 60 ms prebuffer -> still silence
+    assert buf.pull() == bytes(FRAME_BYTES) and m.silence_frames_to_whatsapp == 1
+    buf.push(ten_ms * 4)  # 60 ms buffered -> play
+    out = [buf.pull() for _ in range(3)]
+    assert all(len(f) == FRAME_BYTES and f != bytes(FRAME_BYTES) for f in out)
+    assert m.frames_to_whatsapp == 3 and buf.buffered_ms == 0
+    assert buf.pull() == bytes(FRAME_BYTES)  # drained -> silence, back to prebuffering
+
+
+def test_paced_buffer_never_interleaves_silence_mid_utterance() -> None:
+    from reflexo.voice.bridge_webrtc import AudioMetrics, PacedAudioBuffer
+
+    m = AudioMetrics()
+    buf = PacedAudioBuffer(m)
+    ten_ms = b"\x02\x00" * 480
+    buf.push(ten_ms * 6)
+    for _ in range(50):  # 1 s of speech arriving in real time while we pull one 20 ms frame per tick
+        buf.push(ten_ms * 2)
+        buf.pull()
+    assert m.silence_frames_to_whatsapp == 0 and m.frames_to_whatsapp == 50
+
+
+def test_paced_buffer_caps_latency() -> None:
+    from reflexo.voice.bridge_webrtc import AudioMetrics, PacedAudioBuffer
+
+    m = AudioMetrics()
+    buf = PacedAudioBuffer(m)
+    buf.push(b"\x00\x01" * 48000 * 3)  # 3 s burst
+    assert buf.buffered_ms == 1000 and m.dropped_to_whatsapp > 0
+
+
+async def test_paced_track_runs_at_real_time() -> None:
+    import time as _t
+
+    from reflexo.voice.bridge_webrtc import AudioMetrics, _queued_track
+
+    track = _queued_track(AudioMetrics())
+    started = _t.monotonic()
+    frames = [await track.recv() for _ in range(11)]
+    elapsed = _t.monotonic() - started
+    assert all(f.samples == 960 and f.sample_rate == 48000 for f in frames)
+    assert [f.pts for f in frames[:3]] == [0, 960, 1920]
+    assert 0.18 <= elapsed <= 0.4  # 10 intervals of 20 ms, not as-fast-as-possible

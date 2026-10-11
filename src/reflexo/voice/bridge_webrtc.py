@@ -1,8 +1,9 @@
 """WhatsApp WebRTC (aiortc) ↔ LiveKit room audio bridge (harvested H5 from the old `voice/bridge.py`).
 
-Kept: SDP handling, Opus-only peer connection, the 48 kHz audio pump both ways with a bounded outbound queue
-(drop-oldest), silence fill. Added: explicit agent dispatch, explicit timeouts, audio metrics for tracing, and an
-idempotent `close()` that always releases both legs and deletes the room.
+Kept: SDP handling, Opus-only peer connection, the 48 kHz inbound pump. Replaced: the outbound frame queue with a
+paced PCM buffer (`PacedAudioBuffer`), which fixed choppy agent audio on real calls. Added: explicit agent dispatch,
+explicit timeouts, audio metrics for tracing, and an idempotent `close()` that always releases both legs and
+deletes the room.
 """
 
 from __future__ import annotations
@@ -47,49 +48,87 @@ class AudioMetrics:
         }
 
 
+FRAME_BYTES = FRAME_SAMPLES * 2  # s16 mono
+PREBUFFER_SAMPLES = SAMPLE_RATE * 60 // 1000  # absorb network jitter at the start of each utterance
+MAX_BUFFER_SAMPLES = SAMPLE_RATE  # 1 s; beyond that drop the oldest audio (latency beats completeness)
+
+
+class PacedAudioBuffer:
+    """PCM buffer between LiveKit (frames of any size, arriving in bursts) and the WhatsApp RTP sender, which
+    pulls exactly one 20 ms frame per tick. Silence is produced only when nothing is buffered.
+
+    The first bridge version queued LiveKit frames and inserted a 20 ms silence frame whenever the queue was
+    momentarily empty, without pacing; aiortc pulled as fast as it could, so speech went out chopped with gaps
+    (measured on a real call: 7,573 audio + 4,424 silence frames in 76 s instead of ~3,800)."""
+
+    def __init__(self, metrics: AudioMetrics) -> None:
+        self.metrics = metrics
+        self._buf = bytearray()
+        self._playing = False
+
+    def push(self, pcm: bytes) -> None:
+        self._buf.extend(pcm)
+        excess = len(self._buf) - MAX_BUFFER_SAMPLES * 2
+        if excess > 0:
+            excess += excess % 2
+            del self._buf[:excess]
+            self.metrics.dropped_to_whatsapp += max(1, excess // FRAME_BYTES)
+
+    def pull(self) -> bytes:
+        """Exactly FRAME_BYTES of s16 mono PCM."""
+        if not self._playing and len(self._buf) >= PREBUFFER_SAMPLES * 2:
+            self._playing = True
+        if self._playing and self._buf:
+            chunk = bytes(self._buf[:FRAME_BYTES])
+            del self._buf[:FRAME_BYTES]
+            if len(chunk) < FRAME_BYTES:  # end of an utterance: pad the tail, then prebuffer the next one
+                chunk += bytes(FRAME_BYTES - len(chunk))
+                self._playing = False
+            self.metrics.frames_to_whatsapp += 1
+            return chunk
+        self._playing = False
+        self.metrics.silence_frames_to_whatsapp += 1
+        return bytes(FRAME_BYTES)
+
+    @property
+    def buffered_ms(self) -> int:
+        return len(self._buf) // 2 * 1000 // SAMPLE_RATE
+
+
 def _queued_track(metrics: AudioMetrics) -> Any:
-    """Outbound aiortc track fed by LiveKit agent frames (created lazily so tests need no aiortc)."""
+    """Outbound aiortc track fed by LiveKit agent audio, paced at real time (created lazily: tests need no aiortc)."""
     from aiortc.mediastreams import AudioStreamTrack
     from av import AudioFrame
 
-    class QueuedAudioTrack(AudioStreamTrack):
+    class PacedAudioTrack(AudioStreamTrack):
         kind = "audio"
 
         def __init__(self) -> None:
             super().__init__()
-            self.queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=100)
-            self._timestamp = 0
+            self.buffer = PacedAudioBuffer(metrics)
+            self._t0: float | None = None
+            self._pts = 0
 
         def enqueue(self, lk_frame: Any) -> None:
-            if self.queue.full():  # drop the oldest frame: latency beats completeness in a live call
-                try:
-                    self.queue.get_nowait()
-                    metrics.dropped_to_whatsapp += 1
-                except asyncio.QueueEmpty:
-                    pass
-            self.queue.put_nowait(lk_frame)
+            self.buffer.push(bytes(lk_frame.data))
 
         async def recv(self) -> Any:
-            samples = FRAME_SAMPLES
-            try:
-                lk_frame = await asyncio.wait_for(self.queue.get(), timeout=0.02)
-                audio = np.frombuffer(bytes(lk_frame.data), dtype=np.int16)
-                if audio.size == 0:
-                    audio = np.zeros(samples, dtype=np.int16)
-                frame = AudioFrame.from_ndarray(audio.reshape(1, -1), format="s16", layout="mono")
-                frame.sample_rate = int(getattr(lk_frame, "sample_rate", None) or SAMPLE_RATE)
-                samples = audio.size
-                metrics.frames_to_whatsapp += 1
-            except TimeoutError:
-                frame = AudioFrame.from_ndarray(np.zeros((1, samples), dtype=np.int16), format="s16", layout="mono")
-                frame.sample_rate = SAMPLE_RATE
-                metrics.silence_frames_to_whatsapp += 1
-            frame.pts = self._timestamp
-            frame.time_base = Fraction(1, frame.sample_rate)
-            self._timestamp += samples
+            # pace like aiortc's own tracks: one 20 ms frame per 20 ms of wall clock
+            if self._t0 is None:
+                self._t0 = time.monotonic()
+            else:
+                wait = self._t0 + self._pts / SAMPLE_RATE - time.monotonic()
+                if wait > 0:
+                    await asyncio.sleep(wait)
+            pcm = np.frombuffer(self.buffer.pull(), dtype=np.int16).reshape(1, -1)
+            frame = AudioFrame.from_ndarray(pcm, format="s16", layout="mono")
+            frame.sample_rate = SAMPLE_RATE
+            frame.pts = self._pts
+            frame.time_base = Fraction(1, SAMPLE_RATE)
+            self._pts += FRAME_SAMPLES
             return frame
 
-    return QueuedAudioTrack()
+    return PacedAudioTrack()
 
 
 async def _wait_ice_complete(pc: Any, limit_s: float = ICE_TIMEOUT_S) -> None:
