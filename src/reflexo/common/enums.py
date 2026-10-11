@@ -304,6 +304,7 @@ class AutomationStatus(StrEnum):
 class AutomationExecutor(StrEnum):
     INSTANT = "instant"
     DURABLE = "durable"
+    GUARD = "guard"
 
 
 class AutomationRunStatus(StrEnum):

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     temporal_address: str = "localhost:7243"
     temporal_namespace: str = "default"
     temporal_task_queue: str = "reflexo-main"  # tests use their own queue so a dev worker never picks them up
+    guard_timeout_ms: int = 1000  # spec 200 ms; laptop Docker latency varies and a timeout fails closed
 
     # Observability
     otel_exporter_otlp_endpoint: str | None = "http://localhost:4317"
