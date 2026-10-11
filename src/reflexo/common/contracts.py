@@ -428,6 +428,19 @@ class WorkflowPort(Protocol):
         """Start `AutomationBuildWorkflow` (owner's words → definitions → read-back → YES); returns the workflow id."""
         ...
 
+    async def start_automation_run(
+        self,
+        business_id: UUID,
+        *,
+        run_id: UUID,
+        version_id: UUID,
+        instance_key: str,
+        variables: dict[str, Any],
+        time_scale: float,
+    ) -> bool:
+        """Start `AutomationRunWorkflow` (id `auto-<version>-<instance key>`); False if one is already running."""
+        ...
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         """Deliver a signal; False if the workflow is gone (finished/timed out)."""
         ...

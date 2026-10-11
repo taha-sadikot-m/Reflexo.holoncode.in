@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from temporalio.client import Client
+from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
 from reflexo.common.config import get_settings
@@ -95,6 +96,33 @@ class Workflows:
         )
         log.info("automation_build_started", business_id=str(business_id), workflow_id=workflow_id)
         return workflow_id
+
+    async def start_automation_run(
+        self,
+        business_id: UUID,
+        *,
+        run_id: UUID,
+        version_id: UUID,
+        instance_key: str,
+        variables: dict[str, Any],
+        time_scale: float,
+    ) -> bool:
+        try:
+            await (await client()).start_workflow(
+                "AutomationRunWorkflow",
+                {
+                    "business_id": str(business_id),
+                    "run_id": str(run_id),
+                    "version_id": str(version_id),
+                    "variables": variables,
+                    "time_scale": time_scale,
+                },
+                id=f"auto-{version_id}-{instance_key}",
+                task_queue=get_settings().temporal_task_queue,
+            )
+        except WorkflowAlreadyStartedError:
+            return False
+        return True
 
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         c = await client()

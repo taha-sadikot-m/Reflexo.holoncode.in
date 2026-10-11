@@ -478,6 +478,12 @@ async def order_status(business_id: UUID, customer_id: UUID, order_number: str |
         return await view(s, oid) if oid else None
 
 
+async def get_order(business_id: UUID, order_id: UUID) -> OrderView | None:
+    async with get_db().tenant_session(business_id) as s:
+        exists = (await s.execute(text("SELECT 1 FROM orders WHERE id = :o"), {"o": order_id})).first()
+        return await view(s, order_id) if exists else None
+
+
 async def open_order(business_id: UUID, customer_id: UUID) -> OrderView | None:
     """The customer's order still in progress (draft or awaiting payment): what the next turn continues."""
     async with get_db().tenant_session(business_id) as s:

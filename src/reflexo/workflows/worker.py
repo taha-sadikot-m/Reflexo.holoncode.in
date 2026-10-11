@@ -18,14 +18,15 @@ from reflexo.bootstrap import bootstrap
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.logging import get_logger
 from reflexo.workflows.automation_build import BUILD_ACTIVITIES, AutomationBuildWorkflow
+from reflexo.workflows.automation_run import RUN_ACTIVITIES, AutomationRunWorkflow
 from reflexo.workflows.client import client, task_queue
 from reflexo.workflows.import_activities import ACTIVITIES as IMPORT_ACTIVITIES
 from reflexo.workflows.imports import ImportWorkflow
 from reflexo.workflows.onboarding import ONBOARDING_ACTIVITIES, OnboardingPreviewWorkflow
 
 log = get_logger(__name__)
-WORKFLOWS = [ImportWorkflow, OnboardingPreviewWorkflow, AutomationBuildWorkflow]
-ACTIVITIES: list[Callable[..., Any]] = [*IMPORT_ACTIVITIES, *ONBOARDING_ACTIVITIES, *BUILD_ACTIVITIES]
+WORKFLOWS = [ImportWorkflow, OnboardingPreviewWorkflow, AutomationBuildWorkflow, AutomationRunWorkflow]
+ACTIVITIES: list[Callable[..., Any]] = [*IMPORT_ACTIVITIES, *ONBOARDING_ACTIVITIES, *BUILD_ACTIVITIES, *RUN_ACTIVITIES]
 HEARTBEAT_S = 5
 
 
