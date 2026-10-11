@@ -204,3 +204,76 @@ class TurnScheduler(Protocol):
         ends_thought: bool,
         hints: dict[str, Any] | None = None,
     ) -> UUID: ...
+
+
+# ---------------------------------------------------------------- gateway-facing ports (POC_03 §3.2)
+
+
+@dataclass(frozen=True)
+class RoutableEvent:
+    """An inbound customer event offered to the automation router before a turn is scheduled."""
+
+    type: str  # message.received | comment.received
+    business_id: UUID
+    customer_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    channel: str
+    text: str | None
+    interactive_option_id: str | None
+    domain_event_id: UUID | None
+    post_id: str | None = None
+    comment_id: str | None = None
+
+
+class CallRouterPort(Protocol):
+    """Provided by voice: deliver a chat message into an active call ("delivered"/"buffered") or "none"."""
+
+    async def deliver_if_active(
+        self, business_id: UUID, customer_id: UUID, conversation_id: UUID, message_id: UUID
+    ) -> str: ...
+
+
+class OwnerCommandPort(Protocol):
+    """Provided by owner: deterministic owner replies (YES 1234, /undo, buttons). True if handled."""
+
+    async def try_handle(
+        self,
+        business_id: UUID,
+        member_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        text: str | None,
+        option_id: str | None,
+    ) -> bool: ...
+
+
+class EventRouterPort(Protocol):
+    """Provided by automations: returns "consumed" | "observed" | "none"."""
+
+    async def route_inbound(self, event: RoutableEvent) -> str: ...
+
+
+class BlockHydrator(Protocol):
+    """Provided by knowledge/commerce: fills product/payment/order blocks from database rows at render time."""
+
+    async def product(self, business_id: UUID, offering_id: UUID, variant_id: UUID | None) -> Any: ...
+
+    async def payment_link(self, business_id: UUID, payment_link_id: UUID) -> Any: ...
+
+    async def order_summary(self, business_id: UUID, order_id: UUID) -> Any: ...
+
+
+class OwnerNotifyPort(Protocol):
+    """Provided by owner: route a notification to the owner/team on their channels."""
+
+    async def notify(
+        self,
+        business_id: UUID,
+        kind: str,
+        text: str,
+        *,
+        dedupe_key: str,
+        priority: PriorityClass = PriorityClass.P1,
+        member_id: UUID | None = None,
+    ) -> None: ...

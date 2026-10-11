@@ -1,0 +1,33 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WABA_1",
+      "changes": [
+        {
+          "field": "calls",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "919800000000",
+              "phone_number_id": "PNID_1"
+            },
+            "calls": [
+              {
+                "id": "wacid.CALL1",
+                "from": "919876543210",
+                "to": "919800000000",
+                "event": "connect",
+                "timestamp": "1760000007",
+                "session": {
+                  "sdp_type": "offer",
+                  "sdp": "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\n"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

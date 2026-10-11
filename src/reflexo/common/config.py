@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,37 @@ class Settings(BaseSettings):
     queue_batch: int = 10
     poll_interval_s: float = 1.0
 
+    # Gateway (POC_03 §13)
+    human_takeover_min: int = 30
+    automation_daily_cap: int = 3
+    link_code_ttl_min: int = 30
+    media_dir: str = "./data/media"
+    media_url_secret: SecretStr = SecretStr("dev-media-secret-change-me")
+    media_url_ttl_s: int = 3600
+    max_webhook_bytes: int = 1_048_576
+
+    # Meta (WhatsApp Cloud API, Messenger, Instagram)
+    meta_app_id: str = ""
+    meta_app_secret: SecretStr = SecretStr("")
+    meta_verify_token: SecretStr = SecretStr("")
+    meta_graph_version: str = "v23.0"
+    meta_graph_base: str = "https://graph.facebook.com"
+    instagram_graph_base: str = "https://graph.instagram.com"
+    wa_access_token: SecretStr = SecretStr("")
+    wa_display_number: str = ""
+    wa_order_update_template: str = "order_update"
+    fb_page_token: SecretStr = SecretStr("")
+    ig_access_token: SecretStr = SecretStr("")
+    ig_app_secret: SecretStr = SecretStr("")  # Instagram Login apps sign with the Instagram app secret (verify)
+
+    # Telegram
+    telegram_bot_token: SecretStr = SecretStr("")
+    telegram_webhook_secret: SecretStr = SecretStr("")
+    telegram_api_base: str = "https://api.telegram.org"
+
+    # Simulator (signed provider-shaped payloads from the Simulation Lab)
+    simulator_secret: SecretStr = SecretStr("dev-simulator-secret")
+
     # Admin panel
     admin_user: str = "admin"
     admin_password: SecretStr = SecretStr("change-me")
@@ -57,6 +88,21 @@ class Settings(BaseSettings):
     seed_tg_bot_id: str = "unset-telegram-bot-id"
     seed_fb_page_id: str = "unset-fb-page-id"
     seed_ig_account_id: str = "unset-ig-account-id"
+
+    @model_validator(mode="after")
+    def _deployed_secrets_are_real(self) -> Self:
+        """A deployed stack (env=demo) must not run with dev/placeholder signing secrets: anyone could forge
+        simulator events or media URLs."""
+        if self.env != "demo":
+            return self
+        weak = [
+            name
+            for name in ("media_url_secret", "simulator_secret")
+            if len(v := getattr(self, name).get_secret_value()) < 16 or "change-me" in v or v.startswith("dev-")
+        ]
+        if weak:
+            raise ValueError(f"set strong values (>= 16 chars) for: {', '.join('REFLEXO_' + w.upper() for w in weak)}")
+        return self
 
 
 @lru_cache(maxsize=1)

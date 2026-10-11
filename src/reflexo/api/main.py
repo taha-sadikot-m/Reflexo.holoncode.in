@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
+from reflexo.api.routes import media, webhooks
 from reflexo.bootstrap import bootstrap
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.redis import get_redis
@@ -26,6 +27,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="REFLEXO", version="0.1.0", lifespan=lifespan)
 FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz")
+app.include_router(webhooks.router)
+app.include_router(media.router)
 
 
 @app.get("/healthz")

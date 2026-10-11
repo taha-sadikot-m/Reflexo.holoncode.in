@@ -1,0 +1,17 @@
+{
+  "update_id": 9004,
+  "callback_query": {
+    "id": "cbq1",
+    "from": {
+      "id": 5551,
+      "first_name": "Rahul"
+    },
+    "message": {
+      "message_id": 14,
+      "chat": {
+        "id": 5551
+      }
+    },
+    "data": "o:size_1kg"
+  }
+}

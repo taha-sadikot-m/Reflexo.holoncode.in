@@ -1,0 +1,30 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "PAGE_1",
+      "messaging": [
+        {
+          "sender": {
+            "id": "PSID_1"
+          },
+          "recipient": {
+            "id": "PAGE_1"
+          },
+          "timestamp": 1760000000000,
+          "message": {
+            "mid": "m_IMG1",
+            "attachments": [
+              {
+                "type": "image",
+                "payload": {
+                  "url": "https://cdn.example/img.jpg"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "PAGE_1",
+      "changes": [
+        {
+          "field": "feed",
+          "value": {
+            "item": "post",
+            "verb": "add",
+            "message": "ignored"
+          }
+        }
+      ]
+    }
+  ]
+}

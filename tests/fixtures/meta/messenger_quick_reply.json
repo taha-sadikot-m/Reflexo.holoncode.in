@@ -1,0 +1,26 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "PAGE_1",
+      "messaging": [
+        {
+          "sender": {
+            "id": "PSID_1"
+          },
+          "recipient": {
+            "id": "PAGE_1"
+          },
+          "timestamp": 1760000000000,
+          "message": {
+            "mid": "m_QR1",
+            "text": "Yes",
+            "quick_reply": {
+              "payload": "confirm_yes"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

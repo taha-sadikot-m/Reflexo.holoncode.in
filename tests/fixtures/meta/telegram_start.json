@@ -1,0 +1,16 @@
+{
+  "update_id": 9002,
+  "message": {
+    "message_id": 12,
+    "date": 1760000000,
+    "chat": {
+      "id": 5551,
+      "type": "private"
+    },
+    "from": {
+      "id": 5551,
+      "first_name": "Rahul"
+    },
+    "text": "/start insta_diwali"
+  }
+}

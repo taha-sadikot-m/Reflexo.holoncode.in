@@ -1,0 +1,25 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "PAGE_1",
+      "messaging": [
+        {
+          "sender": {
+            "id": "PAGE_1"
+          },
+          "recipient": {
+            "id": "PSID_1"
+          },
+          "timestamp": 1760000000000,
+          "message": {
+            "mid": "m_ECHO1",
+            "is_echo": true,
+            "app_id": 263902037430900,
+            "text": "Hi, Meera here!"
+          }
+        }
+      ]
+    }
+  ]
+}
