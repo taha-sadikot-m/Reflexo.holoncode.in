@@ -73,6 +73,8 @@ async def import_start(inp: dict[str, Any]) -> dict[str, Any]:
                     VALUES (:id, :b, :k, :f, 'extracting', :w) ON CONFLICT (id) DO NOTHING"""),
             {"id": run_id, "b": business_id, "k": kind, "f": f.id, "w": f"import-{run_id}"},
         )
+    if inp.get("mode") == "onboarding":
+        await owner.onboarding.set_state(business_id, "extracting", {"import_run_id": str(run_id)})
     if inp.get("announce", False):  # started by the owner desk, which already said "reading…"
         await _say(inp, "start", [{"type": "text", "text": f"Reading your file… 📄 ({f.filename or kind})"}])
     await emit("import", PipelineEventStatus.START, business_id=business_id, import_run=str(run_id), kind=kind)

@@ -59,6 +59,21 @@ class Workflows:
         log.info("import_started", business_id=str(business_id), import_run_id=str(run_id), mode=mode)
         return run_id
 
+    async def start_onboarding_preview(self, business_id: UUID, reply_conversation_id: UUID) -> str:
+        preview_id = new_id()
+        workflow_id = f"onboarding-preview-{preview_id}"
+        await (await client()).start_workflow(
+            "OnboardingPreviewWorkflow",
+            {
+                "preview_id": str(preview_id),
+                "business_id": str(business_id),
+                "reply_conversation_id": str(reply_conversation_id),
+            },
+            id=workflow_id,
+            task_queue=get_settings().temporal_task_queue,
+        )
+        return workflow_id
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         c = await client()
         try:

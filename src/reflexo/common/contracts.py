@@ -418,6 +418,10 @@ class WorkflowPort(Protocol):
         """Start `ImportWorkflow`; returns the import run id (workflow id `import-<run id>`)."""
         ...
 
+    async def start_onboarding_preview(self, business_id: UUID, reply_conversation_id: UUID) -> str:
+        """Start `OnboardingPreviewWorkflow` (5 sample customer Q&As for the owner); returns the workflow id."""
+        ...
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         """Deliver a signal; False if the workflow is gone (finished/timed out)."""
         ...

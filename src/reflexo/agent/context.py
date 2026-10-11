@@ -96,18 +96,35 @@ async def prepare(ref: TurnRef) -> PreparedContext:
                 {"c": ref.conversation_id},
             )
         ).first()
+    return await build_context(
+        ref.business_id, conv, inbound, history, relay_row=relay_row, pending=pending, started=started
+    )
+
+
+async def build_context(
+    business_id: UUID,
+    conv: gateway.ConversationView,
+    inbound: list[gateway.MessageView],
+    history: list[gateway.MessageView],
+    *,
+    relay_row: Any = None,
+    pending: Any = None,
+    started: float | None = None,
+) -> PreparedContext:
+    """Lay out the prompt from loaded rows. Also used without a real conversation (onboarding preview sandbox)."""
+    started = started if started is not None else time.perf_counter()
     inbound_text = "\n".join(m.text for m in inbound if m.text).strip()
     customer_id = conv.customer.id if conv.customer else None
 
     # speculative retrieval starts first so its two queries get pool connections before the other loads
-    spec_task = asyncio.create_task(knowledge.speculative(ref.business_id, inbound_text, customer_id=customer_id))
+    spec_task = asyncio.create_task(knowledge.speculative(business_id, inbound_text, customer_id=customer_id))
     await asyncio.sleep(0)
     profile, settings, qas, biz_profile, order = await asyncio.gather(
-        knowledge.profile_block(ref.business_id),
-        knowledge.business_settings(ref.business_id),
-        knowledge.qa_block(ref.business_id),
-        knowledge.get_profile(ref.business_id),
-        commerce.open_order(ref.business_id, customer_id) if customer_id else _none(),
+        knowledge.profile_block(business_id),
+        knowledge.business_settings(business_id),
+        knowledge.qa_block(business_id),
+        knowledge.get_profile(business_id),
+        commerce.open_order(business_id, customer_id) if customer_id else _none(),
     )
     spec = await spec_task
 

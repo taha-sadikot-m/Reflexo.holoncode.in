@@ -194,7 +194,7 @@ async def test_send_to_customer_and_cod_rule(registry: Registry, db: Database, f
                     args={
                         "action": "send",
                         "blocks": [{"type": "text", "text": "Namaste!"}],
-                        "topic": "smalltalk",
+                        "topic": "greeting_smalltalk",
                         "language": "hi-Latn",
                         "referenced_records": [],
                     },

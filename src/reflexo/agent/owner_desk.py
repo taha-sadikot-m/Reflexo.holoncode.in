@@ -92,6 +92,7 @@ async def prepare_owner(ref: TurnRef) -> OwnerContext:
     files = await owner.search_files(ref.business_id, limit=10)
     waiting = await approvals.pending(ref.business_id, limit=5)
     member_name, member_role = await owner.member_info(ref.business_id, conv.member_id)
+    onboarding = await owner.onboarding.get(ref.business_id)
     tz = str(settings.get("timezone") or "Asia/Kolkata")
 
     cod = settings.get("cod_rule") or {}
@@ -128,6 +129,7 @@ async def prepare_owner(ref: TurnRef) -> OwnerContext:
             "# RECENT FILES\n"
             + ("\n".join(f.line(to_business_tz(f.created_at, tz).strftime("%d %b %H:%M")) for f in files) or "(none)"),
             "# PENDING\n" + ("\n".join(pending) or "(nothing pending)"),
+            *([_onboarding_block(onboarding)] if onboarding and onboarding["state"] != "live" else []),
             "# NOW — new message(s) from the owner\n" + "\n".join(_fmt(conv.channel, m, tz) for m in inbound),
             f"Current time: {now.strftime('%a %d %b %Y, %H:%M')} ({tz}); {dates}. Finish with `reply_owner`.",
         ]
@@ -140,6 +142,27 @@ async def prepare_owner(ref: TurnRef) -> OwnerContext:
         member_name=member_name,
         timings_ms={"prepare": int((time.perf_counter() - started) * 1000)},
     )
+
+
+def _onboarding_block(session: dict[str, Any]) -> str:
+    state, data = session["state"], session["data"]
+    current = next((g for g in owner.onboarding.GAPS if g.key == data.get("current")), None)
+    gap_step = (
+        f"Current question key '{current.key}': \"{current.ask}\". When the owner answers, call onboarding_answer "
+        "with that key and their words (answer=null if they say later/skip); then ask the next question it returns."
+        if current
+        else "Ask the remaining onboarding questions via onboarding_answer."
+    )
+    steps = {
+        "sources_requested": "Ask for the menu / price list (photo, PDF, Excel, or typed). When a file appears in "
+        "RECENT FILES, call import_from_file with mode='onboarding'.",
+        "extracting": "The menu is being read, or waits for the owner to confirm the summary (confirm_pending if "
+        "they agree in their own words).",
+        "gap_questions": gap_step,
+        "preview": "The owner is reviewing sample answers. 'theek hai'/ok → onboarding_finish. A correction → "
+        "knowledge_change (qa) with the right answer, then ask if everything else is fine.",
+    }
+    return f"# ONBOARDING (state: {state}) — not live for customers yet\n{steps.get(state, '')}"
 
 
 # ---------------------------------------------------------------- graph

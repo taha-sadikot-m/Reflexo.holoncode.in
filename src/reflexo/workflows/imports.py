@@ -16,6 +16,7 @@ from temporalio.exceptions import ActivityError, ApplicationError
 with workflow.unsafe.imports_passed_through():
     from reflexo.knowledge.api import imports as knowledge_imports  # summary_text: pure function
     from reflexo.workflows import import_activities as acts
+    from reflexo.workflows import onboarding as onb
 
 SHORT = RetryPolicy(maximum_attempts=3, non_retryable_error_types=["ImportFailed"])
 REVIEW_TIMEOUT = timedelta(hours=24)
@@ -92,6 +93,12 @@ class ImportWorkflow:
         except ActivityError as err:
             await self._finish(inp, "failed", _owner_message(err))
             return {"status": "failed"}
+        if inp.get("mode") == "onboarding":  # continue the onboarding state machine (gap questions / preview)
+            nxt = await workflow.execute_activity(
+                onb.after_import, inp, start_to_close_timeout=timedelta(seconds=20), retry_policy=SHORT
+            )
+            if nxt["preview"]:
+                await onb.run_preview(inp)
         return {"status": "committed", "stats": prepared["stats"]}
 
     async def _finish(self, inp: dict[str, Any], status: str, message: str) -> None:

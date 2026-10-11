@@ -493,6 +493,44 @@ async def confirm_pending(ctx: ToolContext, args: ConfirmPendingArgs, s: AsyncSe
     return {"result": outcome or "Done — the result follows in a moment."}
 
 
+# ---------------------------------------------------------------- onboarding (POC_05 §3.4)
+
+
+class OnboardingAnswerArgs(BaseModel):
+    key: str = Field(description="The current onboarding question key (see ONBOARDING)")
+    answer: str | None = Field(default=None, description="The owner's answer in their words; null if they skip it")
+
+
+@tool("onboarding_answer", OnboardingAnswerArgs, desks=OWNER, side_effect=True)
+async def onboarding_answer(ctx: ToolContext, args: OnboardingAnswerArgs, s: AsyncSession) -> dict[str, Any]:
+    """Save the owner's answer to the current onboarding question (or skip it) and get the next step."""
+    if args.key not in {g.key for g in owner.onboarding.GAPS}:
+        raise ToolError("INVALID_ARGS", f"unknown question {args.key}", guidance="Use the key shown in ONBOARDING.")
+    await owner.onboarding.record_gap(ctx.business_id, args.key, args.answer, ctx.member_id)
+    gap = await owner.onboarding.next_gap(ctx.business_id)
+    if gap is not None:
+        await owner.onboarding.set_state(ctx.business_id, "gap_questions", {"current": gap.key})
+        return {"saved": bool(args.answer), "next_question": {"key": gap.key, "ask": gap.ask}}
+    assert ctx.conversation_id is not None
+    await ports.registry.require(WorkflowPort).start_onboarding_preview(  # type: ignore[type-abstract]
+        ctx.business_id, ctx.conversation_id
+    )
+    return {
+        "saved": bool(args.answer),
+        "next": "All set. Tell the owner you're preparing a preview of how you'll answer customers (arrives shortly).",
+    }
+
+
+@tool("onboarding_finish", NoArgs, desks=OWNER, side_effect=True)
+async def onboarding_finish(ctx: ToolContext, args: NoArgs, s: AsyncSession) -> dict[str, Any]:
+    """The owner approved the preview ("theek hai", "ok, live karo"): go live for customers."""
+    session = await owner.onboarding.get(ctx.business_id)
+    if not session or session["state"] != "preview":
+        raise ToolError("NOT_APPLICABLE", "not at the preview step", guidance="Continue the current onboarding step.")
+    await owner.onboarding.go_live(ctx.business_id)
+    return {"live": True, "say": owner.onboarding.LIVE}
+
+
 # ---------------------------------------------------------------- terminal
 
 
@@ -520,5 +558,7 @@ OWNER_TOOLS = [
     "orders_list",
     "import_from_file",
     "confirm_pending",
+    "onboarding_answer",
+    "onboarding_finish",
     "reply_owner",
 ]

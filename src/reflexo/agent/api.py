@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from reflexo.agent import media_describe
+from reflexo.agent import media_describe, sandbox
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
@@ -119,3 +119,11 @@ __all__ += ["ChatResult", "GeminiProvider", "MediaInput", "ModelError", "ModelPr
 # Shared tools the voice desk binds (POC_04 §10.4); voice-only tools (end_call, send_to_chat...) live in voice.
 VOICE_TOOLS = ("catalog_search", "catalog_get", "knowledge_lookup", "delivery_quote")
 __all__ += ["VOICE_TOOLS", "ToolContext", "extract_amounts", "run_tool"]
+
+
+async def preview_answer(business_id: UUID, question: str) -> str:
+    """Onboarding preview: how the customer desk would answer, without a conversation or any side effect."""
+    return await sandbox.preview_answer(gateway(), business_id, question)
+
+
+__all__ += ["preview_answer"]

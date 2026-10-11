@@ -20,10 +20,11 @@ from reflexo.common.logging import get_logger
 from reflexo.workflows.client import client, task_queue
 from reflexo.workflows.import_activities import ACTIVITIES as IMPORT_ACTIVITIES
 from reflexo.workflows.imports import ImportWorkflow
+from reflexo.workflows.onboarding import ONBOARDING_ACTIVITIES, OnboardingPreviewWorkflow
 
 log = get_logger(__name__)
-WORKFLOWS = [ImportWorkflow]
-ACTIVITIES: list[Callable[..., Any]] = [*IMPORT_ACTIVITIES]
+WORKFLOWS = [ImportWorkflow, OnboardingPreviewWorkflow]
+ACTIVITIES: list[Callable[..., Any]] = [*IMPORT_ACTIVITIES, *ONBOARDING_ACTIVITIES]
 HEARTBEAT_S = 5
 
 

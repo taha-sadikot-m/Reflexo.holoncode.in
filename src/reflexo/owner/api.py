@@ -5,6 +5,7 @@ Owner timeline, file library, notifications, onboarding flow, deterministic owne
 
 from reflexo.common.contracts import OwnerCommandPort, OwnerNotifyPort
 from reflexo.common.ports import Registry
+from reflexo.owner import onboarding
 from reflexo.owner.commands import OwnerCommands, execute_decision
 from reflexo.owner.files import OwnerFile, get_file, member_info, search_files, set_description
 from reflexo.owner.notify import OwnerNotifier
@@ -16,6 +17,7 @@ __all__ = [
     "execute_decision",
     "get_file",
     "member_info",
+    "onboarding",
     "register",
     "search_files",
     "set_description",
