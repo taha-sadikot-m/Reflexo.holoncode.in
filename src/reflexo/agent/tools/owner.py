@@ -22,6 +22,7 @@ import reflexo.approvals.api as approvals
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner
+from reflexo.agent.language import detect as detect_language
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
 from reflexo.common.contracts import QuestionAnswerPort, WorkflowPort
@@ -493,6 +494,32 @@ async def confirm_pending(ctx: ToolContext, args: ConfirmPendingArgs, s: AsyncSe
     return {"result": outcome or "Done — the result follows in a moment."}
 
 
+# ---------------------------------------------------------------- automations (POC_06 §4)
+
+
+class AutomationBuilderArgs(BaseModel):
+    description: str = Field(description="The owner's rule(s) in their own words, complete (one message may hold 3)")
+
+
+@tool("start_automation_builder", AutomationBuilderArgs, desks=OWNER, side_effect=True)
+async def start_automation_builder(ctx: ToolContext, args: AutomationBuilderArgs, s: AsyncSession) -> dict[str, Any]:
+    """Turn the owner's rule(s) ("whenever…", limits, reminders, confirmations) into automations. A read-back with
+    a YES code follows in a moment; nothing runs until the owner confirms."""
+    assert ctx.conversation_id is not None
+    workflow_id = await ports.registry.require(WorkflowPort).start_automation_build(  # type: ignore[type-abstract]
+        ctx.business_id,
+        member_id=ctx.member_id,
+        description=args.description,
+        reply_conversation_id=ctx.conversation_id,
+        language=detect_language(args.description, default="hi-Latn"),
+    )
+    return {
+        "started": True,
+        "workflow": workflow_id,
+        "next": "Tell the owner in one short line that you're preparing the rules; the read-back follows.",
+    }
+
+
 # ---------------------------------------------------------------- onboarding (POC_05 §3.4)
 
 
@@ -558,6 +585,7 @@ OWNER_TOOLS = [
     "orders_list",
     "import_from_file",
     "confirm_pending",
+    "start_automation_builder",
     "onboarding_answer",
     "onboarding_finish",
     "reply_owner",

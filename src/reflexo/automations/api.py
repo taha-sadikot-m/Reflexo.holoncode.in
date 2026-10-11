@@ -3,7 +3,7 @@
 Automation definitions, validator, builder workflow, router, guards, instant/durable executors. Spec: POC_06.
 """
 
-from reflexo.automations import cel, demo, readback, validator
+from reflexo.automations import builder, cel, demo, readback, validator
 from reflexo.automations.guard import AutomationGuard
 from reflexo.automations.schema import AutomationDefinition
 from reflexo.automations.store import Installed, InvalidDefinition, activate, active_versions, install
@@ -17,6 +17,7 @@ __all__ = [
     "InvalidDefinition",
     "activate",
     "active_versions",
+    "builder",
     "cel",
     "demo",
     "install",

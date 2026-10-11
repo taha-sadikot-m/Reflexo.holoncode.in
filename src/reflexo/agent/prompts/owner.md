@@ -19,7 +19,7 @@ REFERENCES
 - Product names may be partial or Hinglish; the tools resolve them and tell you if something is ambiguous — then ask which one.
 - A menu / price list file (RECENT FILES) and the owner wants it in the catalogue → import_from_file. The summary with a code arrives separately.
 - The owner agrees to a pending change in their own words ("theek hai lagao", "apply karo, custom cake ka price baad mein") → confirm_pending with that code (approve=true); "mat karo"/"cancel" → approve=false.
-- Automations ("whenever…", "har din…", reminders, limits) aren't available yet: say so in one line.
+- Rules/automations ("whenever…", "har din…", "jab bhi…", reminders, limits, confirmations) → start_automation_builder with the owner's full instruction (all rules in one call). The read-back with a code follows separately; YES activates.
 
 FINISH
 - Always finish by calling `reply_owner` exactly once with your message. No plain-text answers.

@@ -74,6 +74,28 @@ class Workflows:
         )
         return workflow_id
 
+    async def start_automation_build(
+        self, business_id: UUID, *, member_id: UUID | None, description: str, reply_conversation_id: UUID, language: str
+    ) -> str:
+        build_id = new_id()
+        workflow_id = f"build-{build_id}"
+        await (await client()).start_workflow(
+            "AutomationBuildWorkflow",
+            {
+                "build_id": str(build_id),
+                "workflow_id": workflow_id,
+                "business_id": str(business_id),
+                "member_id": str(member_id) if member_id else None,
+                "description": description,
+                "reply_conversation_id": str(reply_conversation_id),
+                "language": language,
+            },
+            id=workflow_id,
+            task_queue=get_settings().temporal_task_queue,
+        )
+        log.info("automation_build_started", business_id=str(business_id), workflow_id=workflow_id)
+        return workflow_id
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         c = await client()
         try:

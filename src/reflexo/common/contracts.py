@@ -422,6 +422,12 @@ class WorkflowPort(Protocol):
         """Start `OnboardingPreviewWorkflow` (5 sample customer Q&As for the owner); returns the workflow id."""
         ...
 
+    async def start_automation_build(
+        self, business_id: UUID, *, member_id: UUID | None, description: str, reply_conversation_id: UUID, language: str
+    ) -> str:
+        """Start `AutomationBuildWorkflow` (owner's words → definitions → read-back → YES); returns the workflow id."""
+        ...
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         """Deliver a signal; False if the workflow is gone (finished/timed out)."""
         ...

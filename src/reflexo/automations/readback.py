@@ -151,9 +151,9 @@ def _step_text(d: AutomationDefinition, s: Any, lang: Lang, seen: set[str]) -> l
         dims = [_label(e, lang) for e in expressions_in(s.key)]
         dim = dims[0] if dims else ("din" if hi else "day")
         out.append(
-            f"har {dim} par maximum **{s.limit} {thing}** orders"
+            f"har {dim} par maximum *{s.limit} {thing}* orders"
             if hi
-            else f"at most **{s.limit} {thing}** orders per {dim}"
+            else f"at most *{s.limit} {thing}* orders per {dim}"
         )
         if s.on_exhausted == "deny":
             deny = next((x for x in d.steps if x.type == "deny"), None)
@@ -206,10 +206,10 @@ def _chain(d: AutomationDefinition, start: str | None, lang: Lang, seen: set[str
 
 
 def describe(d: AutomationDefinition, lang: Lang = "hi-Latn") -> str:
-    """One automation as one sentence block: '**Name:** trigger — steps.'"""
+    """One automation as one sentence block: '*Name:* trigger — steps.'"""
     trigger = _trigger(d, lang)
     body = ", ".join(_step_text(d, d.steps[0], lang, set()))
-    return f"**{d.name}:** {trigger[0].upper()}{trigger[1:]}, {body}."
+    return f"*{d.name}:* {trigger[0].upper()}{trigger[1:]}, {body}."
 
 
 def readback(defs: list[AutomationDefinition], lang: Lang = "hi-Latn", demo_time_scale: float = 1.0) -> str:
