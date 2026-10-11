@@ -262,9 +262,16 @@ async def _tools(state: OwnerState, config: RunnableConfig) -> dict[str, Any]:
     results = await run_tools(calls, ctx, set(OWNER_TOOLS))
     found = list(state.get("approvals") or [])
     for _, r in results:
-        approval = (r.get("data") or {}).get("approval") if isinstance(r, dict) else None
+        data = (r.get("data") or {}) if isinstance(r, dict) else {}
+        approval = data.get("approval")
         if isinstance(approval, dict) and approval.get("id"):
-            found.append({"id": str(approval["id"]), "code": str(approval["code"])})
+            found.append(
+                {
+                    "id": str(approval["id"]),
+                    "code": str(approval["code"]),
+                    "read_back": "\n".join(str(x) for x in data.get("read_back") or []),
+                }
+            )
     messages = [
         ToolMessage(content=json.dumps(r, ensure_ascii=False, default=str), tool_call_id=c.id, name=c.name)
         for c, r in results
@@ -295,8 +302,20 @@ def build_owner_graph() -> StateGraph[OwnerState]:
 # ---------------------------------------------------------------- runner
 
 
+def with_read_back(text_: str, found: list[dict[str, str]]) -> str:
+    """The owner must see exactly what they confirm: any read-back line the model left out is added verbatim."""
+    missing = [
+        line
+        for a in found
+        for line in (a.get("read_back") or "").splitlines()
+        if line.strip() and line.strip() not in text_
+    ]
+    return text_ if not missing else "\n".join(missing) + "\n\n" + text_
+
+
 def reply_blocks(text_: str, found: list[dict[str, str]]) -> list[dict[str, Any]]:
     """The reply, with [Confirm] [Cancel] for the approval made this turn (several: one Confirm per code)."""
+    text_ = with_read_back(text_, found)
     if not found:
         return [{"type": "text", "text": text_}]
     if len(found) == 1:

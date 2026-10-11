@@ -360,3 +360,13 @@ async def test_media_describe_fills_owner_file_and_customer_photo(
     [f] = await q(db, "SELECT description FROM owner_files WHERE media_object_id = :m", m=owner_media)
     [m] = await q(db, "SELECT description FROM media_objects WHERE id = :m", m=customer_media)
     assert (f.description, m.description) == ("Menu photo, 6 cakes with prices", "Two-tier red velvet cake")
+
+
+def test_read_back_lines_are_always_shown() -> None:
+    from reflexo.agent.owner_desk import reply_blocks
+
+    found = [{"id": "x" * 36, "code": "1234", "read_back": "✏️ Truffle 1 kg price: ₹950 → ₹999"}]
+    blocks = reply_blocks("Reply YES 1234 to confirm.", found)  # the model forgot the line
+    assert blocks[0]["text"].startswith("✏️ Truffle 1 kg price: ₹950 → ₹999\n\nReply YES 1234")
+    kept = reply_blocks("✏️ Truffle 1 kg price: ₹950 → ₹999\nReply YES 1234", found)
+    assert kept[0]["text"].count("₹950 → ₹999") == 1
