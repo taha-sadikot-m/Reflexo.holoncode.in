@@ -1,0 +1,138 @@
+# Meera's Bakes — home baker in Pune (POC_00 §3). Main demo story.
+# Identity values that differ per environment come from .env (REFLEXO_SEED_*), referenced by *_setting keys.
+slug: meeras-bakes
+name: "Meera's Bakes"
+default_language: hi-Latn
+order_number_prefix: MB
+order_number_start: 1000
+
+settings:
+  holding_messages:
+    hi-Latn: "Ek minute, main check karke batati hoon 🙏"
+    en: "One moment please, let me check and get back to you 🙏"
+    hi: "एक मिनट, मैं देखकर बताती हूँ 🙏"
+  owner_question_sla_min: 15
+  ask_owner_batch_min: 0
+  cod_rule: null          # set live in the demo ("COD sirf 1000 se kam ke orders par")
+
+profile:
+  identity:
+    name: "Meera's Bakes"
+    description: "Home bakery in Kothrud, Pune — fresh cakes, brownies and cookies, made to order."
+    category: "home bakery"
+    owner_name: "Meera"
+  contact:
+    phone: null
+    address: "Kothrud, Pune 411038"
+    maps_url: null
+    website: null
+  hours:
+    weekly:
+      - {day: mon, intervals: [{open: "10:00", close: "20:00"}]}
+      - {day: tue, intervals: [{open: "10:00", close: "20:00"}]}
+      - {day: wed, intervals: [{open: "10:00", close: "20:00"}]}
+      - {day: thu, intervals: [{open: "10:00", close: "20:00"}]}
+      - {day: fri, intervals: [{open: "10:00", close: "20:00"}]}
+      - {day: sat, intervals: [{open: "10:00", close: "21:00"}]}
+      - {day: sun, intervals: [{open: "11:00", close: "18:00"}]}
+    exceptions: []
+  delivery:
+    notice_hours: 24
+    pickup_available: true
+    pickup_address: "Kothrud, Pune 411038"
+    zones:
+      - id: kothrud-10km
+        label: "Kothrud + 10 km"
+        pincodes: ["411038", "411029", "411052", "411058", "411004", "411016", "411030", "411041"]
+        areas: ["Kothrud", "Karve Nagar", "Warje", "Erandwane", "Deccan", "Shivajinagar", "Bavdhan", "Sinhagad Road"]
+        fee_paise: 5000
+        free_above_paise: 150000
+        eta: "on the chosen delivery slot"
+  policies:
+    returns: "Cakes are made to order, so returns are not possible. If something is wrong with your order, message us within 2 hours of delivery and we will make it right."
+    cancellation: "Free cancellation up to 24 hours before delivery."
+    custom_orders: "Custom photo cakes need 48 hours notice; price depends on design and weight."
+  payments:
+    methods: ["upi_link", "card_link"]
+  persona:
+    name: "Meera's Bakes team"
+    tone: friendly
+    formality: aap
+    emoji: light
+    greeting: "Namaste! Meera's Bakes mein aapka swagat hai 🎂"
+    languages: ["hi-Latn", "en", "hi"]
+
+owner:
+  display_name: "Meera"
+  whatsapp_setting: seed_owner_wa_e164
+  telegram_setting: seed_owner_tg_user_id
+  simulated_whatsapp: "+919999900001"     # Lab owner device (simulated_only binding, POC_07 §3.2)
+
+connections:
+  - {channel: whatsapp, provider: meta_whatsapp, external_account_setting: seed_wa_phone_number_id, display_name: "Meera's Bakes (WhatsApp)", roles: [customer, owner], credential_ref: REFLEXO_WA}
+  - {channel: telegram, provider: telegram, external_account_setting: seed_tg_bot_id, display_name: "Meera's Bakes (Telegram)", roles: [customer, owner], credential_ref: REFLEXO_TELEGRAM}
+  - {channel: facebook_messenger, provider: meta_pages, external_account_setting: seed_fb_page_id, display_name: "Meera's Bakes (Messenger)", roles: [customer], credential_ref: REFLEXO_FB}
+  - {channel: instagram_dm, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram DM)", roles: [customer], credential_ref: REFLEXO_IG}
+  - {channel: instagram_comment, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram comments)", roles: [customer], credential_ref: REFLEXO_IG}
+  - {channel: web_widget, provider: simulator, external_account_id: sim-meeras-bakes, display_name: "Meera's Bakes (Simulator)", roles: [customer, owner]}
+
+order_detail_schemas:
+  - name: "Cake order details"
+    applies_to: {categories: ["cakes"], offering_ids: [], all: false}
+    fields:
+      - {key: flavour, label: "Flavour", type: choice, required: false, options: ["chocolate", "red velvet", "pineapple"], hint: "Only ask if the cake has flavour options"}
+      - {key: eggless, label: "Eggless?", type: choice, required: true, options: ["yes", "no"], hint: "Eggless adds ₹50"}
+      - {key: message_on_cake, label: "Message on cake", type: text, required: false, options: [], hint: "Up to 30 characters"}
+      - {key: delivery_date, label: "Delivery date", type: date, required: true, options: [], hint: "At least 24 hours from now"}
+      - {key: delivery_slot, label: "Delivery slot", type: slot, required: true, options: ["10am-1pm", "1pm-4pm", "4pm-8pm"], hint: ""}
+      - {key: address, label: "Delivery address", type: address, required: true, options: [], hint: "Or 'pickup'"}
+  - name: "General order details"
+    applies_to: {categories: [], offering_ids: [], all: true}
+    fields:
+      - {key: delivery_date, label: "Delivery date", type: date, required: true, options: [], hint: ""}
+      - {key: delivery_slot, label: "Delivery slot", type: slot, required: true, options: ["10am-1pm", "1pm-4pm", "4pm-8pm"], hint: ""}
+      - {key: address, label: "Delivery address", type: address, required: true, options: [], hint: "Or 'pickup'"}
+
+qa:
+  - {question: "Do you deliver to my area?", variants: ["delivery kahan tak hai", "kya aap deliver karte ho"], answer: "We deliver within about 10 km of Kothrud, Pune (₹50, free above ₹1,500). Pickup from Kothrud is also available.", topic: delivery_shipping}
+  - {question: "How early should I order?", variants: ["kitne din pehle order karna hai", "same day milega?"], answer: "Please order at least 24 hours before delivery. Custom photo cakes need 48 hours.", topic: availability_stock}
+  - {question: "How can I pay?", variants: ["payment kaise karu", "UPI chalega?"], answer: "You can pay by UPI or card through a secure payment link we send you.", topic: payments}
+
+catalog:   # loaded only with --full (the demo builds it from a menu photo)
+  - name: "Chocolate Truffle Cake"
+    category: cakes
+    description: "Rich chocolate sponge layered with dark chocolate ganache."
+    attributes: {eggless_available: true, eggless_extra_paise: 5000}
+    aliases: ["choco truffle", "truffle cake", "chocolate cake", "चॉकलेट ट्रफल केक"]
+    variants: [{name: "500 g", price_paise: 55000}, {name: "1 kg", price_paise: 95000}]
+  - name: "Red Velvet Cake"
+    category: cakes
+    description: "Classic red velvet with cream cheese frosting."
+    attributes: {eggless_available: true, eggless_extra_paise: 5000}
+    aliases: ["red velvet", "रेड वेलवेट"]
+    variants: [{name: "1 kg", price_paise: 110000}]
+  - name: "Pineapple Cake"
+    category: cakes
+    description: "Light vanilla sponge with fresh pineapple and whipped cream."
+    attributes: {eggless_available: true, eggless_extra_paise: 5000}
+    aliases: ["pineapple", "पाइनएप्पल केक"]
+    variants: [{name: "1 kg", price_paise: 75000}]
+  - name: "Fudge Brownies"
+    category: brownies
+    description: "Gooey chocolate fudge brownies."
+    attributes: {eggless_available: true, eggless_extra_paise: 0}
+    aliases: ["brownie", "brownies box"]
+    variants: [{name: "Box of 6", price_paise: 42000}]
+  - name: "Choco-chip Cookies"
+    category: cookies
+    description: "Crunchy butter cookies with chocolate chips."
+    attributes: {eggless_available: true, eggless_extra_paise: 0}
+    aliases: ["cookies", "chocochip cookies", "कुकीज़"]
+    variants: [{name: "Jar of 12", price_paise: 35000}]
+  - name: "Custom Photo Cake"
+    category: cakes
+    description: "Photo-printed cake in your choice of flavour. Price depends on design and weight."
+    attributes: {eggless_available: true, notice_hours: 48}
+    aliases: ["photo cake", "custom cake", "birthday photo cake"]
+    base_price_paise: null
+    variants: []

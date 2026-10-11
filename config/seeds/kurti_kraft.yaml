@@ -1,0 +1,69 @@
+# Kurti Kraft — online clothing store (Shopify dev store in F15). Second tenant for the isolation demo (F12).
+slug: kurti-kraft
+name: "Kurti Kraft"
+default_language: en
+order_number_prefix: KK
+order_number_start: 5000
+
+settings:
+  holding_messages:
+    en: "Give me a moment, I'll check and get back to you."
+    hi-Latn: "Ek minute, check karke batati hoon."
+  owner_question_sla_min: 15
+  ask_owner_batch_min: 0
+  cod_rule: {enabled: true, max_total_paise: 300000}
+
+profile:
+  identity: {name: "Kurti Kraft", description: "Handblock-printed cotton kurtis and dupattas, shipped across India.", category: "online clothing store", owner_name: "Anita"}
+  contact: {phone: null, address: "Jaipur, Rajasthan", maps_url: null, website: null}
+  hours:
+    weekly:
+      - {day: mon, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: tue, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: wed, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: thu, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: fri, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: sat, intervals: [{open: "09:00", close: "19:00"}]}
+      - {day: sun, intervals: []}
+    exceptions: []
+  delivery:
+    notice_hours: 0
+    pickup_available: false
+    pickup_address: null
+    zones:
+      - {id: all-india, label: "All India", pincodes: [], areas: ["India"], fee_paise: 7900, free_above_paise: 99900, eta: "4–7 days"}
+  policies:
+    returns: "Easy 7-day returns on unused items with tags."
+    cancellation: "Orders can be cancelled before shipping."
+    custom_orders: "No custom orders."
+  payments: {methods: ["upi_link", "card_link", "cod"]}
+  persona: {name: "Kurti Kraft", tone: professional, formality: aap, emoji: none, greeting: "Hello! Welcome to Kurti Kraft.", languages: ["en", "hi-Latn"]}
+
+owner:
+  display_name: "Anita"
+  simulated_whatsapp: "+919999900002"
+
+connections:
+  - {channel: web_widget, provider: simulator, external_account_id: sim-kurti-kraft, display_name: "Kurti Kraft (Simulator)", roles: [customer, owner]}
+
+order_detail_schemas:
+  - name: "Shipping details"
+    applies_to: {categories: [], offering_ids: [], all: true}
+    fields:
+      - {key: size, label: "Size", type: choice, required: true, options: ["S", "M", "L", "XL"], hint: ""}
+      - {key: address, label: "Shipping address with pincode", type: address, required: true, options: [], hint: ""}
+
+qa:
+  - {question: "Do you ship outside India?", variants: ["international shipping"], answer: "Right now we ship only within India.", topic: delivery_shipping}
+
+catalog:
+  - {name: "Indigo Dabu Kurti", category: kurtis, description: "Hand-block Dabu print, pure cotton.", attributes: {fabric: cotton}, aliases: ["indigo kurti", "blue kurti"], variants: [{name: "S", price_paise: 129900}, {name: "M", price_paise: 129900}, {name: "L", price_paise: 129900}, {name: "XL", price_paise: 129900}]}
+  - {name: "Red Bagru Kurti", category: kurtis, description: "Bagru print with natural dyes.", attributes: {fabric: cotton}, aliases: ["red kurti", "bagru"], variants: [{name: "S", price_paise: 119900}, {name: "M", price_paise: 119900}, {name: "L", price_paise: 119900}]}
+  - {name: "Mustard Anarkali Kurti", category: kurtis, description: "Flared anarkali in mustard cotton.", attributes: {fabric: cotton}, aliases: ["yellow kurti", "anarkali"], variants: [{name: "M", price_paise: 179900}, {name: "L", price_paise: 179900}]}
+  - {name: "White Chikankari Kurti", category: kurtis, description: "Lucknowi chikankari on soft cotton.", attributes: {fabric: cotton}, aliases: ["chikan kurti", "white kurti"], variants: [{name: "S", price_paise: 219900}, {name: "M", price_paise: 219900}, {name: "L", price_paise: 219900}]}
+  - {name: "Green Leheriya Kurti", category: kurtis, description: "Leheriya tie-dye, rayon cotton.", attributes: {fabric: rayon}, aliases: ["green kurti", "leheriya"], variants: [{name: "M", price_paise: 99900}, {name: "L", price_paise: 99900}]}
+  - {name: "Black Kalamkari Kurti", category: kurtis, description: "Kalamkari motifs on black cotton.", attributes: {fabric: cotton}, aliases: ["black kurti", "kalamkari"], variants: [{name: "S", price_paise: 149900}, {name: "M", price_paise: 149900}]}
+  - {name: "Pink Mulmul Dupatta", category: dupattas, description: "Featherlight mulmul dupatta.", attributes: {fabric: mulmul}, aliases: ["pink dupatta"], variants: [{name: "Free size", price_paise: 59900}]}
+  - {name: "Ajrakh Cotton Dupatta", category: dupattas, description: "Ajrakh block print dupatta.", attributes: {fabric: cotton}, aliases: ["ajrakh dupatta"], variants: [{name: "Free size", price_paise: 79900}]}
+  - {name: "Cotton Palazzo", category: bottoms, description: "Comfortable straight palazzo pants.", attributes: {fabric: cotton}, aliases: ["palazzo", "pants"], variants: [{name: "M", price_paise: 69900}, {name: "L", price_paise: 69900}]}
+  - {name: "Kurti + Dupatta Set", category: sets, description: "Indigo kurti with matching dupatta.", attributes: {fabric: cotton}, aliases: ["kurti set", "suit set"], variants: [{name: "M", price_paise: 179900}, {name: "L", price_paise: 179900}]}

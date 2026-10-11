@@ -1,0 +1,87 @@
+# REFLEXO — local development infrastructure (profile "infra", default) and the demo stack (profile "demo").
+# Dev:  docker compose up -d            (infra only; run app processes with `uv run python tasks.py dev`)
+# Demo: docker compose --profile demo up -d
+
+name: reflexo
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: reflexo_owner
+      POSTGRES_PASSWORD: ${REFLEXO_DB_OWNER_PASSWORD:-owner_dev}
+      POSTGRES_DB: reflexo
+      REFLEXO_APP_DB_PASSWORD: ${REFLEXO_APP_DB_PASSWORD:-app_dev}
+      REFLEXO_SERVICE_DB_PASSWORD: ${REFLEXO_SERVICE_DB_PASSWORD:-service_dev}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:-temporal_dev}
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_preload_libraries=pg_stat_statements"]
+    ports: ["${REFLEXO_PG_PORT:-5442}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reflexo_owner -d reflexo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports: ["${REFLEXO_REDIS_PORT:-6390}:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.27.2
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:-temporal_dev}
+      POSTGRES_SEEDS: postgres
+    ports: ["${REFLEXO_TEMPORAL_PORT:-7243}:7233"]
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    depends_on: [temporal]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports: ["${REFLEXO_TEMPORAL_UI_PORT:-8098}:8080"]
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["${REFLEXO_JAEGER_UI_PORT:-16686}:16686", "${REFLEXO_OTLP_PORT:-4317}:4317"]
+    restart: unless-stopped
+
+  api:
+    profiles: ["demo"]
+    build: .
+    env_file: .env
+    environment:
+      REFLEXO_DATABASE_URL: postgresql+asyncpg://reflexo_app:${REFLEXO_APP_DB_PASSWORD:-app_dev}@postgres:5432/reflexo
+      REFLEXO_DATABASE_SERVICE_URL: postgresql+asyncpg://reflexo_service:${REFLEXO_SERVICE_DB_PASSWORD:-service_dev}@postgres:5432/reflexo
+      REFLEXO_DATABASE_OWNER_URL: postgresql+asyncpg://reflexo_owner:${REFLEXO_DB_OWNER_PASSWORD:-owner_dev}@postgres:5432/reflexo
+      REFLEXO_REDIS_URL: redis://redis:6379/0
+      REFLEXO_TEMPORAL_ADDRESS: temporal:7233
+      REFLEXO_OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    command: ["sh", "-c", "alembic upgrade head && uvicorn reflexo.api.main:app --host 0.0.0.0 --port 8080 --proxy-headers"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports: ["8080:8080"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
