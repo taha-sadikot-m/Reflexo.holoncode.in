@@ -292,12 +292,16 @@ def map_reply_to_option(text: str, options: list[dict[str, Any]]) -> dict[str, A
         n = _NUMBER_WORDS[t]
     if n is not None:
         return next((o for o in options if o["n"] == n), None)
-    # a reply that contains exactly one option's title as a whole phrase ("half kg please")
+    # a short reply that contains exactly one option's title as a whole phrase ("half kg please"); a long sentence
+    # that merely mentions a title ("… confirm COD orders and send reminders") is not a button press
     padded = f" {t} "
     contained = [
         o
         for o in options
-        if any(len(c) >= 3 and f" {c} " in padded for c in (_norm(x) for x in [o["title"], *o.get("aliases", [])]))
+        if any(
+            len(c) >= 3 and f" {c} " in padded and len(t.split()) <= len(c.split()) + 3
+            for c in (_norm(x) for x in [o["title"], *o.get("aliases", [])])
+        )
     ]
     if len(contained) == 1:
         return contained[0]

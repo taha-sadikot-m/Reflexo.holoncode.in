@@ -258,7 +258,7 @@ def test_models_yaml_interpolates_settings() -> None:
 
     s = get_settings()
     assert cfg.role("customer_desk").primary == s.model_primary
-    assert cfg.role("builder").primary == s.model_fallback  # builder prefers the stronger/slower model
+    assert cfg.role("builder").primary == s.model_primary  # live: flash-lite (our fallback) broke builder JSON
     assert cfg.role("customer_desk").thinking_budget == 0
     assert cfg.embedding.model == s.embedding_model and cfg.embedding.dimensions == 768
 

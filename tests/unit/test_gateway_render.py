@@ -263,3 +263,15 @@ def test_text_normalize_keeps_devanagari_marks() -> None:
 
     assert normalize("बंद करो!!") == "बंद करो"
     assert normalize("  Half-KG,  please ") == "half kg please"
+
+
+def test_long_sentence_mentioning_a_title_is_not_a_button_press() -> None:
+    """Live: "Do not take more than 8 orders a day, confirm COD orders…" pressed the owner's [✅ Confirm]."""
+    opts = [
+        {"n": 1, "option_id": "apv:x:a", "title": "✅ Confirm", "aliases": []},
+        {"n": 2, "option_id": "apv:x:r", "title": "✖ Cancel", "aliases": []},
+    ]
+    long = "Do not take more than 8 order in day, confirm COD orders and send reminder to customer before delivery"
+    assert map_reply_to_option(long, opts) is None
+    assert map_reply_to_option("ok confirm it", opts)["option_id"] == "apv:x:a"  # type: ignore[index]
+    assert map_reply_to_option("cancel please", opts)["option_id"] == "apv:x:r"  # type: ignore[index]

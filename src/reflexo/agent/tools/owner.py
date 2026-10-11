@@ -103,6 +103,26 @@ async def catalog_change(ctx: ToolContext, args: CatalogChangeArgs, s: AsyncSess
     for op in args.ops:
         if op.action == "add":
             name = str(op.fields.get("name") or op.target).strip()
+            same = [
+                o for o in await knowledge.resolve_offerings(ctx.business_id, name) if o.name.lower() == name.lower()
+            ]
+            if same:  # live: "Custom Photo Cake: price 1500" created a duplicate of the price-on-request item
+                if op.fields.get("price") is None:
+                    raise ToolError("ALREADY_EXISTS", f"{name} already exists", guidance="Ask what should change.")
+                existing = same[0]
+                price = _paise(op.fields["price"])
+                if len(existing.variants) > 1:
+                    sizes = ", ".join(v.name for v in existing.variants)
+                    raise ToolError(
+                        "AMBIGUOUS_MATCH", f"{name} has several sizes", guidance=f"Ask which size: {sizes}."
+                    )
+                if existing.variants:
+                    await knowledge.add(
+                        cs, "variant", "update", existing.variants[0].variant_id, {"price_paise": price}
+                    )
+                else:
+                    await knowledge.add(cs, "offering", "update", existing.offering_id, {"base_price_paise": price})
+                continue
             oid = await knowledge.add(
                 cs,
                 "offering",

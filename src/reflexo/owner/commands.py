@@ -109,6 +109,8 @@ class OwnerCommands:
             await self._answer(say, business_id, member_id, message_id, question, answer)
             return "answer"
 
+        if option_id and option_id.startswith("apv:") and len(body.split()) > 4:
+            option_id = None  # a typed sentence the gateway matched to [Confirm] is an instruction, not a tap
         if option_id and (m := _APPROVAL_BUTTON.match(option_id)):
             await self._decide(say, business_id, member_id, m.group(2) == "a", approval_id=UUID(m.group(1)))
             return "approval"

@@ -370,3 +370,40 @@ def test_read_back_lines_are_always_shown() -> None:
     assert blocks[0]["text"].startswith("✏️ Truffle 1 kg price: ₹950 → ₹999\n\nReply YES 1234")
     kept = reply_blocks("✏️ Truffle 1 kg price: ₹950 → ₹999\nReply YES 1234", found)
     assert kept[0]["text"].count("₹950 → ₹999") == 1
+
+
+async def test_adding_an_existing_product_updates_its_price(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live: "Custom Photo Cake: price 1500" created a second Custom Photo Cake instead of pricing the first."""
+    shop = await bakery(db)
+    fake.script(
+        PRIMARY,
+        steps(
+            call("catalog_change", ops=[{"action": "add", "target": "Custom Photo Cake", "fields": {"price": 1500}}]),
+            read_back_reply,
+        ),
+    )
+    await owner_turn(registry, db, shop, "Custom Photo Cake :- price 1500")
+    assert "✏️ Custom Photo Cake base price: — → ₹1,500" in (await owner_messages(db, shop))[-1]["text"]  # edit, not ➕
+    await owner_says(registry, db, shop, "haan")
+    rows = await q(
+        db, "SELECT base_price_paise FROM offerings WHERE business_id = :b AND name = 'Custom Photo Cake'", b=shop.bid
+    )
+    assert [r.base_price_paise for r in rows] == [150000]
+
+
+async def test_typed_sentence_never_decides_a_pending_confirmation(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live: a rules sentence containing "confirm" answered "Already done ✅" instead of reaching the desk."""
+    shop = await bakery(db)
+    fake.script(
+        PRIMARY,
+        steps(call("knowledge_change", kind="cod_rule", change={"enabled": True, "max_total": 1500}), read_back_reply),
+    )
+    await owner_turn(registry, db, shop, "1500 tak COD allow karo")
+    await owner_says(registry, db, shop, "haan")
+    fake.script(PRIMARY, steps(say_owner("Rules bana rahi hoon.")))
+    await owner_turn(registry, db, shop, "Do not take more than 8 orders a day, confirm COD orders and send reminders")
+    assert (await owner_messages(db, shop))[-1]["text"] == "Rules bana rahi hoon."  # reached the owner desk
