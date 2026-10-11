@@ -97,6 +97,18 @@ class CallController:
             await self._on_connect(conn, call)
         elif event == "terminate":
             await self._on_terminate(call_id, conn.business_id, str((call.get("raw") or {}).get("status") or ""))
+        elif event == "permission_reply":
+            # automatic call-back permission granted after an inbound call (used by outbound calling, F19)
+            perm = call.get("raw") or {}
+            await emit(
+                "call_event",
+                PipelineEventStatus.OK,
+                business_id=conn.business_id,
+                step="call_permission",
+                response=perm.get("response"),
+                permanent=perm.get("is_permanent"),
+                expires=perm.get("expiration_timestamp"),
+            )
         else:
             log.info("call_signal_ignored", call_id=call_id, event_name=event)
 

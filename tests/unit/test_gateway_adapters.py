@@ -452,3 +452,21 @@ class TestSendClassification:
         result = await TelegramAdapter(mock_client(handler)).send({"method": "sendMessage"}, CREDS)
         assert result.status == SendStatus.UNKNOWN
         assert not result.retry_after_unknown_allowed
+
+
+def test_whatsapp_call_permission_reply_is_a_call_event_not_a_message() -> None:
+    """Regression: WhatsApp's automatic call-back permission (sent after every inbound call) was treated as a
+    customer message, so the agent replied "One moment please…" after each call."""
+    a = WhatsAppAdapter()
+    payload = fixture("wa_call_permission_reply")
+    [ev] = a.parse(payload, "PNID_1")
+    assert ev.kind == "call" and ev.call is not None
+    assert (ev.call.event, ev.call.call_id) == ("permission_reply", "wacid.CALL1")
+    assert ev.call.raw["response"] == "accept"
+
+
+def test_whatsapp_interactive_without_reply_is_ignored() -> None:
+    a = WhatsAppAdapter()
+    payload = fixture("wa_call_permission_reply")
+    payload["entry"][0]["changes"][0]["value"]["messages"][0]["interactive"] = {"type": "nfm_reply", "nfm_reply": {}}
+    assert a.parse(payload, "PNID_1") == []

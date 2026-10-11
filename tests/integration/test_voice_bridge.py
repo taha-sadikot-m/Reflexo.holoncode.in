@@ -379,3 +379,49 @@ async def test_start_session_context(db: Database, graph: Graph, bridges: dict[s
     await c.end("wacid.S", "test", terminate=False)
     with pytest.raises(voice_api.SessionNotLive):
         await voice_api.start_session(row.id)
+
+
+async def test_call_permission_webhook_never_reaches_the_desk(
+    db: Database, graph: Graph, bridges: dict[str, FakeBridge]
+) -> None:
+    """Regression for the post-call "One moment please…" message: no chat message, no turn, a call signal only."""
+    reg: Registry = reset_registry()
+    pipeline_api.register(reg)
+    gateway_api.register(reg)
+    shop = await make_shop(db)
+    msg = {
+        "id": "wamid.P1",
+        "from": "919833300010",
+        "type": "interactive",
+        "timestamp": "1760000000",
+        "context": {"id": "wacid.P1"},
+        "interactive": {
+            "type": "call_permission_reply",
+            "call_permission_reply": {"response": "accept", "is_permanent": False, "response_source": "automatic"},
+        },
+    }
+    value = {"messaging_product": "whatsapp", "metadata": {"phone_number_id": shop.pnid}, "messages": [msg]}
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "W", "changes": [{"field": "messages", "value": value}]}],
+    }
+    await deliver(reg, db, "meta_whatsapp", payload, shop.pnid)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        msgs = (
+            await s.execute(text("SELECT count(*) FROM messages WHERE business_id = :b"), {"b": shop.business_id})
+        ).scalar_one()
+        turns = (
+            await s.execute(
+                text("SELECT count(*) FROM conversation_turns WHERE business_id = :b"), {"b": shop.business_id}
+            )
+        ).scalar_one()
+        jobs = (
+            await s.execute(
+                text("""SELECT payload FROM jobs WHERE business_id = :b AND queue = 'voice.call_signal'"""),
+                {"b": shop.business_id},
+            )
+        ).all()
+    assert (msgs, turns) == (0, 0)
+    assert [j.payload["call"]["event"] for j in jobs] == ["permission_reply"]
+    await controller(graph, bridges).handle_signal(jobs[0].payload)  # handled quietly: no Graph call, no session
+    assert graph.actions == [] and bridges == {}

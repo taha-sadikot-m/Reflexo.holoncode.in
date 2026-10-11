@@ -128,7 +128,28 @@ class WhatsAppAdapter:
                 )
             elif mtype == "interactive":
                 inter = msg.get("interactive") or {}
+                if inter.get("type") == "call_permission_reply":
+                    # WhatsApp grants call-back permission automatically after a customer calls us; it arrives as
+                    # an "interactive" message but it is a call-domain event, never something to reply to.
+                    perm = inter.get("call_permission_reply") or {}
+                    call_id = str((msg.get("context") or {}).get("id") or msg.get("id") or "")
+                    out.append(
+                        NormalizedEvent(
+                            kind="call",
+                            provider=self.provider,
+                            channel=ChannelType.VOICE,
+                            route_key=pnid,
+                            occurred_at=_ts(msg.get("timestamp")),
+                            thread_key=wa_id,
+                            sender_external_id=wa_id_to_e164(wa_id),
+                            call=CallSignal(call_id=call_id, event="permission_reply", caller_wa_id=wa_id, raw=perm),
+                            raw=msg,
+                        )
+                    )
+                    continue
                 reply = inter.get("button_reply") or inter.get("list_reply") or {}
+                if not reply.get("id"):
+                    continue  # other interactive types (flows, unknown future types) carry no option to act on
                 out.append(
                     NormalizedEvent(
                         kind="interactive_reply",
