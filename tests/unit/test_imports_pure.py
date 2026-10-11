@@ -15,6 +15,7 @@ from reflexo.knowledge.imports import (
     ImportFailed,
     extract_spreadsheet,
     normalize_price,
+    same_variant,
     validate,
 )
 
@@ -97,3 +98,10 @@ def test_unreadable_files_give_owner_facing_errors() -> None:
         asyncio.run(extract_spreadsheet(uuid4(), b"x", "application/vnd.ms-excel", "menu.xls"))
     with pytest.raises(ImportFailed, match="password"):
         asyncio.run(extract_spreadsheet(uuid4(), b"not a zip", XLSX, "menu.xlsx"))
+
+
+def test_variant_names_match_sizes_and_packs() -> None:
+    assert same_variant("1kg", "1 kg") and same_variant("500 g", "500g")
+    assert same_variant("Box of 6", "box of 6") and same_variant("Jar of 12", "JAR OF 12")
+    assert not same_variant("1 kg", "500 g") and not same_variant("Box of 6", "Box of 12")
+    assert not same_variant("default", "default")

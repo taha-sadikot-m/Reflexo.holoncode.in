@@ -273,6 +273,16 @@ def validate(items: list[ExtractedItem], *, visual: bool) -> list[tuple[Extracte
     return out
 
 
+def same_variant(a: str, b: str) -> bool:
+    """ "1kg" = "1 kg" (canonical sizes); "Box of 6" = "box of 6" (packs: letters/digits only)."""
+    if a.lower() == "default" or b.lower() == "default":
+        return False
+    ca, cb = canonical_size(a), canonical_size(b)
+    if ca and cb:
+        return ca == cb
+    return re.sub(r"[^a-z0-9]", "", a.lower()) == re.sub(r"[^a-z0-9]", "", b.lower())
+
+
 def _price_of(v: Any) -> int | None:
     return int(v) if v is not None else None
 
@@ -384,9 +394,8 @@ async def _apply_item(cs: Any, business_id: UUID, item: ExtractedItem) -> tuple[
     changed = False
     for v in priced:
         if best.variants:
-            wanted = canonical_size(v.name) if v.name.lower() != "default" else None
             existing = next(
-                (e for e in best.variants if wanted and canonical_size(e.name) == wanted),
+                (e for e in best.variants if same_variant(v.name, e.name)),
                 best.variants[0] if len(best.variants) == 1 and v.name.lower() == "default" else None,
             )
             if existing is None:
