@@ -140,6 +140,9 @@ class TelegramAdapter:
                 media=media,
                 location=location,
                 referral_code=referral,
+                reply_to_external_id=str(msg["reply_to_message"]["message_id"])
+                if (msg.get("reply_to_message") or {}).get("message_id")
+                else None,
                 raw=msg,
             )
         ]

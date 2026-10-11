@@ -101,6 +101,7 @@ class WhatsAppAdapter:
                 "external_message_id": msg.get("id"),
                 "sender_external_id": wa_id_to_e164(wa_id),
                 "sender_display_name": names.get(wa_id),
+                "reply_to_external_id": (msg.get("context") or {}).get("id"),
                 "raw": msg,
             }
             if mtype == "text":

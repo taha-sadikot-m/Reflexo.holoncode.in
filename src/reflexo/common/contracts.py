@@ -250,7 +250,37 @@ class OwnerCommandPort(Protocol):
         message_id: UUID,
         text: str | None,
         option_id: str | None,
+        reply_to_external_id: str | None = None,
     ) -> bool: ...
+
+
+@dataclass
+class AnswerResult:
+    """What happened to an owner's answer (agent's `answer_question`)."""
+
+    question_code: str
+    scope: str  # global | customer | temporary
+    qa_entry_id: UUID | None
+    relayed: bool  # a relay turn was scheduled for the customer
+    scope_uncertain: bool = False  # saved for this customer only; the owner is asked whether it applies to all
+    already_answered: bool = False
+
+
+class QuestionAnswerPort(Protocol):
+    """Provided by agent: the ask-the-owner loop's answer side (POC_04 §7 steps 4-7)."""
+
+    async def answer(
+        self,
+        business_id: UUID,
+        question_id: UUID,
+        answer: str,
+        *,
+        member_id: UUID | None,
+        source_message_id: UUID | None = None,
+        scope: str | None = None,
+    ) -> AnswerResult: ...
+
+    async def set_scope(self, business_id: UUID, question_id: UUID, scope: str) -> AnswerResult: ...
 
 
 class EventRouterPort(Protocol):
@@ -281,6 +311,8 @@ class OwnerNotifyPort(Protocol):
         dedupe_key: str,
         priority: PriorityClass = PriorityClass.P1,
         member_id: UUID | None = None,
+        buttons: list[tuple[str, str]] | None = None,
+        ref: dict[str, str] | None = None,
     ) -> None: ...
 
 

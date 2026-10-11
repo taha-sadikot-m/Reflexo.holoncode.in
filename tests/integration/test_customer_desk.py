@@ -41,6 +41,7 @@ FALLBACK = agent.load_models_config().role("customer_desk").fallback or ""
 class Notes:
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
+        self.buttons: list[list[tuple[str, str]]] = []
 
     async def notify(
         self,
@@ -51,8 +52,11 @@ class Notes:
         dedupe_key: str,
         priority: PriorityClass = PriorityClass.P1,
         member_id: UUID | None = None,
+        buttons: list[tuple[str, str]] | None = None,
+        ref: dict[str, str] | None = None,
     ) -> None:
         self.sent.append((kind, text_))
+        self.buttons.append(buttons or [])
 
 
 @pytest.fixture(autouse=True)

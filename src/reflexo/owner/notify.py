@@ -32,7 +32,11 @@ class OwnerNotifier:
         dedupe_key: str,
         priority: PriorityClass = PriorityClass.P1,
         member_id: UUID | None = None,
+        buttons: list[tuple[str, str]] | None = None,
+        ref: dict[str, str] | None = None,
     ) -> None:
+        """`buttons` = [(option_id, title)] (tap = deterministic owner command); `ref` (e.g. question_id) is stored
+        so a swipe-reply to this message can be traced back to what it was about."""
         async with get_db().tenant_session(business_id) as s:
             nid = (
                 await s.execute(
@@ -46,7 +50,7 @@ class OwnerNotifier:
                         "m": member_id,
                         "k": kind,
                         "p": str(priority),
-                        "payload": json.dumps({"text": text_}, ensure_ascii=False),
+                        "payload": json.dumps({"text": text_, **(ref or {})}, ensure_ascii=False),
                         "d": dedupe_key,
                     },
                 )
@@ -83,7 +87,7 @@ class OwnerNotifier:
                 s,
                 business_id=business_id,
                 conversation_id=conv_id,
-                blocks=[{"type": "text", "text": text_}],
+                blocks=_blocks(text_, buttons),
                 origin="system",
                 idempotency_base=f"notify:{nid}",
                 priority=priority,
@@ -105,3 +109,32 @@ class OwnerNotifier:
                 )
             ).scalar_one_or_none()
         return await gateway.get_connection(cid) if cid else None
+
+
+def _blocks(text_: str, buttons: list[tuple[str, str]] | None) -> list[dict[str, object]]:
+    if not buttons:
+        return [{"type": "text", "text": text_}]
+    options = [{"id": oid[:48], "title": title[:80]} for oid, title in buttons[:10]]
+    if len(text_) <= 1024:
+        return [{"type": "buttons", "text": text_, "options": options}]
+    return [{"type": "text", "text": text_}, {"type": "buttons", "text": "Reply:", "options": options}]
+
+
+async def notification_for_reply(business_id: UUID, conversation_id: UUID, reply_to: str) -> dict[str, object] | None:
+    """The notification (payload incl. its `ref`) that an owner swipe-replied to, if the replied message was one."""
+    async with get_db().tenant_session(business_id) as s:
+        key = (
+            await s.execute(
+                text("""SELECT idempotency_key FROM outbound_messages
+                        WHERE conversation_id = :c AND provider_message_id = :p AND idempotency_key LIKE 'notify:%'
+                        ORDER BY created_at DESC LIMIT 1"""),
+                {"c": conversation_id, "p": reply_to},
+            )
+        ).scalar_one_or_none()
+        if key is None:
+            return None
+        nid = key.split(":")[1]
+        row = (
+            await s.execute(text("SELECT kind, payload FROM owner_notifications WHERE id = :id"), {"id": nid})
+        ).first()
+    return {"kind": row.kind, **(row.payload or {})} if row else None

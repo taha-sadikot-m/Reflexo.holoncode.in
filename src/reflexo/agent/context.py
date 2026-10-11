@@ -44,6 +44,7 @@ class PreparedContext:
     open_order: dict[str, Any] | None = None  # compact tool view of the customer's draft/awaiting-payment order
     open_question: dict[str, Any] | None = None  # owner question still unanswered for this conversation
     recent_lines: list[str] = field(default_factory=list)  # last messages, formatted (owner notifications)
+    relay: dict[str, Any] | None = None  # relay turn: the owner's answer to pass on (question, answer, qa id)
 
 
 def _fmt_message(m: gateway.MessageView, tz: str) -> str:
@@ -79,6 +80,15 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         message_ids = list(dict.fromkeys(ref.message_ids))
         inbound = await gateway.messages_by_ids(s, message_ids)
         history = await gateway.recent_messages(s, ref.conversation_id, limit=HISTORY, exclude=message_ids)
+        relay_row = None
+        if ref.hints.get("relay_question_id"):
+            relay_row = (
+                await s.execute(
+                    text("""SELECT id, question, answer, qa_entry_id FROM owner_questions
+                            WHERE id = CAST(:q AS uuid) AND status IN ('answered', 'relayed')"""),
+                    {"q": ref.hints["relay_question_id"]},
+                )
+            ).first()
         pending = (
             await s.execute(
                 text("""SELECT short_code, question, asked_at FROM owner_questions
@@ -147,6 +157,24 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         if pending
         else None
     )
+    relay = (
+        {
+            "question_id": str(relay_row.id),
+            "question": relay_row.question,
+            "answer": relay_row.answer,
+            "qa_id": str(relay_row.qa_entry_id),
+        }
+        if relay_row is not None
+        else None
+    )
+    relay_block = (
+        "# THE OWNER ANSWERED — pass it on now\n"
+        f'The customer asked: "{relay["question"]}"\nThe owner\'s answer (saved as qa:{relay["qa_id"]}): '
+        f'"{relay["answer"]}"\nTell the customer this answer in their language, naturally and briefly '
+        f"(action=send, reference qa:{relay['qa_id']}). Continue the conversation if they asked more."
+        if relay
+        else ""
+    )
     waiting_block = (
         f'# WAITING ON THE OWNER\nAsked at {open_question["asked"]}: "{open_question["question"]}". If the '
         "customer only asks for an update, say you are still checking with the team (action=send); do not ask the "
@@ -165,6 +193,7 @@ async def prepare(ref: TurnRef) -> PreparedContext:
             + ("\n".join(_fmt_message(m, tz) for m in history) or "(new conversation)"),
             *([open_order_block] if open_order_block else []),
             *([waiting_block] if waiting_block else []),
+            *([relay_block] if relay_block else []),
             "# NOW — new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
             f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
             "Reply by calling `reply`.",
@@ -183,6 +212,7 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         timings_ms={"prepare": int((time.perf_counter() - started) * 1000), "speculative": spec.elapsed_ms},
         open_order=order_view,
         open_question=open_question,
+        relay=relay,
         recent_lines=[_fmt_message(m, tz) for m in [*history, *inbound]][-6:],
     )
 

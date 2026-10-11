@@ -73,6 +73,7 @@ class NormalizedEvent(BaseModel):
     call: CallSignal | None = None
     comment: CommentInfo | None = None
     referral_code: str | None = None  # e.g. Telegram /start payload or ad referral ref
+    reply_to_external_id: str | None = None  # the provider message this one replies to (swipe-reply / quote)
     echo_app_id: str | None = None  # app that sent an echoed message (None = sent by a human in the inbox)
     raw: dict[str, Any] = Field(default_factory=dict)
 

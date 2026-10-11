@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import httpx
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reflexo.common.config import get_settings
@@ -21,6 +22,7 @@ from reflexo.common.contracts import (
     MediaUrlPort,
     OutboundSenderPort,
 )
+from reflexo.common.db import get_db
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
@@ -31,6 +33,7 @@ from reflexo.gateway.adapters.meta_whatsapp import WhatsAppAdapter
 from reflexo.gateway.adapters.simulator import SimulatorAdapter
 from reflexo.gateway.adapters.telegram import TelegramAdapter
 from reflexo.gateway.connections import ConnectionInfo, credentials, find_connection, get_connection
+from reflexo.gateway.connections import clear_cache as clear_connection_cache
 from reflexo.gateway.inbound import GatewayInbound
 from reflexo.gateway.media import MediaSigner, media_path, register_jobs, store_media
 from reflexo.gateway.outbound import EnqueueResult, Outbound
@@ -261,3 +264,20 @@ async def member_conversation(s: AsyncSession, conn: ConnectionInfo, thread_key:
 
 
 __all__ += ["ConversationSender", "member_conversation"]
+
+
+async def set_customer_mode(business_id: UUID, mode: str) -> int:
+    """`/pause` (off) and `/resume` (tiered): the AI's mode on every customer-facing connection of the business."""
+    async with get_db().tenant_session(business_id) as s:
+        n = (
+            await s.execute(
+                text("""UPDATE channel_connections SET customer_mode = CAST(:m AS customer_mode)
+                        WHERE 'customer' = ANY(roles) RETURNING id"""),
+                {"m": mode},
+            )
+        ).all()
+    clear_connection_cache()
+    return len(n)
+
+
+__all__ += ["set_customer_mode"]

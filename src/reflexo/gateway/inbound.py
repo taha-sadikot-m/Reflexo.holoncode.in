@@ -344,6 +344,7 @@ class GatewayInbound:
             message_id,
             ev.text,
             interactive.option_id if interactive else None,
+            ev.reply_to_external_id,
         ):
             await emit(
                 "owner_command",

@@ -470,3 +470,54 @@ def test_whatsapp_interactive_without_reply_is_ignored() -> None:
     payload = fixture("wa_call_permission_reply")
     payload["entry"][0]["changes"][0]["value"]["messages"][0]["interactive"] = {"type": "nfm_reply", "nfm_reply": {}}
     assert a.parse(payload, "PNID_1") == []
+
+
+def test_swipe_replies_carry_the_replied_message_id() -> None:
+    """WP-10: a reply to the owner-question message answers that question."""
+    tg = TelegramAdapter().parse(
+        {
+            "update_id": 1,
+            "message": {
+                "message_id": 7,
+                "date": 1760000000,
+                "chat": {"id": 42},
+                "from": {"id": 42},
+                "text": "haan",
+                "reply_to_message": {"message_id": 5, "text": "Question 1234"},
+            },
+        },
+        "rk",
+    )
+    assert tg[0].reply_to_external_id == "5"
+    plain = TelegramAdapter().parse(
+        {"update_id": 2, "message": {"message_id": 8, "date": 1, "chat": {"id": 42}, "from": {"id": 42}, "text": "x"}},
+        "rk",
+    )
+    assert plain[0].reply_to_external_id is None
+    wa_payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "metadata": {"phone_number_id": "PN1"},
+                            "contacts": [{"wa_id": "919811122233", "profile": {"name": "R"}}],
+                            "messages": [
+                                {
+                                    "from": "919811122233",
+                                    "id": "wamid.B",
+                                    "timestamp": "1760000000",
+                                    "type": "text",
+                                    "text": {"body": "haan"},
+                                    "context": {"id": "wamid.A"},
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        ]
+    }
+    assert WhatsAppAdapter().parse(wa_payload, "PN1")[0].reply_to_external_id == "wamid.A"

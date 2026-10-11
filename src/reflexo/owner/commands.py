@@ -1,0 +1,224 @@
+"""Deterministic owner commands (POC_04 §9; POC_03 §3.2 step 12): handled without the model.
+
+* `1234 <answer>`, a tap on a question button (`oq:<id>:<n>`), or a swipe-reply to the question message → the
+  ask-the-owner answer (agent's QuestionAnswerPort);
+* `oqs:<id>:g|c` (everyone / this customer) → the scope of an answer that was saved for one customer only;
+* `/undo` → revert the last applied knowledge change set; `/pause` / `/resume` → AI off / on for customers;
+  `/help`.
+Everything else returns False and becomes an owner-desk turn.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import text
+
+import reflexo.gateway.api as gateway
+import reflexo.knowledge.api as knowledge
+from reflexo.common.contracts import AnswerResult, QuestionAnswerPort
+from reflexo.common.db import get_db
+from reflexo.common.enums import PipelineEventStatus
+from reflexo.common.logging import get_logger
+from reflexo.common.ports import Registry
+from reflexo.common.xray import emit
+from reflexo.owner.notify import notification_for_reply
+
+log = get_logger(__name__)
+_ANSWER = re.compile(r"^\s*(\d{4})\s*[:.\-–]?\s+(\S.*)$", re.DOTALL)
+_OPTION = re.compile(r"^(oq|oqs):([0-9a-f-]{36}):(.+)$")
+I_WILL_TELL = "later"  # option id of "Main batati hoon": not an answer
+HELP = (
+    "Commands:\n"
+    "• `1234 <answer>` — answer customer question 1234 (or reply to the question message)\n"
+    "• `/undo` — undo the last change\n"
+    "• `/pause` / `/resume` — stop / restart AI replies to customers\n"
+    "Anything else: just tell me what you need."
+)
+
+
+class OwnerCommands:
+    """OwnerCommandPort."""
+
+    def __init__(self, registry: Registry) -> None:
+        self.registry = registry
+
+    async def try_handle(
+        self,
+        business_id: UUID,
+        member_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        text_: str | None,
+        option_id: str | None,
+        reply_to_external_id: str | None = None,
+    ) -> bool:
+        body = (text_ or "").strip()
+        handled = await self._dispatch(
+            business_id, member_id, conversation_id, message_id, body, option_id, reply_to_external_id
+        )
+        if handled:
+            await emit("owner_command", PipelineEventStatus.OK, business_id=business_id, command=handled)
+        return handled is not None
+
+    async def _dispatch(
+        self,
+        business_id: UUID,
+        member_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        body: str,
+        option_id: str | None,
+        reply_to: str | None,
+    ) -> str | None:
+        say = _Replier(business_id, conversation_id, message_id)
+        if option_id and (m := _OPTION.match(option_id)):
+            kind, qid, value = m.group(1), UUID(m.group(2)), m.group(3)
+            if kind == "oqs":  # ids stay ≤ 48 chars: g = everyone, c = this customer
+                scope = {"g": "global", "c": "customer"}.get(value)
+                if scope is None:
+                    return None
+                result = await self._answers().set_scope(business_id, qid, scope)
+                await say("✅ Saved for everyone." if scope == "global" else "✅ Kept for this customer only.")
+                log.info("owner_scope_set", question=result.question_code, scope=scope)
+                return "scope"
+            question = await _question(business_id, question_id=qid)
+            if question is None:
+                await say("That question is no longer open.")
+                return "answer"
+            if value == I_WILL_TELL:
+                await say(f"Ok 👍 Reply `{question['code']} <answer>` when you're ready.")
+                return "answer_later"
+            options = question["options"] or []
+            idx = int(value) if value.isdigit() else -1
+            if not 0 <= idx < len(options):
+                return None
+            # A typed message the gateway matched to a button ("5309 Haan, sab cakes … ₹50 extra" → [Haan]) keeps
+            # the owner's full words; only a bare tap or the option word itself is the option.
+            typed = (m2.group(2) if (m2 := _ANSWER.match(body)) else body).strip()
+            chosen = str(options[idx])
+            answer = typed if typed and typed.lower().strip(" .!") != chosen.lower() else chosen
+            await self._answer(say, business_id, member_id, message_id, question, answer)
+            return "answer"
+
+        if body.lower() in ("/help", "help"):
+            await say(HELP)
+            return "help"
+        if body.lower() in ("/undo", "undo"):
+            await self._undo(say, business_id, member_id)
+            return "undo"
+        if body.lower() in ("/pause", "/resume"):
+            mode = "off" if body.lower() == "/pause" else "tiered"
+            await gateway.set_customer_mode(business_id, mode)
+            await say(
+                "⏸️ AI replies to customers are paused. Send /resume to restart."
+                if mode == "off"
+                else "▶️ AI replies to customers are back on."
+            )
+            return body.lower().lstrip("/")
+
+        if (m := _ANSWER.match(body)) is not None:
+            question = await _question(business_id, code=m.group(1))
+            if question is not None:
+                if question["status"] in ("answered", "relayed"):
+                    await say(f"Question {question['code']} was already answered ✅")
+                else:
+                    await self._answer(say, business_id, member_id, message_id, question, m.group(2).strip())
+                return "answer"
+        if reply_to and body:
+            note = await notification_for_reply(business_id, conversation_id, reply_to)
+            replied_qid = (note or {}).get("question_id")
+            if isinstance(replied_qid, str):
+                question = await _question(business_id, question_id=UUID(replied_qid))
+                if question is not None and question["status"] not in ("answered", "relayed"):
+                    await self._answer(say, business_id, member_id, message_id, question, body)
+                    return "answer"
+        return None
+
+    async def _answer(
+        self, say: _Replier, business_id: UUID, member_id: UUID, message_id: UUID, q: dict[str, Any], answer: str
+    ) -> None:
+        result: AnswerResult = await self._answers().answer(
+            business_id, q["id"], answer, member_id=member_id, source_message_id=message_id
+        )
+        who = q["customer_name"] or "the customer"
+        if result.already_answered:
+            await say(f"Question {result.question_code} was already answered ✅")
+            return
+        sent = f"Sending your answer to {who}" if result.relayed else "Saved"
+        if result.scope_uncertain:  # kept private until the owner says it applies to everyone
+            await say(
+                f"✅ {sent}. Saved for {who} only for now — should it apply to everyone?",
+                buttons=[(f"oqs:{q['id']}:g", "Everyone"), (f"oqs:{q['id']}:c", f"Only {who}"[:20])],
+            )
+            return
+        where = {"global": "for everyone", "customer": f"for {who} only", "temporary": "for today"}[result.scope]
+        await say(f"✅ {sent}. Saved {where} — next time I'll answer this myself. (/undo to remove)")
+
+    async def _undo(self, say: _Replier, business_id: UUID, member_id: UUID) -> None:
+        try:
+            undone = await knowledge.revert(business_id, member_id=member_id)
+        except LookupError:
+            await say("Nothing to undo.")
+            return
+        except knowledge.ChangeConflict:
+            await say("Can't undo: those items changed after that edit. Tell me what to fix instead.")
+            return
+        await say(f"↩️ {undone.summary} ✅")
+
+    def _answers(self) -> QuestionAnswerPort:
+        return self.registry.require(QuestionAnswerPort)  # type: ignore[type-abstract]
+
+
+class _Replier:
+    """Short deterministic replies on the owner's conversation (idempotent per inbound message)."""
+
+    def __init__(self, business_id: UUID, conversation_id: UUID, message_id: UUID) -> None:
+        self.business_id, self.conversation_id, self.message_id = business_id, conversation_id, message_id
+        self.n = 0
+
+    async def __call__(self, text_: str, buttons: list[tuple[str, str]] | None = None) -> None:
+        block: dict[str, Any] = (
+            {"type": "buttons", "text": text_, "options": [{"id": i, "title": t} for i, t in buttons]}
+            if buttons
+            else {"type": "text", "text": text_}
+        )
+        async with get_db().tenant_session(self.business_id) as s:
+            await gateway.outbound().enqueue(
+                s,
+                business_id=self.business_id,
+                conversation_id=self.conversation_id,
+                blocks=[block],
+                origin="system",
+                idempotency_base=f"cmd:{self.message_id}:{self.n}",
+            )
+        self.n += 1
+
+
+async def _question(
+    business_id: UUID, *, code: str | None = None, question_id: UUID | None = None
+) -> dict[str, Any] | None:
+    """An open (or just answered) question by short code or id; the newest one if a code was reused."""
+    async with get_db().tenant_session(business_id) as s:
+        row = (
+            await s.execute(
+                text("""SELECT q.id, q.short_code, q.status, q.options, c.display_name FROM owner_questions q
+                        JOIN customers c ON c.id = q.customer_id
+                        WHERE (CAST(:id AS uuid) IS NOT NULL AND q.id = CAST(:id AS uuid))
+                           OR (CAST(:code AS text) IS NOT NULL AND q.short_code = :code
+                               AND q.status IN ('open', 'asked', 'answered', 'relayed'))
+                        ORDER BY (q.status IN ('open', 'asked')) DESC, q.created_at DESC LIMIT 1"""),
+                {"id": question_id, "code": code},
+            )
+        ).first()
+    if row is None or str(row.status) in ("expired", "cancelled"):
+        return None
+    return {
+        "id": row.id,
+        "code": row.short_code.strip(),
+        "status": str(row.status),
+        "options": row.options,
+        "customer_name": row.display_name,
+    }

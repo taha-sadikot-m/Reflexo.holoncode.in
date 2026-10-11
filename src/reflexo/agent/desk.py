@@ -26,12 +26,13 @@ from reflexo.agent.checkpointer import get_checkpointer
 from reflexo.agent.context import PreparedContext, holding_text, prepare
 from reflexo.agent.graphs.customer import CustomerState, TurnDeps, build_graph
 from reflexo.agent.model_gateway.gateway import ModelGateway
+from reflexo.agent.questions import SLA_QUEUE
 from reflexo.agent.runs import record_run
 from reflexo.agent.schemas import AgentOutput, OwnerQuestionDraft
 from reflexo.agent.tools.base import ToolContext
 from reflexo.agent.tools.customer import CUSTOMER_TOOLS
 from reflexo.common.config import get_settings
-from reflexo.common.contracts import OwnerNotifyPort, TurnHandle, TurnRef
+from reflexo.common.contracts import JobEnqueuer, OwnerNotifyPort, TurnHandle, TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass, TurnOutcome
 from reflexo.common.ids import new_id
@@ -225,6 +226,10 @@ class CustomerDesk:
                 if originally_handoff and output
                 else [{"type": "text", "text": HANDOFF_ACK.get(language, HANDOFF_ACK["hi-Latn"])}]
             )
+        elif action in ("fallback", "ask_owner") and prepared.relay:
+            # a relay turn that could not compose: the owner's own words are the answer (never re-ask the owner)
+            blocks = [{"type": "text", "text": str(prepared.relay["answer"])}]
+            action = "send"
         elif action == "fallback" and prepared.open_question:
             blocks = [{"type": "text", "text": STILL_CHECKING.get(language, STILL_CHECKING["hi-Latn"])}]
         elif action in ("ask_owner", "fallback"):
@@ -270,6 +275,13 @@ class CustomerDesk:
                     turn_id=ref.turn_id,
                     draft=draft,
                     sla_min=sla,
+                )
+                await self._schedule_sla(s, ref.business_id, question[0], sla)
+            if prepared.relay and blocks:
+                await s.execute(
+                    text("""UPDATE owner_questions SET status = 'relayed', relayed_at = now()
+                            WHERE id = CAST(:q AS uuid) AND status = 'answered'"""),
+                    {"q": prepared.relay["question_id"]},
                 )
             if output and output.customer_facts:
                 await gateway.add_customer_facts(
@@ -333,7 +345,17 @@ class CustomerDesk:
             guess = f"\nMy guess: {draft.ai_guess}" if draft.ai_guess else ""
             why = "I couldn't handle this message myself." if action == "fallback" else "I don't have this answer."
             body = f'❓ *Question {code}* — {why}\n"{draft.question}"{guess}\n\n{context}\n\nReply: `{code} <answer>`'
-            await notifier.notify(business_id, "question", body, dedupe_key=f"oq:{qid}", priority=PriorityClass.P1)
+            buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate(draft.options[:2])]
+            buttons.append((f"oq:{qid}:later", "I'll reply"))
+            await notifier.notify(
+                business_id,
+                "question",
+                body,
+                dedupe_key=f"oq:{qid}",
+                priority=PriorityClass.P1,
+                buttons=buttons,
+                ref={"question_id": str(qid)},
+            )
         elif action == "fallback" and prepared and prepared.open_question:
             code = prepared.open_question["code"]
             body = f'🔁 *Follow-up on question {code}*: "{inbound_text[:300]}"\n\n{context}'
@@ -353,6 +375,17 @@ class CustomerDesk:
                 dedupe_key=f"handoff:{conv.id}:{int(time.time() // 600)}",
                 priority=PriorityClass.P1,
             )
+
+    async def _schedule_sla(self, s: AsyncSession, business_id: UUID, question_id: UUID, sla_min: int) -> None:
+        await self.registry.require(JobEnqueuer).enqueue(  # type: ignore[type-abstract]
+            SLA_QUEUE,
+            {"business_id": str(business_id), "question_id": str(question_id)},
+            business_id=business_id,
+            priority=PriorityClass.P2,
+            dedupe_key=f"oqsla:{question_id}",
+            delay_s=sla_min * 60,
+            session=s,
+        )
 
     async def send_holding_reply(self, business_id: UUID, conversation_id: UUID, turn_id: UUID) -> None:
         settings = await knowledge.business_settings(business_id)
