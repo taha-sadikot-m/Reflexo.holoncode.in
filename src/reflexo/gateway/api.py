@@ -15,7 +15,12 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reflexo.common.config import get_settings
-from reflexo.common.contracts import InboundProcessorPort, MediaUrlPort, OutboundSenderPort
+from reflexo.common.contracts import (
+    ConversationSenderPort,
+    InboundProcessorPort,
+    MediaUrlPort,
+    OutboundSenderPort,
+)
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
@@ -96,6 +101,7 @@ def register(registry: Registry) -> None:
     registry.provide(InboundProcessorPort, inbound)  # type: ignore[type-abstract]
     registry.provide(OutboundSenderPort, _outbound)  # type: ignore[type-abstract]
     registry.provide(MediaUrlPort, _signer)  # type: ignore[type-abstract]
+    registry.provide(ConversationSenderPort, ConversationSender())  # type: ignore[type-abstract]
     register_jobs(registry, adapters())
 
 
@@ -219,3 +225,39 @@ async def resolve_caller(
 
 __all__ += ["ResolvedSender", "credentials", "resolve_caller"]
 ResolvedSender = identity.ResolvedSender
+
+
+# ---------------------------------------------------------------- sending outside a turn (ConversationSenderPort)
+
+
+class ConversationSender:
+    async def send_blocks(
+        self,
+        business_id: UUID,
+        conversation_id: UUID,
+        blocks: list[dict[str, object]],
+        *,
+        origin: str,
+        idempotency_base: str,
+    ) -> UUID | None:
+        from reflexo.common.db import get_db
+
+        async with get_db().tenant_session(business_id) as s:
+            result = await outbound().enqueue(
+                s,
+                business_id=business_id,
+                conversation_id=conversation_id,
+                blocks=blocks,
+                origin=origin,
+                idempotency_base=idempotency_base,
+            )
+        return result.message_id
+
+
+async def member_conversation(s: AsyncSession, conn: ConnectionInfo, thread_key: str, member_id: UUID) -> UUID:
+    """The owner/team member's conversation on a connection (created on first use, e.g. for notifications)."""
+    conv_id, _, _ = await identity._conversation(s, conn, thread_key, "owner", None, member_id, False)
+    return conv_id
+
+
+__all__ += ["ConversationSender", "member_conversation"]

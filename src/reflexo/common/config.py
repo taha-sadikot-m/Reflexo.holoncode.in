@@ -90,6 +90,14 @@ class Settings(BaseSettings):
     admin_session_secret: SecretStr = SecretStr("dev-admin-session-secret")
     admin_session_hours: int = 8
 
+    # commerce / Razorpay (POC_05 §4.5, §6)
+    razorpay_key_id: str = ""
+    razorpay_key_secret: SecretStr = SecretStr("")
+    razorpay_webhook_secret: SecretStr = SecretStr("")
+    razorpay_api_base: str = "https://api.razorpay.com/v1"
+    payment_link_ttl_h: int = 48
+    razorpay_reconcile_s: int = 120  # demo: check unpaid links every 2 min (missed webhooks)
+
     # voice (POC_04 §10, §13)
     livekit_url: str = ""
     livekit_api_key: str = ""

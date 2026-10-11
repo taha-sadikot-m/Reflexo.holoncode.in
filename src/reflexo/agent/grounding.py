@@ -10,10 +10,11 @@ import re
 from urllib.parse import urlparse
 from uuid import UUID
 
+import reflexo.commerce.api as commerce
 import reflexo.knowledge.api as knowledge
 from reflexo.agent.output_gate import extract_amounts
 from reflexo.agent.schemas import AgentOutput, GroundingRecords
-from reflexo.common.blocks import CarouselBlock, ProductBlock
+from reflexo.common.blocks import CarouselBlock, OrderSummaryBlock, PaymentLinkBlock, ProductBlock
 
 _DISCOUNT_HINT = re.compile(r"%|discount|off\b|chhoot|छूट", re.IGNORECASE)
 _NUMBERS = re.compile(r"\d+")
@@ -105,6 +106,23 @@ async def hydrate(
     if isinstance(email, str) and email:
         rec.allowed_emails.add(email.lower())
 
+    # ---- orders and payment links (refs and blocks), re-read through commerce
+    block_orders = {str(b.order_id) for b in output.blocks if isinstance(b, OrderSummaryBlock)}
+    block_links = {str(b.payment_link_id) for b in output.blocks if isinstance(b, PaymentLinkBlock)}
+    order_ids = {u for t, i in refs if t == "order" and (u := _uuid(i))} | {UUID(i) for i in block_orders}
+    link_ids = {u for t, i in refs if t == "payment_link" and (u := _uuid(i))} | {UUID(i) for i in block_links}
+    commerce_facts = await commerce.grounding_amounts(business_id, list(order_ids), list(link_ids))
+    rec.amounts_paise |= commerce_facts["amounts"]
+    rec.allowed_urls |= commerce_facts["urls"]
+    for kind, ids, valid in (
+        ("order", block_orders, commerce_facts["orders"]),
+        ("payment_link", block_links, commerce_facts["links"]),
+    ):
+        for i in ids - valid:
+            rec.missing_refs.append((kind, i))
+        for i in ids & valid:
+            rec.valid_refs.add((kind, i))
+
     # ---- validity of every reference
     for t, i in refs:
         u = _uuid(i)
@@ -114,7 +132,9 @@ async def hydrate(
             or (t == "qa" and u in qa_ids)
             or (t == "delivery_zone" and i in zone_ids)
             or (t == "profile" and i in PROFILE_SECTIONS)
-        )  # order/payment_link: resolved by commerce (WP-09); unknown until then
+            or (t == "order" and i in commerce_facts["orders"])
+            or (t == "payment_link" and i in commerce_facts["links"])
+        )
         if ok:
             rec.valid_refs.add((t, i))
         else:

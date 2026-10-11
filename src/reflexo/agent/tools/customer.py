@@ -15,6 +15,7 @@ import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent.schemas import AgentOutput
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
+from reflexo.agent.tools.orders import ORDER_TOOLS
 from reflexo.common.money import format_inr
 
 CUSTOMER = {"customer", "voice"}
@@ -176,5 +177,6 @@ CUSTOMER_TOOLS = [
     "knowledge_lookup",
     "delivery_quote",
     "offer_whatsapp_continue",
+    *ORDER_TOOLS,
     "reply",
 ]

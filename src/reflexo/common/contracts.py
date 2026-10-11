@@ -338,3 +338,34 @@ class JobQueuePort(Protocol):
     async def complete(self, job: JobRow, worker: str) -> None: ...
 
     async def fail(self, job: JobRow, worker: str, error: str) -> str: ...
+
+
+class ConversationSenderPort(Protocol):
+    """Provided by gateway: send blocks into a conversation outside a turn (order confirmations, owner pings).
+    Goes through the normal outbound path (policy, render, idempotency). Returns the message id or None."""
+
+    async def send_blocks(
+        self,
+        business_id: UUID,
+        conversation_id: UUID,
+        blocks: list[dict[str, Any]],
+        *,
+        origin: str,
+        idempotency_base: str,
+    ) -> UUID | None: ...
+
+
+@dataclass(frozen=True)
+class GuardResult:
+    allowed: bool
+    reason: str | None = None
+    alternatives: list[str] = field(default_factory=list)
+    code: str | None = None
+
+
+class OrderGuardPort(Protocol):
+    """Provided by automations (POC_06 §6): capacity and similar rules checked (and reserved) at order confirm."""
+
+    async def check(self, business_id: UUID, order: dict[str, Any]) -> GuardResult: ...
+
+    async def release(self, business_id: UUID, order_id: UUID, reason: str) -> None: ...

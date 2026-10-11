@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
-from reflexo.api.routes import admin, media, webhooks
+from reflexo.api.routes import admin, integrations, media, webhooks
 from reflexo.bootstrap import bootstrap
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.redis import get_redis
@@ -31,6 +31,7 @@ FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz")
 app.include_router(webhooks.router)
 app.include_router(media.router)
 app.include_router(admin.router)
+app.include_router(integrations.router)
 app.add_exception_handler(HTTPException, admin.problem_handler)  # type: ignore[arg-type]
 
 # Local single-port convenience: serve the built admin SPA if present (Caddy serves it in the demo deployment).
