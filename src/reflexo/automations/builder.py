@@ -96,7 +96,7 @@ def check(definitions: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list
     fixed: list[dict[str, Any]] = []
     problems: list[str] = []
     for i, raw in enumerate(definitions, 1):
-        raw = copy.deepcopy(raw)
+        raw = _sanitize(copy.deepcopy(raw))
         d, report = parse(raw)
         if d is not None:
             report = validate(d)
@@ -108,6 +108,18 @@ def check(definitions: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list
         problems += [f"{label}: {f.code} {f'(step {f.step}) ' if f.step else ''}{f.message}" for f in _blocking(report)]
         fixed.append(raw)
     return fixed, problems
+
+
+def _sanitize(raw: dict[str, Any]) -> dict[str, Any]:
+    """Template fallbacks are decided deterministically (only approved templates), never trusted from the model:
+    live, Gemini wrote null/strings there and repair rounds could not fix it."""
+    for step in raw.get("steps", []) if isinstance(raw.get("steps"), list) else []:
+        if not isinstance(step, dict) or "template_fallback" not in step:
+            continue
+        tf = step["template_fallback"]
+        if not (isinstance(tf, dict) and tf.get("name") in APPROVED_TEMPLATES and isinstance(tf.get("vars"), list)):
+            del step["template_fallback"]
+    return raw
 
 
 def _blocking(report: Any) -> list[Finding]:

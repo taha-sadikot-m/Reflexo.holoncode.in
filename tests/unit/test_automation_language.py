@@ -115,3 +115,15 @@ def test_readback_states_every_limit_wait_and_message() -> None:
     assert "⏱ Demo mode: 1 din = 60 sec." in text
     en = readback.readback([d for d in defs if d], "en")
     assert "at most *8 cake* orders per delivery date" in en and "wait up to 2 hours" in en
+
+
+def test_builder_never_trusts_model_template_fallbacks() -> None:
+    """Live finding: Gemini wrote null/strings into template_fallback; the approved template is attached instead."""
+    from reflexo.automations import builder
+
+    for bad in (None, "order_update", {"name": "made_up", "vars": []}):
+        raw = copy.deepcopy(demo.DELIVERY_REMINDER)
+        raw["steps"][1]["template_fallback"] = bad
+        [fixed], problems = builder.check([raw])
+        assert problems == []
+        assert fixed["steps"][1]["template_fallback"]["name"] == "order_update"
