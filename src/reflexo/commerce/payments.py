@@ -387,8 +387,12 @@ async def handle_payment_event(log_id: UUID) -> None:
     pay = (payload.get("payment") or {}).get("entity") or {}
     ref = pl.get("reference_id") or (pay.get("notes") or {}).get("payment_link_ref")
     link = await _find_link(pl.get("id"), ref)
-    if link is None:
-        log.info("payment_event_unmatched", event=row.type, link=pl.get("id"))
+    if link is None:  # e.g. payment.* events without a link reference: payment_link.* carries the outcome
+        log.info("payment_event_unmatched", event_type=row.type, link=pl.get("id"))
+        async with get_db().service_session(ServiceReason.INTEGRATION_ROUTING) as s:
+            await s.execute(
+                text("UPDATE integration_events_log SET processed_at = now() WHERE id = :id"), {"id": log_id}
+            )
         return
     if row.type == "payment_link.paid":
         await apply_paid(
@@ -400,17 +404,8 @@ async def handle_payment_event(log_id: UUID) -> None:
         )
     elif row.type in ("payment_link.expired", "payment_link.cancelled"):
         await apply_expired(link.business_id, link.id, "expired" if row.type.endswith("expired") else "cancelled")
-    elif row.type == "payment.failed":
-        async with get_db().tenant_session(link.business_id) as s:
-            conv = (
-                await s.execute(text("SELECT conversation_id FROM orders WHERE id = :o"), {"o": link.order_id})
-            ).scalar_one()
-        await _send_customer(
-            link.business_id,
-            conv,
-            [{"type": "text", "text": "The payment didn't go through. You can try again with the same link 🙏"}],
-            f"payfail:{link.id}:{pay.get('id')}",
-        )
+    # payment.failed: recorded only. Razorpay's checkout already shows the failure and the customer retries on the
+    # same page (live: failed at 10:06:30, paid 10 s later) — a WhatsApp "didn't go through" mid-retry is noise.
     with_time = row.payload.get("created_at")
     await emit("payment", PipelineEventStatus.OK, business_id=link.business_id, event=row.type, created_at=with_time)
     async with get_db().service_session(ServiceReason.INTEGRATION_ROUTING) as s:

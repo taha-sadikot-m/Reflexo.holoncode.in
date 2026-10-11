@@ -612,3 +612,25 @@ async def test_order_start_takes_details_in_one_call(registry: Registry, db: Dat
     assert data["details"] == {"eggless": "yes", "address": "Kothrud 411038", "delivery_slot": "4pm-8pm"}
     assert [e["key"] for e in data["not_accepted"]] == ["delivery_date"] and "not accepted" in data["next"]
     assert data["total"] == "₹1,050" and [m["key"] for m in data["missing_details"]] == ["delivery_date"]
+
+
+async def test_payment_events_without_link_reference_are_processed_quietly(
+    registry: Registry, db: Database, rzp: FakeRazorpay
+) -> None:
+    """Live: payment.failed / payment.captured carry no link reference; their jobs died on a logging TypeError."""
+    shop = await shop_with_customer(db)
+    order = await ready_order(shop)
+    await commerce.confirm_order(shop["bid"], order.order_id, "razorpay_link", idem="q1")
+    before = len(await q(db, "SELECT id FROM outbound_messages WHERE conversation_id = :c", c=shop["conv"]))
+    for kind in ("payment.failed", "payment.captured"):
+        event = {"event": kind, "payload": {"payment": {"entity": {"id": f"pay_{rzp.tag}", "amount": 105000}}}}
+        assert (await post_webhook(event, event_id=f"evt_{kind}_{rzp.tag}")).status_code == 200
+    assert await run_jobs(registry, "commerce.payment_event") == 2  # handlers return; nothing raises or retries
+    rows = await q(
+        db,
+        "SELECT processed_at FROM integration_events_log WHERE external_event_id LIKE :e",
+        e=f"evt_%_{rzp.tag}",
+    )
+    assert len(rows) == 2 and all(r.processed_at is not None for r in rows)
+    after = len(await q(db, "SELECT id FROM outbound_messages WHERE conversation_id = :c", c=shop["conv"]))
+    assert after == before  # no "didn't go through" message mid-checkout
