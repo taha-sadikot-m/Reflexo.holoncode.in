@@ -32,6 +32,19 @@ class Settings(BaseSettings):
     # Demo controls
     demo_time_scale: float = Field(default=1.0, gt=0, le=1.0)
 
+    # Pipeline (POC_03 §13)
+    coalesce_window_ms: int = 1500
+    coalesce_short_ms: int = 600
+    coalesce_cap_ms: int = 4000
+    turn_lease_s: int = 20
+    turn_max_attempts: int = 3
+    turn_business_concurrency: int = 4
+    holding_after_s: int = 12
+    outbound_rate_per_s: float = 20.0
+    outbound_unknown_wait_s: int = 10
+    queue_batch: int = 10
+    poll_interval_s: float = 1.0
+
     # Admin panel
     admin_user: str = "admin"
     admin_password: SecretStr = SecretStr("change-me")

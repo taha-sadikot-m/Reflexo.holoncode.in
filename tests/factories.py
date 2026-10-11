@@ -42,3 +42,47 @@ async def make_tenant(db: Database, name: str = "Test Biz") -> Tenant:
             {"id": conv, "b": bid, "c": cid, "cust": cust, "tk": f"thread-{conv}"},
         )
     return Tenant(bid, cid, cust, conv)
+
+
+async def make_outbound(db: Database, t: Tenant, parts: int = 1, key: str | None = None) -> tuple[UUID, list[UUID]]:
+    """An outbound message with `parts` queued send-log rows (part order = insertion order)."""
+    mid = new_id()
+    ids: list[UUID] = []
+    base = key or str(mid)
+    async with db.tenant_session(t.business_id) as s:
+        await s.execute(
+            text("""INSERT INTO messages (id, business_id, conversation_id, direction, author, channel,
+                                          channel_connection_id, content_text, status)
+                    VALUES (:id, :b, :c, 'outbound', 'ai', 'web_widget', :cc, 'hello', 'queued')"""),
+            {"id": mid, "b": t.business_id, "c": t.conversation_id, "cc": t.connection_id},
+        )
+        for i in range(parts):
+            oid = new_id()
+            ids.append(oid)
+            await s.execute(
+                text("""INSERT INTO outbound_messages (id, business_id, message_id, conversation_id,
+                            channel_connection_id, part_index, idempotency_key, rendered_payload, priority)
+                        VALUES (:id, :b, :m, :c, :cc, :i, :k, '{}', 'p0')"""),
+                {
+                    "id": oid,
+                    "b": t.business_id,
+                    "m": mid,
+                    "c": t.conversation_id,
+                    "cc": t.connection_id,
+                    "i": i,
+                    "k": f"{base}:{i}",
+                },
+            )
+    return mid, ids
+
+
+async def make_inbound_message(db: Database, t: Tenant, text_body: str = "hi") -> UUID:
+    mid = new_id()
+    async with db.tenant_session(t.business_id) as s:
+        await s.execute(
+            text("""INSERT INTO messages (id, business_id, conversation_id, direction, author, channel,
+                                          channel_connection_id, content_text, status)
+                    VALUES (:id, :b, :c, 'inbound', 'customer', 'web_widget', :cc, :txt, 'received')"""),
+            {"id": mid, "b": t.business_id, "c": t.conversation_id, "cc": t.connection_id, "txt": text_body},
+        )
+    return mid

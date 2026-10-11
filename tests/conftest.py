@@ -72,3 +72,15 @@ async def db(pg: PgUrls) -> AsyncIterator[object]:
     yield database
     set_db(None)
     await database.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _redis_disabled() -> Iterator[None]:
+    """Tests run without Redis by default: every Redis call takes the Postgres fallback path instantly."""
+    from reflexo.common.redis import SafeRedis, set_redis
+
+    r = SafeRedis("redis://127.0.0.1:1/0")
+    r.set_disabled(True)
+    set_redis(r)
+    yield
+    set_redis(None)
