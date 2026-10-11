@@ -78,6 +78,8 @@ async def entrypoint(job: Any) -> None:
     from reflexo.voice import sessions
     from reflexo.voice.agent import GOODBYE, ReflexoVoiceAgent, record_turn
     from reflexo.voice.context import SessionNotLive, start_session
+    from reflexo.voice.in_call import InCallChat
+    from reflexo.voice.summary import send_summary
 
     _ensure_bootstrap()
     meta = json.loads(job.job.metadata or "{}")
@@ -130,13 +132,20 @@ async def entrypoint(job: Any) -> None:
 
             spawn(goodbye())
 
+    voice_agent = ReflexoVoiceAgent(ctx)
+    in_call = InCallChat(ctx, session, voice_agent)
+    voice_agent.in_call = in_call
+
     async def on_shutdown(reason: str = "") -> None:
+        in_call.stop.set()
         if tasks:
             await asyncio.wait(tasks, timeout=3)
         # our own shutdowns carry a reason ("agent_end:done", "silence"); anything else means the room went away
         why = str(reason or "")
         why = why if why.startswith(("agent_end", "silence", "session_not_live")) else "caller_hangup"
         ended = await sessions.mark_ended(call_session_id, why[:100])
+        if why != "session_not_live":
+            await send_summary(ctx)  # never raises: a failed recap must not break the shutdown
         await emit(
             "voice_turn",
             PipelineEventStatus.OK,
@@ -148,7 +157,8 @@ async def entrypoint(job: Any) -> None:
         )
 
     job.add_shutdown_callback(on_shutdown)
-    await session.start(agent=ReflexoVoiceAgent(ctx), room=job.room)
+    await session.start(agent=voice_agent, room=job.room)
+    spawn(in_call.run())  # photos/text/location sent in the WhatsApp chat during the call
 
 
 def main() -> None:

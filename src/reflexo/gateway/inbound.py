@@ -284,8 +284,9 @@ class GatewayInbound:
                 return
             call_router = self.registry.optional(CallRouterPort)  # type: ignore[type-abstract]
             if call_router is not None:
+                kind = "location" if ev.location else (ev.media[0].kind if ev.media else "text")
                 routed = await call_router.deliver_if_active(
-                    conn.business_id, sender.customer_id, sender.conversation_id, message_id
+                    conn.business_id, sender.customer_id, sender.conversation_id, message_id, kind
                 )
                 await emit(
                     "call_route",

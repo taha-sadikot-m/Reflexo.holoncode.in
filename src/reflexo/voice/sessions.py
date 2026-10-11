@@ -169,3 +169,11 @@ async def recover_orphans(bridge_host: str) -> list[CallSession]:
             return []
         rows = (await s.execute(text(_SELECT + " WHERE cs.id = ANY(:ids)"), {"ids": ids})).all()
     return [_row(r) for r in rows]
+
+
+async def transcript(call_session_id: UUID) -> list[dict[str, Any]]:
+    async with get_db().service_session(ServiceReason.VOICE) as s:
+        rows = (
+            await s.execute(text("SELECT transcript FROM call_sessions WHERE id = :id"), {"id": call_session_id})
+        ).scalar_one_or_none()
+    return list(rows or [])

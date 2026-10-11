@@ -235,7 +235,12 @@ class CallRouterPort(Protocol):
     """Provided by voice: deliver a chat message into an active call ("delivered"/"buffered") or "none"."""
 
     async def deliver_if_active(
-        self, business_id: UUID, customer_id: UUID, conversation_id: UUID, message_id: UUID
+        self,
+        business_id: UUID,
+        customer_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        kind: str = "text",  # text | image | document | audio | location
     ) -> str: ...
 
 

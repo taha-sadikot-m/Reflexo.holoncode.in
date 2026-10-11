@@ -117,7 +117,16 @@ def langchain_model(role: str, purpose: str = "graph") -> GatewayChatModel:
 __all__ += ["ChatResult", "GeminiProvider", "MediaInput", "ModelError", "ModelProvider", "langchain_model"]
 
 # Shared tools the voice desk binds (POC_04 §10.4); voice-only tools (end_call, send_to_chat...) live in voice.
-VOICE_TOOLS = ("catalog_search", "catalog_get", "knowledge_lookup", "delivery_quote")
+VOICE_TOOLS = (
+    "catalog_search",
+    "catalog_get",
+    "knowledge_lookup",
+    "delivery_quote",
+    "order_start",
+    "order_update",
+    "order_confirm",
+    "order_status",
+)
 __all__ += ["VOICE_TOOLS", "ToolContext", "extract_amounts", "run_tool"]
 
 
@@ -127,3 +136,11 @@ async def preview_answer(business_id: UUID, question: str) -> str:
 
 
 __all__ += ["preview_answer"]
+
+
+async def describe_media(business_id: UUID, media_object_id: UUID, *, owner_file: bool = False) -> str:
+    """One-line description of a stored photo/PDF/sheet (vision role; also saved on the media object)."""
+    return await media_describe.describe(gateway(), business_id, media_object_id, owner_file=owner_file)
+
+
+__all__ += ["describe_media"]
