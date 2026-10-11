@@ -32,6 +32,7 @@ from reflexo.knowledge.models import (
     VariantInfo,
 )
 from reflexo.knowledge.query import ParsedQuery, canonical_size, parse_query
+from reflexo.knowledge.resolve import OfferingRef, VariantRef, patch_settings, resolve_offerings
 
 __all__ = [
     "BusinessProfile",
@@ -42,10 +43,12 @@ __all__ = [
     "DeliveryQuote",
     "KnowledgeHit",
     "OfferingAttributes",
+    "OfferingRef",
     "ParsedQuery",
     "RenderedProfile",
     "SpeculativeResult",
     "VariantInfo",
+    "VariantRef",
     "add",
     "apply",
     "apply_now",
@@ -63,11 +66,13 @@ __all__ = [
     "match_image_description",
     "next_open",
     "parse_query",
+    "patch_settings",
     "preview",
     "profile_block",
     "qa_block",
     "register",
     "reindex_business",
+    "resolve_offerings",
     "revert",
     "search_catalog",
     "search_knowledge",

@@ -6,9 +6,10 @@ Owner timeline, file library, notifications, onboarding flow, deterministic owne
 from reflexo.common.contracts import OwnerCommandPort, OwnerNotifyPort
 from reflexo.common.ports import Registry
 from reflexo.owner.commands import OwnerCommands
+from reflexo.owner.files import OwnerFile, member_info, search_files, set_description
 from reflexo.owner.notify import OwnerNotifier
 
-__all__ = ["OwnerCommands", "OwnerNotifier", "register"]
+__all__ = ["OwnerCommands", "OwnerFile", "OwnerNotifier", "member_info", "register", "search_files", "set_description"]
 
 
 def register(registry: Registry) -> None:

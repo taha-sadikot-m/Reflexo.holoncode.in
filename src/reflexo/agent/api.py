@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from reflexo.agent import media_describe
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
@@ -92,6 +93,15 @@ def register(registry: Registry, provider: ModelProvider | None = None) -> None:
             await questions.run_sla(UUID(job.payload["business_id"]), UUID(job.payload["question_id"]))
 
         jobs.register(SLA_QUEUE, owner_question_sla)
+        model_gateway = _gateway
+
+        async def describe_media(job: JobRow) -> None:
+            p = job.payload
+            await media_describe.describe(
+                model_gateway, UUID(p["business_id"]), UUID(p["media_object_id"]), owner_file=bool(p.get("owner"))
+            )
+
+        jobs.register(media_describe.QUEUE, describe_media)
 
 
 def gateway() -> ModelGateway:

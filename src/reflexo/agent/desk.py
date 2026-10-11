@@ -26,6 +26,7 @@ from reflexo.agent.checkpointer import get_checkpointer
 from reflexo.agent.context import PreparedContext, holding_text, prepare
 from reflexo.agent.graphs.customer import CustomerState, TurnDeps, build_graph
 from reflexo.agent.model_gateway.gateway import ModelGateway
+from reflexo.agent.owner_desk import OwnerDesk
 from reflexo.agent.questions import SLA_QUEUE
 from reflexo.agent.runs import record_run
 from reflexo.agent.schemas import AgentOutput, OwnerQuestionDraft
@@ -116,6 +117,7 @@ class CustomerDesk:
         self.registry = registry
         self.gateway = model_gateway
         self._graph: CompiledStateGraph[CustomerState] | None = None
+        self.owner = OwnerDesk(model_gateway)
 
     async def graph(self) -> CompiledStateGraph[CustomerState]:
         if self._graph is None:
@@ -125,8 +127,11 @@ class CustomerDesk:
     # ---------------------------------------------------------------- TurnRunnerPort
     async def run_turn(self, handle: TurnHandle) -> None:
         ref = handle.ref
+        if ref.desk == Desk.OWNER:
+            await self.owner.run_turn(handle)
+            return
         if ref.desk != Desk.CUSTOMER:
-            log.info("desk_not_available_yet", desk=str(ref.desk), turn_id=str(ref.turn_id))  # owner desk: WP-10
+            log.info("desk_not_available", desk=str(ref.desk), turn_id=str(ref.turn_id))
             await handle.finish(TurnOutcome.NO_REPLY)
             return
         started = time.perf_counter()
@@ -405,6 +410,10 @@ class CustomerDesk:
 
     async def run_fallback(self, ref: TurnRef, reason: str) -> None:
         """The turn failed permanently: holding reply + owner question with the raw customer text."""
+        if ref.desk == Desk.OWNER:
+            log.warning("owner_turn_fallback", turn_id=str(ref.turn_id), reason=reason)
+            await self.owner.run_fallback(ref)
+            return
         settings = await knowledge.business_settings(ref.business_id)
         async with get_db().tenant_session(ref.business_id) as s:
             conv = await gateway.conversation_view(s, ref.conversation_id)

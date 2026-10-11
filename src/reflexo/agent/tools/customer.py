@@ -56,7 +56,7 @@ class CatalogSearchArgs(BaseModel):
     in_stock_only: bool = False
 
 
-@tool("catalog_search", CatalogSearchArgs, desks=CUSTOMER)
+@tool("catalog_search", CatalogSearchArgs, desks=CUSTOMER | {"owner"})
 async def catalog_search(ctx: ToolContext, args: CatalogSearchArgs) -> dict[str, Any]:
     """Search the catalogue. Returns up to 5 products with live variant prices. Reference what you use as
     variant/offering records."""
@@ -96,7 +96,7 @@ class KnowledgeLookupArgs(BaseModel):
     query: str = Field(description="The customer's question about the business (policies, hours, payments...)")
 
 
-@tool("knowledge_lookup", KnowledgeLookupArgs, desks=CUSTOMER)
+@tool("knowledge_lookup", KnowledgeLookupArgs, desks=CUSTOMER | {"owner"})
 async def knowledge_lookup(ctx: ToolContext, args: KnowledgeLookupArgs) -> dict[str, Any]:
     """Look up the owner's answers (Q&A) and business info (hours, delivery, policies, payments, contact).
     Reference hits as qa:<id> or profile:<section>."""

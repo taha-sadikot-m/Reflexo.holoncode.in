@@ -16,6 +16,7 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+import reflexo.approvals.api as approvals
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.common.contracts import AnswerResult, QuestionAnswerPort
@@ -29,6 +30,11 @@ from reflexo.owner.notify import notification_for_reply
 log = get_logger(__name__)
 _ANSWER = re.compile(r"^\s*(\d{4})\s*[:.\-–]?\s+(\S.*)$", re.DOTALL)
 _OPTION = re.compile(r"^(oq|oqs):([0-9a-f-]{36}):(.+)$")
+_APPROVAL_BUTTON = re.compile(r"^apv:([0-9a-f-]{36}):([ar])$")
+_YES = r"(?:yes|y|haan|han|ha|ok|okay|confirm|done|theek hai|kar do)"
+_NO = r"(?:no|n|nahi|nahin|cancel|mat karo|rehne do)"
+_DECIDE_CODE = re.compile(rf"^\s*({_YES}|{_NO})\s*[,:]?\s*(\d{{4}})\s*[.!]*\s*$", re.IGNORECASE)
+_DECIDE_BARE = re.compile(rf"^\s*({_YES}|{_NO})\s*[.!👍✅]*\s*$", re.IGNORECASE)
 I_WILL_TELL = "later"  # option id of "Main batati hoon": not an answer
 HELP = (
     "Commands:\n"
@@ -103,6 +109,20 @@ class OwnerCommands:
             await self._answer(say, business_id, member_id, message_id, question, answer)
             return "answer"
 
+        if option_id and (m := _APPROVAL_BUTTON.match(option_id)):
+            await self._decide(say, business_id, member_id, m.group(2) == "a", approval_id=UUID(m.group(1)))
+            return "approval"
+        if (m := _DECIDE_CODE.match(body)) is not None:
+            approve = re.fullmatch(_YES, m.group(1), re.IGNORECASE) is not None
+            if await self._decide(say, business_id, member_id, approve, code=m.group(2)):
+                return "approval"
+        elif (m := _DECIDE_BARE.match(body)) is not None:
+            only = await _single_recent_approval(business_id, conversation_id)
+            if only is not None:
+                approve = re.fullmatch(_YES, m.group(1), re.IGNORECASE) is not None
+                await self._decide(say, business_id, member_id, approve, approval_id=only)
+                return "approval"
+
         if body.lower() in ("/help", "help"):
             await say(HELP)
             return "help"
@@ -157,6 +177,58 @@ class OwnerCommands:
         where = {"global": "for everyone", "customer": f"for {who} only", "temporary": "for today"}[result.scope]
         await say(f"✅ {sent}. Saved {where} — next time I'll answer this myself. (/undo to remove)")
 
+    async def _decide(
+        self,
+        say: _Replier,
+        business_id: UUID,
+        member_id: UUID,
+        approve: bool,
+        *,
+        approval_id: UUID | None = None,
+        code: str | None = None,
+    ) -> bool:
+        """Record the decision and carry it out. False if there is no such request (the text was something else)."""
+        decision = await approvals.decide(
+            business_id, approve=approve, member_id=member_id, via=None, approval_id=approval_id, code=code
+        )
+        if decision is None:
+            return False
+        a = decision.approval
+        if decision.already_decided:
+            await say("Already done ✅" if a.status == "approved" else f"That was already {a.status}.")
+            return True
+        if decision.expired:
+            await say("That confirmation expired — tell me again and I'll redo the read-back.")
+            return True
+        if not approve:
+            await say("Cancelled — nothing changed.")
+            return True
+        subject = a.subject
+        try:
+            if a.kind == "change_confirmation" and subject.get("change_set_id"):
+                await knowledge.apply(business_id, UUID(subject["change_set_id"]))
+                await say(f"Done ✅ {a.preview.get('summary', '')} updated. (/undo to revert)")
+            elif a.kind == "change_confirmation" and subject.get("settings_patch"):
+                await knowledge.patch_settings(business_id, subject["settings_patch"])
+                await say(f"Done ✅ {a.preview.get('summary', 'Settings')} updated.")
+            elif a.kind == "outbound_draft":
+                async with get_db().tenant_session(business_id) as s:
+                    await gateway.outbound().enqueue(
+                        s,
+                        business_id=business_id,
+                        conversation_id=UUID(subject["conversation_id"]),
+                        blocks=[{"type": "text", "text": subject["text"]}],
+                        origin="owner_command",
+                        idempotency_base=f"approved:{a.id}",
+                    )
+                await say(f"Sent ✅ to {subject.get('to', 'the customer')}.")
+            else:
+                log.warning("approval_kind_unhandled", kind=a.kind)
+                await say("Approved ✅")
+        except knowledge.ChangeConflict:
+            await say("Not applied: those items changed after the read-back. Tell me again and I'll redo it.")
+        return True
+
     async def _undo(self, say: _Replier, business_id: UUID, member_id: UUID) -> None:
         try:
             undone = await knowledge.revert(business_id, member_id=member_id)
@@ -195,6 +267,20 @@ class _Replier:
                 idempotency_base=f"cmd:{self.message_id}:{self.n}",
             )
         self.n += 1
+
+
+async def _single_recent_approval(business_id: UUID, conversation_id: UUID) -> UUID | None:
+    """A bare "yes"/"no" decides the one confirmation this chat is waiting on (asked in the last 30 minutes)."""
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id FROM approval_requests WHERE status = 'pending' AND expires_at > now()
+                          AND created_at > now() - interval '30 minutes'
+                          AND subject->>'owner_conversation_id' = :c ORDER BY created_at DESC LIMIT 2"""),
+                {"c": str(conversation_id)},
+            )
+        ).all()
+    return rows[0].id if len(rows) == 1 else None
 
 
 async def _question(

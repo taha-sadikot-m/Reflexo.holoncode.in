@@ -194,3 +194,38 @@ async def mark_needs_attention(s: AsyncSession, conversation_id: UUID) -> None:
         text("UPDATE conversations SET needs_attention = true, updated_at = now() WHERE id = :id"),
         {"id": conversation_id},
     )
+
+
+async def owner_timeline(
+    s: AsyncSession, member_id: UUID, *, limit: int = 30, exclude: list[UUID] | None = None
+) -> list[tuple[str, MessageView]]:
+    """One owner timeline (POC_04 §8): the member's last messages across all their owner conversations, oldest
+    first, each tagged with its channel — a file sent on WhatsApp is visible to a command on Telegram."""
+    rows = (
+        await s.execute(
+            text("""SELECT m.id, m.direction, m.author, m.content_text, m.created_at, m.interactive_reply,
+                           m.attachments, c.channel
+                    FROM messages m JOIN conversations c ON c.id = m.conversation_id
+                    WHERE c.member_id = :mem AND c.participant_role = 'owner'
+                      AND NOT (m.id = ANY(CAST(:ex AS uuid[])))
+                      AND m.status NOT IN ('blocked', 'failed', 'pending_approval')
+                    ORDER BY m.created_at DESC, m.id DESC LIMIT :n"""),
+            {"mem": member_id, "ex": [str(x) for x in exclude or []], "n": limit},
+        )
+    ).all()
+    out = [
+        (
+            str(r.channel),
+            MessageView(
+                id=r.id,
+                direction=str(r.direction),
+                author=str(r.author),
+                text=r.content_text or "",
+                created_at=r.created_at,
+                interactive_option=(r.interactive_reply or {}).get("option_id"),
+                attachments=await _attachments(s, r.attachments or []),
+            ),
+        )
+        for r in rows
+    ]
+    return list(reversed(out))

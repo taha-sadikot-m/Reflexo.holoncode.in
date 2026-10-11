@@ -518,6 +518,6 @@ def test_swipe_replies_carry_the_replied_message_id() -> None:
                     }
                 ]
             }
-        ]
+        ],
     }
     assert WhatsAppAdapter().parse(wa_payload, "PN1")[0].reply_to_external_id == "wamid.A"

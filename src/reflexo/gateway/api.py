@@ -35,7 +35,7 @@ from reflexo.gateway.adapters.telegram import TelegramAdapter
 from reflexo.gateway.connections import ConnectionInfo, credentials, find_connection, get_connection
 from reflexo.gateway.connections import clear_cache as clear_connection_cache
 from reflexo.gateway.inbound import GatewayInbound
-from reflexo.gateway.media import MediaSigner, media_path, register_jobs, store_media
+from reflexo.gateway.media import MediaSigner, file_kind, media_path, register_jobs, store_media
 from reflexo.gateway.outbound import EnqueueResult, Outbound
 from reflexo.gateway.views import (
     ConversationView,
@@ -46,6 +46,7 @@ from reflexo.gateway.views import (
     conversation_view,
     mark_needs_attention,
     messages_by_ids,
+    owner_timeline,
     recent_messages,
     set_customer_language,
 )
@@ -281,3 +282,17 @@ async def set_customer_mode(business_id: UUID, mode: str) -> int:
 
 
 __all__ += ["set_customer_mode"]
+
+__all__ += ["owner_timeline"]
+
+
+async def set_media_description(business_id: UUID, media_object_id: UUID, description: str) -> None:
+    """Filled by the media.describe job; shown wherever the attachment appears ([image: …] in prompts)."""
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("UPDATE media_objects SET description = :d WHERE id = :id"),
+            {"d": description[:1000], "id": media_object_id},
+        )
+
+
+__all__ += ["file_kind", "set_media_description"]

@@ -117,6 +117,8 @@ class Settings(BaseSettings):
     # desks (POC_04 §13)
     agent_checkpointer: Literal["postgres", "memory"] = "postgres"
     max_model_calls_customer: int = 4
+    max_model_calls_owner: int = 6  # owner turns chain lookups + a change + the reply (POC_04 §9)
+    max_tool_calls_owner: int = 10
     max_tool_calls_customer: int = 8
 
     # knowledge / search (POC_05 §6)
