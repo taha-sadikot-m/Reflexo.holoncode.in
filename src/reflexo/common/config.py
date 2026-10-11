@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     # Simulator (signed provider-shaped payloads from the Simulation Lab)
     simulator_secret: SecretStr = SecretStr("dev-simulator-secret")
 
+    # model gateway (POC_04 §2)
+    model_provider: Literal["gemini", "fake"] = "gemini"
+    google_api_key: SecretStr = SecretStr("")
+    model_primary: str = "gemini-2.5-flash"
+    model_fallback: str = "gemini-2.5-flash-lite"
+    embedding_model: str = "gemini-embedding-001"
+    models_config: str = "config/models.yaml"
+
     # knowledge / search (POC_05 §6)
     search_k: int = 5
     search_trgm_threshold: float = Field(default=0.3, ge=0.05, le=1.0)

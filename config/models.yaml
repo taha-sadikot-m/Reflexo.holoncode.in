@@ -1,0 +1,10 @@
+# Model roles (POC_04 §2.1). ${VAR} is replaced from settings (REFLEXO_* env / .env).
+# thinking_budget: Gemini 2.5 "thinking" tokens; 0 = off (latency-critical roles), -1 = model default (dynamic).
+roles:
+  customer_desk: {primary: "${REFLEXO_MODEL_PRIMARY}", fallback: "${REFLEXO_MODEL_FALLBACK}", temperature: 0.3, max_output_tokens: 800, hedge_after_ms: 2500, timeout_ms: 20000, thinking_budget: 0}
+  owner_desk: {primary: "${REFLEXO_MODEL_PRIMARY}", fallback: "${REFLEXO_MODEL_FALLBACK}", temperature: 0.2, max_output_tokens: 1200, hedge_after_ms: 3000, timeout_ms: 25000, thinking_budget: 0}
+  builder: {primary: "${REFLEXO_MODEL_FALLBACK}", fallback: "${REFLEXO_MODEL_PRIMARY}", temperature: 0.1, max_output_tokens: 4000, hedge_after_ms: 8000, timeout_ms: 60000, thinking_budget: -1}
+  vision: {primary: "${REFLEXO_MODEL_PRIMARY}", fallback: "${REFLEXO_MODEL_FALLBACK}", temperature: 0.0, max_output_tokens: 1500, timeout_ms: 30000, thinking_budget: 0}
+  extract: {primary: "${REFLEXO_MODEL_PRIMARY}", fallback: "${REFLEXO_MODEL_FALLBACK}", temperature: 0.0, max_output_tokens: 6000, timeout_ms: 60000, thinking_budget: 0}
+  classifier: {primary: "${REFLEXO_MODEL_PRIMARY}", temperature: 0.0, max_output_tokens: 200, timeout_ms: 5000, thinking_budget: 0}
+embedding: {model: "${REFLEXO_EMBEDDING_MODEL}", dimensions: 768, batch_size: 100, timeout_ms: 15000}

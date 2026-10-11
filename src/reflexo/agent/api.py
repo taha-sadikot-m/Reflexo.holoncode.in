@@ -2,3 +2,83 @@
 
 LangGraph desks (customer, owner, builder), tools, output gate, ask-owner, model gateway. Spec: POC_04.
 """
+
+from __future__ import annotations
+
+from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
+from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
+from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_messages
+from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, ModelProvider
+from reflexo.agent.runs import record_run
+from reflexo.common.config import get_settings
+from reflexo.common.contracts import EmbedderPort, ModelGatewayPort
+from reflexo.common.llm import ChatResult, MediaInput, ModelError
+from reflexo.common.logging import get_logger
+from reflexo.common.ports import Registry
+
+__all__ = [
+    "Attempt",
+    "FakeProvider",
+    "FakeReply",
+    "GatewayChatModel",
+    "ModelGateway",
+    "ModelsConfig",
+    "RoleConfig",
+    "gateway",
+    "load_models_config",
+    "record_run",
+    "register",
+    "to_gateway_messages",
+    "tool_result",
+]
+
+log = get_logger(__name__)
+_gateway: ModelGateway | None = None
+
+
+class _UnconfiguredProvider:
+    """Stands in when no API key is set: every call fails clearly instead of the process refusing to start."""
+
+    name = "unconfigured"
+
+    async def generate(self, attempt: Attempt) -> ChatResult:
+        raise ModelError(
+            "CREDENTIAL_INVALID", "REFLEXO_GOOGLE_API_KEY is not set", model=attempt.model, retryable=False
+        )
+
+    async def embed(self, model: str, texts: list[str], *, task: str, dimensions: int) -> list[list[float]]:
+        raise ModelError("CREDENTIAL_INVALID", "REFLEXO_GOOGLE_API_KEY is not set", model=model, retryable=False)
+
+
+def build_provider() -> ModelProvider:
+    s = get_settings()
+    if s.model_provider == "fake":
+        return FakeProvider()
+    key = s.google_api_key.get_secret_value()
+    if not key:
+        log.warning("model_provider_unconfigured", hint="set REFLEXO_GOOGLE_API_KEY or REFLEXO_MODEL_PROVIDER=fake")
+        return _UnconfiguredProvider()
+    return GeminiProvider(key)
+
+
+def register(registry: Registry, provider: ModelProvider | None = None) -> None:
+    """Provide the model gateway (and the embedder for knowledge search when a provider is configured)."""
+    global _gateway
+    provider = provider or build_provider()
+    _gateway = ModelGateway(provider, load_models_config())
+    registry.provide(ModelGatewayPort, _gateway)  # type: ignore[type-abstract]
+    if not isinstance(provider, _UnconfiguredProvider):
+        registry.provide(EmbedderPort, GatewayEmbedder(_gateway))  # type: ignore[type-abstract]
+
+
+def gateway() -> ModelGateway:
+    if _gateway is None:
+        raise RuntimeError("agent not registered (bootstrap() not called)")
+    return _gateway
+
+
+def langchain_model(role: str, purpose: str = "graph") -> GatewayChatModel:
+    return GatewayChatModel(gateway=gateway(), role=role, purpose=purpose)
+
+
+__all__ += ["ChatResult", "GeminiProvider", "MediaInput", "ModelError", "ModelProvider", "langchain_model"]

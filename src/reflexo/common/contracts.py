@@ -10,12 +10,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reflexo.common.enums import Desk, PriorityClass, TurnOutcome
+from reflexo.common.llm import CallCtx, ChatMessage, ChatResult, MediaInput, ToolSpec
+
+_M = TypeVar("_M", bound=BaseModel)
 
 # ---------------------------------------------------------------- rows handed to port implementations
 
@@ -299,3 +303,19 @@ class MediaUrlPort(Protocol):
     """Provided by gateway: short-lived signed public URL for a stored media object."""
 
     def url_for(self, media_object_id: UUID) -> str: ...
+
+
+class ModelGatewayPort(Protocol):
+    """Provided by agent (model gateway, POC_04 §2.2): hedged, accounted model calls for other modules."""
+
+    async def chat(
+        self, role: str, messages: list[ChatMessage], tools: list[ToolSpec] | None = None, *, ctx: CallCtx
+    ) -> ChatResult: ...
+
+    async def structured(self, role: str, messages: list[ChatMessage], schema: type[_M], *, ctx: CallCtx) -> _M: ...
+
+    async def vision(
+        self, role: str, prompt: str, media: list[MediaInput], schema: type[_M], *, ctx: CallCtx
+    ) -> _M: ...
+
+    async def embed(self, texts: list[str], *, task: str, ctx: CallCtx | None = None) -> list[list[float]]: ...
