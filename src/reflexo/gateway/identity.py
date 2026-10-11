@@ -125,7 +125,12 @@ async def resolve_customer(
                                 WHERE business_id = :b AND channel = CAST(:c AS channel_type) AND external_id = :e"""),
             {"n": display_name, "b": business_id, "c": ident_channel, "e": external_id},
         )
-        await s.execute(text("UPDATE customers SET last_seen_at = now() WHERE id = :id"), {"id": found})
+        # a customer first seen without a name (e.g. a call signal) gets the profile name later; never overwrite one
+        await s.execute(
+            text("""UPDATE customers SET last_seen_at = now(),
+                           display_name = COALESCE(NULLIF(display_name, ''), :n) WHERE id = :id"""),
+            {"id": found, "n": display_name},
+        )
         return found, False
     customer_id = new_id()
     phone = external_id if ident_channel == "whatsapp" else None  # WhatsApp proves possession of the number

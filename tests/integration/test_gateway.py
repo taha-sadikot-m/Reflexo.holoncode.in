@@ -707,3 +707,22 @@ async def test_status_webhooks_move_forward_only(registry: Registry, db: Databas
     assert await status_now() == "failed"
     [part] = await q(db, "SELECT status FROM outbound_messages WHERE provider_message_id = 'wamid.P0'")
     assert str(part.status) == "failed"
+
+
+async def test_nameless_customer_gets_profile_name_later(registry: Registry, db: Database) -> None:
+    """Live finding: a customer first created by a call signal had no name, so 'Taha ko bolo…' found nobody."""
+    shop = await make_shop(db)
+    await deliver(registry, db, "meta_whatsapp", wa_message(shop.pnid, "919811111177", "wamid.N1", "hi"), shop.pnid)
+    conv = await conversation_for(db, shop.wa, "919811111177")
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(text("UPDATE customers SET display_name = NULL WHERE id = :c"), {"c": conv.customer_id})
+    await deliver(registry, db, "meta_whatsapp", wa_message(shop.pnid, "919811111177", "wamid.N2", "hello"), shop.pnid)
+    [cust] = await q(db, "SELECT display_name FROM customers WHERE id = :id", id=conv.customer_id)
+    assert cust.display_name == "Rahul"
+    async with db.service_session(ServiceReason.ADMIN) as s:  # a name set by the shop is never overwritten
+        await s.execute(
+            text("UPDATE customers SET display_name = 'Rahul Verma' WHERE id = :c"), {"c": conv.customer_id}
+        )
+    await deliver(registry, db, "meta_whatsapp", wa_message(shop.pnid, "919811111177", "wamid.N3", "ok"), shop.pnid)
+    [cust] = await q(db, "SELECT display_name FROM customers WHERE id = :id", id=conv.customer_id)
+    assert cust.display_name == "Rahul Verma"
