@@ -157,3 +157,24 @@ export interface XrayEvent {
   attrs: Record<string, unknown>;
   at: string | null;
 }
+export interface ChaosOutcome {
+  kind: string;
+  expected: string;
+  ok: boolean;
+  checks: Record<string, unknown>;
+  seconds: number;
+  conversation_id: string | null;
+}
+export interface ChaosRun {
+  id: string;
+  kind: string;
+  state: "running" | "done" | "abandoned";
+  actor: number | null;
+  outcome: ChaosOutcome | null;
+  at: string;
+}
+export interface ChaosOverview {
+  actions: { kind: string; expected: string }[];
+  flags: Record<string, { value: unknown; expires_at: string | null }>;
+  recent: ChaosRun[];
+}

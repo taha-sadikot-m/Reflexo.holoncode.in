@@ -203,11 +203,25 @@ async def chaos_overview(_: Authed, business_id: Business) -> dict[str, Any]:
     }
 
 
-@router.post("/chaos/{kind}")
-async def chaos_run(kind: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+@router.post("/chaos/{kind}", status_code=202)
+async def chaos_start(kind: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+    """Starts the action and returns at once; poll GET /chaos for the verified outcome."""
     if kind not in admin.chaos.EXPECTED:
         raise problem(404, "NOT_FOUND", f"unknown chaos action {kind}")
-    return (await admin.chaos.run(kind, business_id)).asdict()
+    try:
+        run_id = await admin.chaos.start(kind, business_id)
+    except admin.chaos.ChaosBusy as busy:
+        raise problem(409, "CHAOS_BUSY", f"{busy} is still running; wait for it to finish") from None
+    return {"id": str(run_id), "kind": kind, "state": "running"}
+
+
+@router.post("/chaos/flags/{key}/clear")
+async def chaos_clear_flag(key: str, _: Mutating) -> dict[str, Any]:
+    try:
+        cleared = await admin.chaos.clear_flag(key)
+    except ValueError:
+        raise problem(404, "NOT_FOUND", f"{key} is not a chaos flag") from None
+    return {"key": key, "cleared": cleared}
 
 
 # ---------------------------------------------------------------- simulated actors (POC_07 §3.2)

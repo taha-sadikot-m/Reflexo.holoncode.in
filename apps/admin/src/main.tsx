@@ -7,6 +7,7 @@ import "./index.css";
 import { Layout } from "./components/Layout";
 import { ApiError } from "./lib/api";
 import { SessionProvider, useSession } from "./lib/session";
+import { Chaos } from "./pages/Chaos";
 import { Conversations } from "./pages/Conversations";
 import { Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
@@ -31,6 +32,7 @@ function App() {
         <Route index element={<Overview />} />
         <Route path="xray" element={<Xray />} />
         <Route path="conversations" element={<Conversations />} />
+        <Route path="chaos" element={<Chaos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -109,3 +109,58 @@ async def test_kill_after_tool_fires_once(registry: Registry, db: Database, monk
     assert (await agent.run_tool(call, ctx, {"catalog_search"}))["ok"]  # the retry runs normally
     assert exits == [137]
     await clear_flags(db)
+
+
+async def test_start_returns_at_once_and_the_run_closes_its_row(registry: Registry, db: Database) -> None:
+    meera, _ = await make_bakery(db)
+    await make_bakery(db)
+    run_id = await admin.chaos.start("cross_business_read", meera)
+    [first] = await admin.chaos.recent(meera)
+    assert first["id"] == str(run_id) and first["state"] in ("running", "done")
+    await asyncio.gather(*admin.chaos._tasks)
+    [done] = await admin.chaos.recent(meera)
+    assert done["state"] == "done" and done["outcome"]["ok"] is True
+
+
+async def test_one_run_at_a_time_per_business_unless_the_open_row_is_stale(registry: Registry, db: Database) -> None:
+    bid, _ = await make_bakery(db)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("INSERT INTO chaos_events (id, business_id, kind, params) VALUES (:i, :b, 'burst', '{}')"),
+            {"i": new_id(), "b": bid},
+        )
+    with pytest.raises(admin.chaos.ChaosBusy):
+        await admin.chaos.start("cross_business_read", bid)
+    async with db.service_session(ServiceReason.ADMIN) as s:  # API restarted mid-run: the row is orphaned
+        await s.execute(
+            text("UPDATE chaos_events SET created_at = now() - interval '11 minutes' WHERE business_id = :b"),
+            {"b": bid},
+        )
+    assert (await admin.chaos.recent(bid))[0]["state"] == "abandoned"
+    await admin.chaos.start("cross_business_read", bid)
+    await asyncio.gather(*admin.chaos._tasks)
+
+
+async def test_a_failing_run_still_closes_its_row(
+    registry: Registry, db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bid, _ = await make_bakery(db)
+
+    async def boom(*_: Any) -> dict[str, Any]:
+        raise RuntimeError("provider exploded")
+
+    monkeypatch.setattr(admin.chaos, "_cross_business", boom)
+    await admin.chaos.start("cross_business_read", bid)
+    await asyncio.gather(*admin.chaos._tasks)
+    [row] = await admin.chaos.recent(bid)
+    assert row["state"] == "done" and row["outcome"]["ok"] is False
+    assert "provider exploded" in row["outcome"]["checks"]["error"]
+
+
+async def test_disarm_clears_only_chaos_flags(db: Database) -> None:
+    await admin.chaos.set_flag("redis_disabled", True, 30)
+    assert await admin.chaos.clear_flag("redis_disabled") is True
+    assert "redis_disabled" not in await admin.chaos.active_flags()
+    assert await admin.chaos.clear_flag("redis_disabled") is False
+    with pytest.raises(ValueError):
+        await admin.chaos.clear_flag("kill_switch")

@@ -53,7 +53,7 @@ class ChaosResult:
     ok: bool
     checks: dict[str, Any] = field(default_factory=dict)
     seconds: float = 0.0
-    trace_id: str | None = None
+    conversation_id: str | None = None  # the simulated customer's conversation (links to Conversations / X-ray)
 
     def asdict(self) -> dict[str, Any]:
         return asdict(self)
@@ -139,28 +139,99 @@ def _text(payload: dict[str, Any]) -> str:
     return str((payload.get("text") or {}).get("body") or payload.get("text") or json.dumps(payload))
 
 
-async def _record(business_id: UUID, result: ChaosResult, params: dict[str, Any]) -> None:
+class ChaosBusy(Exception):
+    """Another chaos action is still running for this business (their checks would contaminate each other)."""
+
+
+STALE_AFTER_S = 600  # a run row still open after this was orphaned by an API restart
+_tasks: set[asyncio.Task[None]] = set()  # keep references: the event loop holds tasks weakly
+
+
+async def _open_event(business_id: UUID, kind: str, params: dict[str, Any]) -> UUID:
+    """Insert the run row (outcome NULL = running); refuses while another run for the business is open."""
+    event_id = new_id()
     async with get_db().service_session(ServiceReason.ADMIN) as s:
+        lock = text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))")  # serialises check-then-insert
+        await s.execute(lock, {"k": f"chaos:{business_id}"})
+        busy = (
+            await s.execute(
+                text("""SELECT kind FROM chaos_events WHERE business_id = :b AND outcome IS NULL
+                          AND created_at > now() - make_interval(secs => :stale) LIMIT 1"""),
+                {"b": business_id, "stale": STALE_AFTER_S},
+            )
+        ).scalar_one_or_none()
+        if busy is not None:
+            raise ChaosBusy(busy)
         await s.execute(
             text("""INSERT INTO chaos_events (id, business_id, kind, params, outcome)
-                    VALUES (:id, :b, :k, CAST(:p AS jsonb), CAST(:o AS jsonb))"""),
-            {
-                "id": new_id(),
-                "b": business_id,
-                "k": result.kind,
-                "p": json.dumps(params),
-                "o": json.dumps(result.asdict(), default=str),
-            },
+                    VALUES (:id, :b, :k, CAST(:p AS jsonb), NULL)"""),
+            {"id": event_id, "b": business_id, "k": kind, "p": json.dumps(params)},
+        )
+    return event_id
+
+
+async def _close_event(event_id: UUID, result: ChaosResult) -> None:
+    async with get_db().service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE chaos_events SET outcome = CAST(:o AS jsonb) WHERE id = :id"),
+            {"id": event_id, "o": json.dumps(result.asdict(), default=str)},
         )
 
 
+def _actor(kind: str) -> int:
+    # kill_worker needs order_start, so its customer must have no open draft: a fresh simulated customer per run
+    return 40 + secrets.randbelow(59) if kind == "kill_worker" else ACTOR.get(kind, 19)
+
+
 async def run(kind: str, business_id: UUID, other_business_id: UUID | None = None) -> ChaosResult:
+    """Run one action to completion (scripts, tests). The admin panel uses `start`."""
     if kind not in EXPECTED:
         raise ValueError(f"unknown chaos action {kind}")
+    actor = _actor(kind)
+    event_id = await _open_event(business_id, kind, {"actor": actor})
+    result = await _execute(kind, business_id, other_business_id, actor)
+    await _close_event(event_id, result)
+    return result
+
+
+async def start(kind: str, business_id: UUID) -> UUID:
+    """Start an action in the background and return its run id at once: runs take 20 s to ~3 min, longer than a
+    load balancer keeps an idle request open. The panel polls `recent` until the row has an outcome."""
+    if kind not in EXPECTED:
+        raise ValueError(f"unknown chaos action {kind}")
+    actor = _actor(kind)
+    event_id = await _open_event(business_id, kind, {"actor": actor})
+
+    async def body() -> None:
+        try:
+            result = await _execute(kind, business_id, None, actor)
+        except Exception as exc:  # the row must close either way, or the panel stays "running"
+            log.exception("chaos_run_failed", kind=kind)
+            result = ChaosResult(kind, EXPECTED[kind], False, {"error": f"{type(exc).__name__}: {str(exc)[:300]}"})
+        await _close_event(event_id, result)
+
+    task = asyncio.create_task(body(), name=f"chaos:{kind}:{event_id}")
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
+    return event_id
+
+
+_DISARMABLE = {"slow_model", "redis_disabled", "kill_after_tool"}
+
+
+async def clear_flag(key: str) -> bool:
+    """End a chaos toggle early (the panel's "disarm")."""
+    if key not in _DISARMABLE:
+        raise ValueError(f"{key} is not a chaos flag")
+    async with get_db().service_session(ServiceReason.ADMIN) as s:
+        deleted = (await s.execute(text("DELETE FROM runtime_flags WHERE key = :k RETURNING key"), {"k": key})).first()
+    clear_caches()
+    return deleted is not None
+
+
+async def _execute(kind: str, business_id: UUID, other_business_id: UUID | None, actor: int) -> ChaosResult:
     started = time.monotonic()
     since = utcnow() - timedelta(seconds=1)
-    # kill_worker needs order_start, so its customer must have no open draft: a fresh simulated customer per run
-    actor = 40 + secrets.randbelow(59) if kind == "kill_worker" else ACTOR.get(kind, 19)
     checks: dict[str, Any]
     if kind == "duplicate_webhook":
         checks = await _duplicate(business_id, actor, since)
@@ -175,7 +246,9 @@ async def run(kind: str, business_id: UUID, other_business_id: UUID | None = Non
     else:
         checks = await _cross_business(business_id, other_business_id)
     result = ChaosResult(kind, EXPECTED[kind], bool(checks.pop("ok")), checks, round(time.monotonic() - started, 1))
-    await _record(business_id, result, {"actor": actor})
+    if kind != "cross_business_read":
+        conv = await _conversation(business_id, int(checks.get("actor", actor)))
+        result.conversation_id = str(conv) if conv else None
     log.info("chaos_run", kind=kind, ok=result.ok, seconds=result.seconds)
     return result
 
@@ -232,8 +305,9 @@ async def _kill_worker(business_id: UUID, actor: int, since: Any) -> dict[str, A
     runs = 1
     if not checks["worker_killed"]:
         runs = 2
-        checks = await _kill_once(business_id, 40 + (actor - 40 + 1 + secrets.randbelow(57)) % 59, utcnow())
-    return checks | {"scenario_runs": runs}
+        actor = 40 + (actor - 40 + 1 + secrets.randbelow(57)) % 59
+        checks = await _kill_once(business_id, actor, utcnow())
+    return checks | {"scenario_runs": runs, "actor": actor}
 
 
 async def _kill_once(business_id: UUID, actor: int, since: Any) -> dict[str, Any]:
@@ -378,12 +452,24 @@ async def _cross_business(business_id: UUID, other_business_id: UUID | None) -> 
 
 
 async def recent(business_id: UUID, limit: int = 20) -> list[dict[str, Any]]:
+    """Latest runs, newest first. `state`: running | done | abandoned (still open after STALE_AFTER_S)."""
     async with get_db().service_session(ServiceReason.ADMIN) as s:
         rows = (
             await s.execute(
-                text("""SELECT kind, outcome, created_at FROM chaos_events
-                        WHERE business_id = :b ORDER BY created_at DESC LIMIT :n"""),
-                {"b": business_id, "n": limit},
+                text("""SELECT id, kind, params, outcome, created_at,
+                               outcome IS NULL AND created_at < now() - make_interval(secs => :stale) AS stale
+                        FROM chaos_events WHERE business_id = :b ORDER BY created_at DESC LIMIT :n"""),
+                {"b": business_id, "n": limit, "stale": STALE_AFTER_S},
             )
         ).all()
-    return [{"kind": r.kind, "outcome": r.outcome, "at": r.created_at.isoformat()} for r in rows]
+    return [
+        {
+            "id": str(r.id),
+            "kind": r.kind,
+            "state": "done" if r.outcome is not None else "abandoned" if r.stale else "running",
+            "actor": (r.params or {}).get("actor"),
+            "outcome": r.outcome,
+            "at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]

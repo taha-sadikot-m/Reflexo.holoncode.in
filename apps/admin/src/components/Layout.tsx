@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, LogOut, MessagesSquare, Moon, Sun } from "lucide-react";
+import { Activity, Bomb, LayoutDashboard, LogOut, MessagesSquare, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -9,6 +9,7 @@ const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/xray", label: "Pipeline X-ray", icon: Activity },
   { to: "/conversations", label: "Conversations", icon: MessagesSquare },
+  { to: "/chaos", label: "Chaos", icon: Bomb },
 ];
 
 export function Layout() {
