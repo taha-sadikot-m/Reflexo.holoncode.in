@@ -49,11 +49,17 @@ def _uuid(value: str, name: str) -> UUID:
 def _guide(view: commerce.OrderView) -> dict[str, Any]:
     out = view.tool_view()
     out["reference"] = {"type": "order", "id": str(view.order_id)}
-    out["next"] = (
-        "Ask for the missing details (one or two at a time), then call order_update."
-        if view.missing_details
-        else "Read the order back (items, date, address, total) and ask how they want to pay, then order_confirm."
-    )
+    if view.detail_errors:
+        out["next"] = (
+            "Some details were not accepted (see not_accepted and its guidance): explain why in one line, offer the "
+            "valid option, and ask for any other missing details."
+        )
+    elif view.missing_details:
+        out["next"] = "Ask for the missing details (one or two at a time), then call order_update."
+    else:
+        out["next"] = (
+            "Read the order back (items, date, address, total) and ask how they want to pay, then order_confirm."
+        )
     return out
 
 
@@ -64,14 +70,21 @@ async def _call(coro: Any) -> Any:
         raise ToolError(exc.code, str(exc), guidance=exc.guidance) from exc
 
 
+DETAILS_DESC = (
+    "Detail values the customer already gave, by key, e.g. {'delivery_date': 'YYYY-MM-DD' (use the Dates line), "
+    "'delivery_slot': '4pm-8pm', 'address': '...', 'eggless': 'yes', 'message_on_cake': '...'}"
+)
+
+
 class OrderStartArgs(BaseModel):
     items: list[ItemArg] = Field(min_length=1, description="What the customer wants to order")
+    details: dict[str, str] = Field(default_factory=dict, description=DETAILS_DESC)
 
 
 @tool("order_start", OrderStartArgs, desks=ORDER_DESKS, side_effect=True)
 async def order_start(ctx: ToolContext, args: OrderStartArgs, s: AsyncSession) -> dict[str, Any]:
-    """Start the customer's order (or add to their open draft). Returns lines, totals and the details still needed.
-    Reference the order as order:<order_id>."""
+    """Start the customer's order (or add to their open draft), with any details they already gave. Returns lines,
+    totals, details not accepted and the details still needed. Reference the order as order:<order_id>."""
     if ctx.customer_id is None:
         raise ToolError("NOT_APPLICABLE", "no customer in this conversation")
     view = await _call(
@@ -84,6 +97,8 @@ async def order_start(ctx: ToolContext, args: OrderStartArgs, s: AsyncSession) -
             created_by="voice" if ctx.desk == "voice" else "ai",
         )
     )
+    if args.details:  # details given in the same message: one call instead of start + update
+        view = await _call(commerce.update_order(ctx.business_id, view.order_id, details=args.details))
     return _guide(view)
 
 
@@ -91,11 +106,7 @@ class OrderUpdateArgs(BaseModel):
     order_id: str
     add_items: list[ItemArg] = Field(default_factory=list)
     remove_line_ids: list[str] = Field(default_factory=list)
-    details: dict[str, str] = Field(
-        default_factory=dict,
-        description="Detail values by key, e.g. {'delivery_date': 'YYYY-MM-DD', 'delivery_slot': '4pm-8pm', "
-        "'address': '...', 'eggless': 'yes', 'message_on_cake': '...'}",
-    )
+    details: dict[str, str] = Field(default_factory=dict, description=DETAILS_DESC)
 
 
 @tool("order_update", OrderUpdateArgs, desks=ORDER_DESKS, side_effect=True)

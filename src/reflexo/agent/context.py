@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -125,7 +126,8 @@ async def prepare(ref: TurnRef) -> PreparedContext:
             + (f"summary: {conv.summary}\n" if conv.summary else "")
             + ("\n".join(_fmt_message(m, tz) for m in history) or "(new conversation)"),
             "# NOW — new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
-            f"Current time: {now_local.strftime('%a %d %b, %H:%M')} ({tz}). Reply by calling `reply`.",
+            f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
+            "Reply by calling `reply`.",
         ]
     )
     return PreparedContext(
@@ -154,3 +156,13 @@ def holding_text(settings: dict[str, Any], language: str) -> str:
 
 def customer_id_of(ctx: PreparedContext) -> UUID | None:
     return ctx.conversation.customer.id if ctx.conversation.customer else None
+
+
+def _upcoming_days(now_local: datetime) -> str:
+    """Resolve relative dates for the model ("kal", "parso", "Saturday"): models guess the year otherwise."""
+    days = [now_local.date() + timedelta(days=i) for i in range(8)]
+    names = ["today", "tomorrow", "day after tomorrow"]
+    return "Dates: " + "; ".join(
+        f"{names[i] if i < len(names) else d.strftime('%A')} = {d.strftime('%a %d %b')} ({d.isoformat()})"
+        for i, d in enumerate(days)
+    )

@@ -5,6 +5,7 @@ model only ever passes ids, quantities and detail values, and gets displays back
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -57,6 +58,24 @@ async def applicable_fields(business_id: UUID, categories: set[str], offering_id
     return list(specific.values()) + [f for k, f in general.items() if k not in specific]
 
 
+DAY_PARTS = {
+    "morning": {"morning", "subah", "सुबह"},
+    "afternoon": {"afternoon", "noon", "dopahar", "dopehar", "दोपहर"},
+    "evening": {"evening", "shaam", "sham", "शाम"},
+    "night": {"night", "raat", "रात"},
+}
+_SLOT_START = re.compile(r"^\s*(\d{1,2})(?::\d{2})?\s*(am|pm)?", re.IGNORECASE)
+
+
+def _day_part(slot: str) -> str | None:
+    """'4pm-8pm' -> 'evening' (by the slot's start hour)."""
+    m = _SLOT_START.match(slot)
+    if not m:
+        return None
+    hour = int(m.group(1)) % 12 + (12 if (m.group(2) or "").lower() == "pm" else 0)
+    return "morning" if hour < 12 else "afternoon" if hour < 16 else "evening" if hour < 20 else "night"
+
+
 async def _validate_value(
     business_id: UUID, field: DetailField, raw: Any, notice_hours: int | None, subtotal: int
 ) -> tuple[Any, int | None]:
@@ -77,7 +96,11 @@ async def _validate_value(
     if field.type == "slot":
         options = {o.lower().replace(" ", ""): o for o in field.options}
         key = str(value).lower().replace(" ", "")
-        if key not in options:
+        if key not in options:  # "evening" / "shaam" -> the one slot in that part of the day, if unambiguous
+            part = next((p for p, words in DAY_PARTS.items() if key in words), None)
+            matches = [o for o in field.options if part and _day_part(o) == part]
+            if len(matches) == 1:
+                return matches[0], None
             raise CommerceError(
                 "VALIDATION_FAILED",
                 f"slot '{value}' is not available",
@@ -97,9 +120,9 @@ async def _validate_value(
         if d < earliest:
             raise CommerceError(
                 "VALIDATION_FAILED",
-                f"{d.isoformat()} is too soon",
-                guidance=f"The earliest possible delivery date is {earliest.strftime('%a %d %b')}; "
-                f"explain the notice period and offer that date or later.",
+                f"{d.isoformat()} is in the past" if d.year < earliest.year else f"{d.isoformat()} is too soon",
+                guidance=f"The earliest possible delivery date is {earliest.strftime('%a %d %b %Y')} "
+                f"({earliest.isoformat()}); check the year, explain the notice period and offer that date or later.",
                 details={"earliest": earliest.isoformat()},
             )
         return d.isoformat(), None
@@ -411,6 +434,7 @@ async def update_order(
                 text("DELETE FROM order_items WHERE order_id = :o AND id = ANY(:ids)"),
                 {"o": order_id, "ids": list(remove_line_ids)},
             )
+        rejected: list[dict[str, Any]] = []
         if details:
             await recompute(s, business_id, order_id)  # subtotal for the free-delivery threshold
             current = await view(s, order_id)
@@ -422,7 +446,12 @@ async def update_order(
                 if field is None:
                     merged[key] = raw if isinstance(raw, str | int | float | bool) else json.dumps(raw)
                     continue
-                merged[key], _fee = await _validate_value(business_id, field, raw, notice, current.subtotal_paise)
+                try:
+                    merged[key], _fee = await _validate_value(business_id, field, raw, notice, current.subtotal_paise)
+                except CommerceError as exc:  # keep the valid details of this call; report the rest
+                    rejected.append(
+                        {"key": key, "value": str(raw), "code": exc.code, "reason": str(exc), "guidance": exc.guidance}
+                    )
             await s.execute(
                 text("UPDATE orders SET details = CAST(:d AS jsonb) WHERE id = :id"),
                 {"d": json.dumps(merged, ensure_ascii=False), "id": order_id},
@@ -433,6 +462,7 @@ async def update_order(
             raise CommerceError(
                 "VALIDATION_FAILED", "the order has no items", guidance="Ask what they'd like to order."
             )
+        result.detail_errors = rejected
         return result
 
 

@@ -77,13 +77,18 @@ UNITS = re.compile(
     r"jar|box|boxes|cupcakes?|cookies|brownies|nos?)\b",
     re.IGNORECASE,
 )
-_DISCOUNT_WORDS = r"(?:discount|off|chhoot|chhut|chut|choot|छूट|kam kar|kam karke|less|concession|offer)"
+# Discount claims (whole words only: "egg*less* 1 kg" is not a discount). Strong words count in either direction;
+# "off" only after an amount ("₹100 off", never "we're off on 15th"); weak words ("less", "kam", "offer") only right
+# after a rupee amount ("₹100 less", "50 rupees kam"), so "less than 24 hours" / "offer 2 options" stay clean.
+_STRONG = r"(?:discount|chhoot|chhut|chut|choot|छूट|concession)"
+_WEAK = r"(?:less|kam|kam kar|kam karke|offer)"
+_GAP = r"[ :,-]+(?:[\wऀ-ॿ]+[ :,-]+){0,2}?"
 _PCT = re.compile(r"(\d+(?:\.\d+)?)\s*(?:%|percent|pratishat|प्रतिशत)", re.IGNORECASE)
 # within one sentence: words separated by spaces/commas only, never across "." / "?" / newline
 _DISCOUNT_NEAR = re.compile(
-    rf"{_DISCOUNT_WORDS}[ :,-]+(?:[\wऀ-ॿ]+[ :,-]+){{0,2}}?(?:₹|rs\.?)?\s*(\d[\d,]*)"
-    rf"|(?:₹|rs\.?)?\s*(\d[\d,]*)\s*(?:rs\.?|rupees?|rupaye|₹)?[ :,-]+(?:[\wऀ-ॿ]+[ :,-]+){{0,2}}?"
-    rf"{_DISCOUNT_WORDS}\b",
+    rf"(?<![\wऀ-ॿ]){_STRONG}{_GAP}(?:₹|rs\.?)?\s*(\d[\d,]*)"
+    rf"|(?<![\w.])(?:₹|rs\.?)?\s*(\d[\d,]*)\s*(?:rs\.?|rupees?|rupaye|₹)?{_GAP}(?:{_STRONG}|off)(?![\wऀ-ॿ])"
+    rf"|(?:(?:₹|rs\.?)\s*(\d[\d,]*)|(?<![\w.])(\d[\d,]*)\s*(?:rs\.?|rupees?|rupaye|₹))[ :,-]+{_WEAK}(?![\wऀ-ॿ])",
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:no|not|nahi|nahin|nhi|without)\b|नहीं|नही", re.IGNORECASE)

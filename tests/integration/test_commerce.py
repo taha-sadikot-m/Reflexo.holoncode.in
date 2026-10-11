@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Iterator
 from datetime import date, timedelta
 from typing import Any
@@ -231,15 +232,27 @@ async def test_order_lifecycle_details_and_totals(registry: Registry, db: Databa
     assert v.order_number == "MB-1001" and v.subtotal_paise == 95000 and v.status == "draft"
     assert set(v.missing_details) >= {"eggless", "delivery_date", "delivery_slot", "address"}
 
-    with pytest.raises(commerce.CommerceError) as too_soon:
-        await commerce.update_order(shop["bid"], v.order_id, details={"delivery_date": date.today().isoformat()})
-    assert "earliest possible delivery date" in (too_soon.value.guidance or "")
-    with pytest.raises(commerce.CommerceError) as bad_slot:
-        await commerce.update_order(shop["bid"], v.order_id, details={"delivery_slot": "midnight"})
-    assert "10am-1pm" in (bad_slot.value.guidance or "")
-    with pytest.raises(commerce.CommerceError) as far:
-        await commerce.update_order(shop["bid"], v.order_id, details={"address": "Hinjewadi"})
-    assert far.value.code == "NOT_SERVICEABLE"
+    # one call, mixed: valid details are kept, invalid ones come back with guidance (live bug: all were lost)
+    mixed = await commerce.update_order(
+        shop["bid"],
+        v.order_id,
+        details={
+            "eggless": "yes",
+            "delivery_date": date.today().isoformat(),
+            "delivery_slot": "midnight",
+            "address": "Hinjewadi",
+        },
+    )
+    rejected = {e["key"]: e for e in mixed.detail_errors}
+    assert set(rejected) == {"delivery_date", "delivery_slot", "address"}
+    guidance = rejected["delivery_date"]["guidance"]  # ISO + year: the model must not guess (live bug: 2023)
+    assert re.search(rf"\({date.today().year}-\d\d-\d\d\)", guidance), guidance
+    assert "10am-1pm" in rejected["delivery_slot"]["guidance"] and rejected["address"]["code"] == "NOT_SERVICEABLE"
+    assert "eggless" not in mixed.missing_details and "not_accepted" in mixed.tool_view()
+    past = await commerce.update_order(shop["bid"], v.order_id, details={"delivery_date": "2023-10-13"})
+    assert past.detail_errors[0]["reason"] == "2023-10-13 is in the past"
+    evening = await commerce.update_order(shop["bid"], v.order_id, details={"delivery_slot": "shaam"})
+    assert evening.delivery_slot == "4pm-8pm" and evening.detail_errors == []  # "evening"/"shaam" -> the one slot
 
     v = await commerce.update_order(
         shop["bid"],
@@ -569,3 +582,33 @@ async def test_order_tools_and_grounding(registry: Registry, db: Database, rzp: 
     assert (pl.url, pl.amount_display) == (rzp.created[0]["url"], "₹1,000")
     summary = await views.order_summary(shop["bid"], UUID(oid))
     assert summary.total_display == "₹1,000" and summary.payment == "Payment pending"
+
+
+async def test_order_start_takes_details_in_one_call(registry: Registry, db: Database, rzp: FakeRazorpay) -> None:
+    """Live regression: "1 kg truffle, eggless, Kothrud, day after tomorrow evening" in one message."""
+    shop = await shop_with_customer(db)
+    truffle = shop["cards"]["Chocolate Truffle Cake"]
+    ctx = agent.ToolContext(
+        business_id=shop["bid"],
+        desk="customer",
+        channel="whatsapp",
+        conversation_id=shop["conv"],
+        customer_id=shop["cust"],
+        member_id=None,
+        turn_id=new_id(),
+        step=1,
+    )
+    args = {
+        "items": [{"offering_id": str(truffle.offering_id), "variant_id": str(variant(truffle, "1 kg"))}],
+        "details": {
+            "eggless": "yes",
+            "address": "Kothrud 411038",
+            "delivery_slot": "evening",
+            "delivery_date": "2023-10-13",
+        },
+    }
+    res = await agent.run_tool(ToolCall(id="1", name="order_start", args=args), ctx, {"order_start"})
+    data = res["data"]
+    assert data["details"] == {"eggless": "yes", "address": "Kothrud 411038", "delivery_slot": "4pm-8pm"}
+    assert [e["key"] for e in data["not_accepted"]] == ["delivery_date"] and "not accepted" in data["next"]
+    assert data["total"] == "₹1,050" and [m["key"] for m in data["missing_details"]] == ["delivery_date"]

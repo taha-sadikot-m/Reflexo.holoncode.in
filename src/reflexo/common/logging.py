@@ -41,8 +41,24 @@ def _trace_processor(_: Any, __: str, event_dict: MutableMapping[str, Any]) -> M
     return event_dict
 
 
+_URL_SECRET = re.compile(r"/bot\d+:[\w-]+")  # Telegram puts the bot token in the request path
+
+
+class _UrlSecretFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if _URL_SECRET.search(message):
+            record.msg, record.args = _URL_SECRET.sub("/bot***", message), None
+        return True
+
+
 def configure_logging(service: str, level: str = "INFO") -> None:
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level.upper())
+    # httpx logs every request URL at INFO (a Telegram URL carries the bot token); keep library logs at WARNING
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(_UrlSecretFilter())
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

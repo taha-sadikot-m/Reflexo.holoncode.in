@@ -73,6 +73,8 @@ class OrderView(BaseModel):
     address: str | None = None
     customer_id: UUID
     conversation_id: UUID | None = None
+    # details from the last update that were not accepted (the valid ones in the same call are kept)
+    detail_errors: list[dict[str, Any]] = Field(default_factory=list)
 
     def tool_view(self) -> dict[str, Any]:
         """Compact view for the model: displays only, ids for references."""
@@ -94,6 +96,7 @@ class OrderView(BaseModel):
                 for f in self.fields
                 if f.key in self.missing_details
             ],
+            **({"not_accepted": self.detail_errors} if self.detail_errors else {}),
         }
 
 

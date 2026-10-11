@@ -194,3 +194,25 @@ def test_ask_owner_and_no_reply_skip_content_checks() -> None:
 def test_button_titles_are_checked() -> None:
     blocks = [{"type": "buttons", "text": "Kaunsa size?", "options": [{"id": "a", "title": "1 kg ₹900"}]}]
     assert failed(check(out("", blocks=blocks), records())) == ["amounts"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The earliest we can deliver your eggless 1 kg Chocolate Truffle Cake is Mon 12 Oct.",  # live false positive
+        "We need no less than 24 hours notice.",
+        "Orders placed less than 24 hours ahead can't be delivered.",
+        "I can offer 2 options: 500 g or 1 kg.",
+        "We're off on 15 Oct, closed for Diwali.",
+        "Order MB-1001 is confirmed.",
+    ],
+)
+def test_ordinary_sentences_are_not_discounts(text: str) -> None:
+    assert "discounts" not in failed(check(out(text, topic="order_status"), records()))
+
+
+@pytest.mark.parametrize(
+    "text", ["₹100 less de dete hain", "50 rupees kam kar denge", "Flat ₹200 off today", "discount of 15"]
+)
+def test_discount_phrasings_are_caught(text: str) -> None:
+    assert "discounts" in failed(check(out(text), records(amounts_paise={10000, 5000, 20000, 1500})))
