@@ -19,7 +19,7 @@ from sqlalchemy import text
 import reflexo.approvals.api as approvals
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
-from reflexo.common.contracts import AnswerResult, QuestionAnswerPort
+from reflexo.common.contracts import AnswerResult, QuestionAnswerPort, WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.logging import get_logger
@@ -187,46 +187,14 @@ class OwnerCommands:
         approval_id: UUID | None = None,
         code: str | None = None,
     ) -> bool:
-        """Record the decision and carry it out. False if there is no such request (the text was something else)."""
-        decision = await approvals.decide(
-            business_id, approve=approve, member_id=member_id, via=None, approval_id=approval_id, code=code
+        """Record and carry out a decision; False if there is no such request (the text was something else)."""
+        outcome = await execute_decision(
+            self.registry, business_id, member_id, approve, approval_id=approval_id, code=code
         )
-        if decision is None:
+        if outcome is None:
             return False
-        a = decision.approval
-        if decision.already_decided:
-            await say("Already done ✅" if a.status == "approved" else f"That was already {a.status}.")
-            return True
-        if decision.expired:
-            await say("That confirmation expired — tell me again and I'll redo the read-back.")
-            return True
-        if not approve:
-            await say("Cancelled — nothing changed.")
-            return True
-        subject = a.subject
-        try:
-            if a.kind == "change_confirmation" and subject.get("change_set_id"):
-                await knowledge.apply(business_id, UUID(subject["change_set_id"]))
-                await say(f"Done ✅ {a.preview.get('summary', '')} updated. (/undo to revert)")
-            elif a.kind == "change_confirmation" and subject.get("settings_patch"):
-                await knowledge.patch_settings(business_id, subject["settings_patch"])
-                await say(f"Done ✅ {a.preview.get('summary', 'Settings')} updated.")
-            elif a.kind == "outbound_draft":
-                async with get_db().tenant_session(business_id) as s:
-                    await gateway.outbound().enqueue(
-                        s,
-                        business_id=business_id,
-                        conversation_id=UUID(subject["conversation_id"]),
-                        blocks=[{"type": "text", "text": subject["text"]}],
-                        origin="owner_command",
-                        idempotency_base=f"approved:{a.id}",
-                    )
-                await say(f"Sent ✅ to {subject.get('to', 'the customer')}.")
-            else:
-                log.warning("approval_kind_unhandled", kind=a.kind)
-                await say("Approved ✅")
-        except knowledge.ChangeConflict:
-            await say("Not applied: those items changed after the read-back. Tell me again and I'll redo it.")
+        if outcome:  # "" = a workflow owns the follow-up message
+            await say(outcome)
         return True
 
     async def _undo(self, say: _Replier, business_id: UUID, member_id: UUID) -> None:
@@ -267,6 +235,59 @@ class _Replier:
                 idempotency_base=f"cmd:{self.message_id}:{self.n}",
             )
         self.n += 1
+
+
+async def execute_decision(
+    registry: Registry,
+    business_id: UUID,
+    member_id: UUID | None,
+    approve: bool,
+    *,
+    approval_id: UUID | None = None,
+    code: str | None = None,
+) -> str | None:
+    """Decide an approval and carry it out. Returns the owner-facing result, "" when a waiting workflow (import,
+    automation) takes over and reports itself, or None if there is no such request."""
+    decision = await approvals.decide(
+        business_id, approve=approve, member_id=member_id, via=None, approval_id=approval_id, code=code
+    )
+    if decision is None:
+        return None
+    a = decision.approval
+    if decision.already_decided:
+        return "Already done ✅" if a.status == "approved" else f"That was already {a.status}."
+    if decision.expired:
+        return "That confirmation expired — tell me again and I'll redo the read-back."
+    subject = a.subject
+    if subject.get("workflow_id"):  # the workflow waits for this decision and applies/reports itself
+        delivered = await registry.require(WorkflowPort).signal(  # type: ignore[type-abstract]
+            str(subject["workflow_id"]), "approval_decided", {"approve": approve, "approval_id": str(a.id)}
+        )
+        return "" if delivered else "That review has already ended — send it again if you still want it."
+    if not approve:
+        return "Cancelled — nothing changed."
+    try:
+        if a.kind == "change_confirmation" and subject.get("change_set_id"):
+            await knowledge.apply(business_id, UUID(subject["change_set_id"]))
+            return f"Done ✅ {a.preview.get('summary', '')} updated. (/undo to revert)"
+        if a.kind == "change_confirmation" and subject.get("settings_patch"):
+            await knowledge.patch_settings(business_id, subject["settings_patch"])
+            return f"Done ✅ {a.preview.get('summary', 'Settings')} updated."
+        if a.kind == "outbound_draft":
+            async with get_db().tenant_session(business_id) as s:
+                await gateway.outbound().enqueue(
+                    s,
+                    business_id=business_id,
+                    conversation_id=UUID(subject["conversation_id"]),
+                    blocks=[{"type": "text", "text": subject["text"]}],
+                    origin="owner_command",
+                    idempotency_base=f"approved:{a.id}",
+                )
+            return f"Sent ✅ to {subject.get('to', 'the customer')}."
+    except knowledge.ChangeConflict:
+        return "Not applied: those items changed after the read-back. Tell me again and I'll redo it."
+    log.warning("approval_kind_unhandled", kind=a.kind)
+    return "Approved ✅"
 
 
 async def _single_recent_approval(business_id: UUID, conversation_id: UUID) -> UUID | None:

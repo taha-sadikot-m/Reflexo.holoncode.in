@@ -74,3 +74,19 @@ async def member_info(business_id: UUID, member_id: UUID) -> tuple[str, str]:
             await s.execute(text("SELECT display_name, role FROM team_members WHERE id = :m"), {"m": member_id})
         ).first()
     return (row.display_name, str(row.role)) if row else ("Owner", "owner")
+
+
+async def get_file(business_id: UUID, file_id: UUID) -> OwnerFile | None:
+    async with get_db().tenant_session(business_id) as s:
+        r = (
+            await s.execute(
+                text("""SELECT id, filename, kind, description, received_via, created_at, media_object_id
+                        FROM owner_files WHERE id = :id"""),
+                {"id": file_id},
+            )
+        ).first()
+    return (
+        OwnerFile(r.id, r.filename, str(r.kind), r.description, str(r.received_via), r.created_at, r.media_object_id)
+        if r
+        else None
+    )

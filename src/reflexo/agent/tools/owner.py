@@ -24,7 +24,7 @@ import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
-from reflexo.common.contracts import QuestionAnswerPort
+from reflexo.common.contracts import QuestionAnswerPort, WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.money import format_inr
 from reflexo.common.timeutil import to_business_tz, utcnow
@@ -444,6 +444,55 @@ async def orders_list(ctx: ToolContext, args: OrdersListArgs) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------- imports and confirmations
+
+
+class ImportFromFileArgs(BaseModel):
+    file_ref: str = Field(description="file:<id> from RECENT FILES or files_search")
+    mode: Literal["catalog_update", "onboarding"] = "catalog_update"
+
+
+@tool("import_from_file", ImportFromFileArgs, desks=OWNER, side_effect=True)
+async def import_from_file(ctx: ToolContext, args: ImportFromFileArgs, s: AsyncSession) -> dict[str, Any]:
+    """Read a menu / price list (photo, PDF, Excel, CSV) and prepare the catalogue changes for the owner to confirm.
+    Runs in the background; the summary with a confirmation code follows in a moment."""
+    try:
+        file_id = UUID(args.file_ref.removeprefix("file:").strip())
+    except ValueError as exc:
+        raise ToolError("INVALID_ARGS", "bad file ref", guidance="Use file:<id> from RECENT FILES.") from exc
+    f = await owner.get_file(ctx.business_id, file_id)
+    if f is None:
+        raise ToolError("NOT_FOUND", "no such file", guidance="Use files_search to find the file.")
+    if f.kind not in ("image", "pdf", "spreadsheet"):
+        raise ToolError("VALIDATION_FAILED", f"can't import a {f.kind}", guidance="Ask for a photo, PDF or Excel.")
+    assert ctx.conversation_id is not None
+    run_id = await ports.registry.require(WorkflowPort).start_import(  # type: ignore[type-abstract]
+        ctx.business_id, f.id, mode=args.mode, member_id=ctx.member_id, reply_conversation_id=ctx.conversation_id
+    )
+    return {
+        "started": True,
+        "import_run": str(run_id),
+        "next": "Tell the owner in one short line that you're reading the file and the summary will follow.",
+    }
+
+
+class ConfirmPendingArgs(BaseModel):
+    code: str = Field(description="The 4-digit code of the change waiting for confirmation (see PENDING)")
+    approve: bool
+
+
+@tool("confirm_pending", ConfirmPendingArgs, desks=OWNER, side_effect=True)
+async def confirm_pending(ctx: ToolContext, args: ConfirmPendingArgs, s: AsyncSession) -> dict[str, Any]:
+    """Confirm or cancel a change waiting for confirmation when the owner agrees in their own words
+    ("theek hai lagao", "haan apply karo, custom cake baad mein")."""
+    outcome = await owner.execute_decision(
+        ports.registry, ctx.business_id, ctx.member_id, args.approve, code=args.code.strip()
+    )
+    if outcome is None:
+        raise ToolError("NOT_FOUND", f"nothing waiting with code {args.code}", guidance="Check PENDING for the code.")
+    return {"result": outcome or "Done — the result follows in a moment."}
+
+
 # ---------------------------------------------------------------- terminal
 
 
@@ -469,5 +518,7 @@ OWNER_TOOLS = [
     "files_search",
     "send_to_customer",
     "orders_list",
+    "import_from_file",
+    "confirm_pending",
     "reply_owner",
 ]

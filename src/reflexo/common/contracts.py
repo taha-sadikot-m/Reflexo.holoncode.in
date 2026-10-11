@@ -401,3 +401,23 @@ class OrderGuardPort(Protocol):
     async def check(self, business_id: UUID, order: dict[str, Any]) -> GuardResult: ...
 
     async def release(self, business_id: UUID, order_id: UUID, reason: str) -> None: ...
+
+
+class WorkflowPort(Protocol):
+    """Provided by workflows (Temporal client): start durable workflows and deliver signals (POC_01 §5.5)."""
+
+    async def start_import(
+        self,
+        business_id: UUID,
+        owner_file_id: UUID,
+        *,
+        mode: str,
+        member_id: UUID | None,
+        reply_conversation_id: UUID,
+    ) -> UUID:
+        """Start `ImportWorkflow`; returns the import run id (workflow id `import-<run id>`)."""
+        ...
+
+    async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
+        """Deliver a signal; False if the workflow is gone (finished/timed out)."""
+        ...

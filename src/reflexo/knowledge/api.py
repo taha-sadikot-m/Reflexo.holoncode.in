@@ -15,7 +15,7 @@ from sqlalchemy import text
 from reflexo.common.contracts import BlockHydrator, EmbedderPort, JobEnqueuer, JobHandlerRegistry, JobRow
 from reflexo.common.db import get_db
 from reflexo.common.ports import Registry
-from reflexo.knowledge import changesets, indexer, profile, search
+from reflexo.knowledge import changesets, imports, indexer, profile, search
 from reflexo.knowledge.changesets import add, apply, apply_now, begin, preview, revert
 from reflexo.knowledge.hydrator import KnowledgeHydrator
 from reflexo.knowledge.models import (
@@ -262,3 +262,6 @@ async def detail_schemas(business_id: UUID) -> list[dict[str, Any]]:
             )
         ).all()
     return [{"id": str(r.id), "name": r.name, "applies_to": r.applies_to, "fields": r.fields} for r in rows]
+
+
+__all__ += ["imports"]
