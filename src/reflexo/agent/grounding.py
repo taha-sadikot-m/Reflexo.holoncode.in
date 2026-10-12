@@ -40,11 +40,12 @@ async def hydrate(
     wa_display_number: str | None = None,
     trusted_texts: Sequence[str] = (),
     capability_decided: bool = False,
+    tool_backed: bool = False,
 ) -> GroundingRecords:
     """`trusted_texts`: what the business data and our tools told the model this turn (never the customer's own
     words). Their amounts are facts even when the model does not list a record for them — provenance, not
     citation: live, "COD only up to ₹1,500" from order_confirm's decline was refused and the turn fell back."""
-    rec = GroundingRecords(business_id=business_id, capability_decided=capability_decided)
+    rec = GroundingRecords(business_id=business_id, capability_decided=capability_decided, tool_backed=tool_backed)
     refs = [(r.type, r.id) for r in output.referenced_records]
     for fact in trusted_texts:
         rec.amounts_paise |= stated_amounts(fact)
@@ -66,13 +67,17 @@ async def hydrate(
     for c in cards:
         # offerings shown as product blocks count as referenced: their prices are rendered from the rows
         if c.offering_id in offering_refs or c.offering_id in block_ids or variant_ids & variant_refs:
+            # price modifiers the shop's data defines (`eggless_extra_paise`, …): the modifier, and each variant
+            # with it applied — "Truffle 1 kg eggless ₹1,000" is a fact (eval: the gate blocked it)
+            modifiers = [
+                v for k, v in c.attributes.items() if k.endswith("_extra_paise") and isinstance(v, int) and v > 0
+            ]
+            rec.amounts_paise |= set(modifiers)
             for v in c.variants:
                 if v.price_paise is not None:
                     rec.amounts_paise.add(v.price_paise)
+                    rec.amounts_paise |= {v.price_paise + m for m in modifiers}
                 rec.quantity_numbers |= {int(n) for n in _NUMBERS.findall(v.name)}
-            extra = c.attributes.get("eggless_extra_paise")
-            if isinstance(extra, int) and extra > 0:
-                rec.amounts_paise.add(extra)
             rec.quantity_numbers |= {int(n) for n in _NUMBERS.findall(c.name)}
             if c.price_on_request and (c.offering_id in offering_refs or c.offering_id in block_ids):
                 rec.price_on_request = True

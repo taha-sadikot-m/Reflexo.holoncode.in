@@ -167,6 +167,16 @@ def route_after_step(state: CustomerState) -> str:
     return END if state.get("result") == "fallback" else "model"
 
 
+def _answered(m: Any) -> bool:
+    """A tool (not the reply/repair channel) returned a successful result."""
+    if not isinstance(m, ToolMessage) or m.name == "reply":
+        return False
+    try:
+        return bool(json.loads(str(m.content)).get("ok"))
+    except (ValueError, AttributeError):
+        return False
+
+
 def _tool_facts(state: CustomerState) -> list[str]:
     """This turn's tool results as the gate may trust them: our tools' data minus the customer's echoed words.
     Repair/nudge feedback (name "reply") is not a fact — it quotes the very amounts that were refused."""
@@ -219,6 +229,7 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         trusted_texts=[p.trusted_facts, *_tool_facts(state)],
         capability_decided=p.shop_decided
         or any(isinstance(m, ToolMessage) and m.name in ACTION_TOOLS for m in state["messages"]),
+        tool_backed=any(_answered(m) for m in state["messages"]),
     )
     result: GateResult = output_gate.check(output, records)
     await emit(

@@ -327,7 +327,13 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
         )
 
     # 6. grounding
-    if output.action == "send" and output.topic in GROUNDED_TOPICS and not records.valid_refs:
+    # a business fact rests on a record it cites, or on what our tools answered this turn (provenance)
+    if (
+        output.action == "send"
+        and output.topic in GROUNDED_TOPICS
+        and not records.valid_refs
+        and not records.tool_backed
+    ):
         checks.append(
             GateCheck(
                 name="grounding",
@@ -343,7 +349,11 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
     # 7. tier rules (rewrite, not fail)
     rewritten: str | None = None
     if output.action == "send":
-        backed = output.topic in CAPABILITY_TOPICS and records.capability_decided
+        # who decides: an outcome for an order needs a capability (an action tool under the owner's playbook, or
+        # the owner's relayed decision); stating the shop's own policy is information (eval: "cancellation policy
+        # kya hai?" cited the profile and was still handed off)
+        policy_only = bool(records.valid_refs) and all(t in ("profile", "qa") for t, _ in records.valid_refs)
+        backed = output.topic in CAPABILITY_TOPICS and (records.capability_decided or policy_only)
         if (output.topic in HANDOFF_TOPICS and not backed) or output.flags.angry:
             rewritten = "handoff"
         elif output.topic == "discount_negotiation" and not records.discount_texts:

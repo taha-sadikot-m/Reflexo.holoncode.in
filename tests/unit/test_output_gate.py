@@ -166,6 +166,16 @@ def test_grounding_required_for_fact_topics() -> None:
     assert check(smalltalk, records(valid_refs=set())).passed
 
 
+def test_a_tool_answer_grounds_a_fact_without_a_record() -> None:
+    """order_status found no order: "no order yet" is the tool's answer, there is nothing to cite."""
+    none_yet = out("Aapka abhi koi order nahi hai.", topic="order_status", referenced_records=[])
+    assert failed(check(none_yet, records(valid_refs=set()))) == ["grounding"]
+    assert check(none_yet, records(valid_refs=set(), tool_backed=True)).passed
+    # numbers are still checked on their own
+    priced = out("Aapka order ₹999 ka hai.", topic="order_status", referenced_records=[])
+    assert failed(check(priced, records(valid_refs=set(), tool_backed=True))) == ["amounts"]
+
+
 def test_missing_reference_fails() -> None:
     r = check(out("₹950"), records(missing_refs=[("variant", "nope")]))
     assert failed(r) == ["references"]
@@ -186,6 +196,18 @@ def test_tier_rewrites() -> None:
         out("Aapka order cancel ho gaya", topic="returns_refunds_cancellation"), records(capability_decided=True)
     )
     assert backed.passed and backed.rewritten_action is None  # an action tool decided it by the owner's rules
+    # stating the shop's own policy is information, not a decision
+    policy = check(
+        out("24 ghante pehle tak cancellation free hai", topic="returns_refunds_cancellation"),
+        records(valid_refs={("profile", "policies")}),
+    )
+    assert policy.passed and policy.rewritten_action is None
+    # ...but an outcome for an order still needs a capability
+    order_claim = check(
+        out("Aapka order cancel ho gaya", topic="returns_refunds_cancellation"),
+        records(valid_refs={("profile", "policies"), ("order", "o1")}),
+    )
+    assert order_claim.rewritten_action == "handoff"
     angry = check(out("Sorry!", topic="other", flags={"angry": True}), records())
     assert angry.rewritten_action == "handoff"
     haggle = check(out("Thoda kam ho jayega", topic="discount_negotiation"), records())

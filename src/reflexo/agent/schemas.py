@@ -37,7 +37,8 @@ GROUNDED_TOPICS = frozenset(
 )  # fmt: skip
 HANDOFF_TOPICS = frozenset({"returns_refunds_cancellation", "complaint", "human_request"})
 # ...unless a capability decided it this turn (ADR-015): an action tool ran under the owner's playbook, or the
-# owner's decision is being relayed. Then the reply reports a real outcome and is not overridden.
+# owner's decision is being relayed. Then the reply reports a real outcome and is not overridden. A reply that only
+# states the shop's own policy (cites profile / Q&A, no order) is information and is not overridden either.
 CAPABILITY_TOPICS = frozenset({"returns_refunds_cancellation"})
 
 
@@ -157,3 +158,6 @@ class GroundingRecords(BaseModel):
     block_offering_ids: set[str] = Field(default_factory=set)  # offerings that product/carousel blocks may show
     known_numbers: set[str] = Field(default_factory=set)  # plain numbers the system showed the model this turn
     capability_decided: bool = False  # an action tool ran this turn, or the owner's decision is being relayed
+    # one of our tools answered this turn: the reply may rest on that answer even when it has no record to cite
+    # (eval: "mera order kahan hai?" → order_status found none → "no order yet" fell back for lack of a ref)
+    tool_backed: bool = False
