@@ -271,6 +271,15 @@ class AnswerResult:
     already_answered: bool = False
 
 
+class ShopProceduresPort(Protocol):
+    """Provided by automations (ADR-015 awareness): the owner's active procedures in plain words, and what a running
+    one is waiting for from this customer — so the agent never contradicts the shop."""
+
+    async def describe(self, business_id: UUID) -> list[str]: ...
+
+    async def waiting_on(self, business_id: UUID, customer_id: UUID | None) -> list[str]: ...
+
+
 class ProposalPort(Protocol):
     """Provided by agent (ADR-015): carry out the owner's decision on an action the agent proposed — exactly the
     stored action, no new LLM decision — tell the customer, and offer to learn a rule. Returns the owner-facing

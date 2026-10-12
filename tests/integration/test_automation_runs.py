@@ -310,3 +310,32 @@ async def test_cancelling_an_order_ends_its_runs_and_frees_capacity(
     assert "order_cancelled" in kinds and "automation" not in kinds  # told about the cancel, never "not confirmed"
     again = await commerce.cancel_order(shop["bid"], order.order_id, by="customer")
     assert again.status == "already_cancelled"
+
+
+async def test_the_agent_sees_the_shops_procedures_and_what_they_wait_for(
+    registry: Registry, db: Database, worker: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 12 Oct: the COD rule asked "reply YES to confirm" while the agent said "confirmed" — it could not see
+    the owner's procedure. Now its context shows the procedure and the open wait for this customer."""
+    from reflexo.agent.context import prepare
+    from tests.integration.test_ask_owner import claim_pending
+
+    monkeypatch.setenv("REFLEXO_DEMO_RESPONSE_WINDOW_MIN_S", "60")
+    get_settings.cache_clear()
+    shop = await cod_shop(db)
+    await automations.install(shop["bid"], automations.demo.COD_CONFIRMATION, description_nl="COD confirm karwana")
+    await confirmed_cod_order(registry, shop)
+
+    async def waiting() -> bool:
+        return bool(
+            await q(db, "SELECT id FROM automation_waits WHERE business_id = :b AND status = 'waiting'", b=shop["bid"])
+        )
+
+    await eventually(waiting)
+    question = wa_message(shop["pnid"], CUSTOMER_WA, f"wamid.{new_id()}", "did my order go through?")
+    await deliver(registry, db, "meta_whatsapp", question, shop["pnid"])  # not a YES: the agent answers it
+    turn = await claim_pending(registry, db, shop["conv"])
+    prepared = await prepare(turn.ref)
+    assert "# HOW THIS SHOP WORKS" in prepared.dynamic and "COD confirmation" in prepared.dynamic
+    assert "# OPEN WITH THIS CUSTOMER" in prepared.dynamic
+    assert "is waiting for this customer's reply" in prepared.dynamic

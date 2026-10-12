@@ -22,10 +22,12 @@ import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent import language as lang
 from reflexo.agent import prompts
+from reflexo.agent.capabilities import CAPABILITIES
 from reflexo.agent.proposals import decided_block
 from reflexo.agent.tools.customer import card_json
 from reflexo.agent.tools.orders import STATUS_MEANING
-from reflexo.common.contracts import TurnRef
+from reflexo.common import ports
+from reflexo.common.contracts import ShopProceduresPort, TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.timeutil import to_business_tz, utcnow
 
@@ -111,7 +113,7 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         relay_row=relay_row,
         pending=pending,
         started=started,
-        shop_blocks=await _shop_blocks(ref),
+        shop_blocks=await _shop_blocks(ref, conv.customer.id if conv.customer else None),
     )
 
 
@@ -271,25 +273,40 @@ def without_customer_words(value: Any) -> Any:
     return value
 
 
-async def _shop_blocks(ref: TurnRef) -> list[str]:
-    """What the shop has decided or is still deciding for this conversation (ADR-015 awareness): the relay of a
-    decided proposal, and proposals the owner has not answered yet — so the agent never claims an outcome."""
+async def _shop_blocks(ref: TurnRef, customer_id: UUID | None) -> list[str]:
+    """The agent's awareness (ADR-015, POC_10 §7), so it never contradicts the shop:
+    - HOW THIS SHOP WORKS: the owner's playbook rules and active procedures, in the words the owner approved;
+    - OPEN WITH THIS CUSTOMER: proposals the owner has not answered and procedures waiting for this customer;
+    - THE SHOP DECIDED: on a relay turn, the owner's decision to pass on."""
     blocks: list[str] = []
+    rules = await knowledge.playbook.rules(ref.business_id, customer_id=customer_id)
+    procedures = ports.registry.optional(ShopProceduresPort)  # type: ignore[type-abstract]
+    how = [
+        f"- {r.readback(CAPABILITIES[r.capability].label)}" + (" (this customer only)" if r.customer_id else "")
+        for r in rules
+        if r.capability in CAPABILITIES
+    ]
+    if procedures is not None:
+        how += [f"- {line}" for line in await procedures.describe(ref.business_id)]
+    if how:
+        blocks.append(
+            "# HOW THIS SHOP WORKS (the owner's own rules — act by them, never contradict them)\n" + "\n".join(how)
+        )
+
     if proposal_id := ref.hints.get("proposal_id"):
         a = await approvals.get(ref.business_id, UUID(str(proposal_id)))
         if a is not None:
             blocks.append(decided_block(a, await approvals.outcome(ref.business_id, a.id)))
-    waiting = [
-        f"- {a.preview.get('label', 'an action')}: {a.preview.get('summary', '')} (code {a.short_code})"
+    open_items = [
+        f"- You asked the owner: {a.preview.get('label', 'an action').lower()} {a.preview.get('summary', '')} — no "
+        "answer yet. If the customer asks, the shop is deciding and you will update them; never say it is done."
         for a in await approvals.open_for(ref.business_id, kind="tool_call", conversation_id=ref.conversation_id)
         if str(a.id) != str(proposal_id)
     ]
-    if waiting:
-        blocks.append(
-            "# WAITING ON THE SHOP — you proposed these to the owner, no answer yet\n"
-            + "\n".join(waiting)
-            + "\nIf the customer asks, say the shop is deciding and you will update them; never say it is done."
-        )
+    if procedures is not None:
+        open_items += [f"- {line}" for line in await procedures.waiting_on(ref.business_id, customer_id)]
+    if open_items:
+        blocks.append("# OPEN WITH THIS CUSTOMER\n" + "\n".join(open_items))
     return blocks
 
 

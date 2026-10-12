@@ -215,7 +215,9 @@ async def test_asking_again_while_the_owner_decides_is_one_proposal(
         len(await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid))
         == 1
     )
-    assert any("WAITING ON THE SHOP" in s for s in seen)  # the second turn knows it is still pending
+    assert any(
+        "OPEN WITH THIS CUSTOMER" in s and "no answer yet" in s for s in seen
+    )  # the second turn knows it is still pending
 
 
 async def test_the_owners_rules_decide_without_asking(

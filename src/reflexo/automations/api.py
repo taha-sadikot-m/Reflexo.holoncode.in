@@ -4,11 +4,12 @@ Automation definitions, validator, builder workflow, router, guards, instant/dur
 """
 
 from reflexo.automations import builder, cel, demo, readback, runtime, validator
+from reflexo.automations.awareness import ShopProcedures
 from reflexo.automations.guard import AutomationGuard
 from reflexo.automations.router import INSTANT_QUEUE, ROUTE_QUEUE, AutomationRouter
 from reflexo.automations.schema import AutomationDefinition, iso_seconds
 from reflexo.automations.store import Installed, InvalidDefinition, activate, active_versions, install
-from reflexo.common.contracts import EventRouterPort, JobHandlerRegistry, OrderGuardPort
+from reflexo.common.contracts import EventRouterPort, JobHandlerRegistry, OrderGuardPort, ShopProceduresPort
 from reflexo.common.ports import Registry
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
 
 def register(registry: Registry) -> None:
     registry.provide(OrderGuardPort, AutomationGuard())  # type: ignore[type-abstract]
+    registry.provide(ShopProceduresPort, ShopProcedures())  # type: ignore[type-abstract]
     router = AutomationRouter()
     registry.provide(EventRouterPort, router)  # type: ignore[type-abstract]
     jobs = registry.optional(JobHandlerRegistry)  # type: ignore[type-abstract]
