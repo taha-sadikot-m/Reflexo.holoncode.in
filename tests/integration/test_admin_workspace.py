@@ -16,20 +16,18 @@ from reflexo.common.contracts import TurnRunnerPort
 from reflexo.common.db import Database
 from reflexo.common.ids import new_id
 from reflexo.common.ports import Registry
+from tests.integration import test_learning as loop
 from tests.integration.test_admin_api import login
 from tests.integration.test_ask_owner import bakery, owner_says, q, wa_number
 from tests.integration.test_customer_desk import PRIMARY, turn_for
-from tests.integration.test_learning import (  # noqa: F401  (fixtures)
-    SAY,
-    _generous_speculative_budget,
-    asks_to_cancel,
-    fake,
-    learning,
-    placed_order,
-    registry,
-)
+from tests.integration.test_learning import SAY, asks_to_cancel, learning, placed_order
 
 pytestmark = pytest.mark.integration
+
+# the learning tests' fixtures: a fake model, the real owner/commerce stack, a generous speculative budget
+fake = loop.fake
+registry = loop.registry
+_generous_speculative_budget = loop._generous_speculative_budget
 
 
 @pytest.fixture
