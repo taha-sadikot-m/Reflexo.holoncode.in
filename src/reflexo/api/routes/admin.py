@@ -307,3 +307,107 @@ async def scenario_run_detail(run_id: str, _: Authed) -> dict[str, Any]:
 @router.post("/scenarios/runs/{run_id}/stop")
 async def scenario_stop(run_id: str, _: Mutating) -> dict[str, bool]:
     return {"stopped": admin.scenarios.stop(run_id)}
+
+
+# ---------------------------------------------------------------- workspace pages (POC_07 §2, WP-13a)
+
+
+@router.get("/orders")
+async def orders(
+    _: Authed,
+    business_id: Business,
+    status: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> dict[str, Any]:
+    try:
+        return await admin.workspace.orders(business_id, status, limit)
+    except ValueError as exc:
+        raise problem(422, "INVALID", str(exc)) from exc
+
+
+@router.get("/orders/capacity")
+async def orders_capacity(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.capacity(business_id)
+
+
+@router.get("/orders/{order_id}")
+async def order(order_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+    found = await admin.workspace.order_detail(business_id, order_id)
+    if found is None:
+        raise problem(404, "NOT_FOUND", "order not found")
+    return found
+
+
+@router.get("/automations")
+async def automations(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.automations(business_id)
+
+
+@router.get("/automations/{automation_id}")
+async def automation(automation_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+    found = await admin.workspace.automation_detail(business_id, automation_id)
+    if found is None:
+        raise problem(404, "NOT_FOUND", "automation not found")
+    return found
+
+
+async def _set_automation(business_id: UUID, automation_id: UUID, status: str) -> dict[str, str]:
+    try:
+        return {"status": await admin.workspace.set_automation_status(business_id, automation_id, status)}
+    except LookupError as exc:
+        raise problem(404, "NOT_FOUND", str(exc)) from exc
+
+
+@router.post("/automations/{automation_id}/pause")
+async def automation_pause(automation_id: UUID, _: Mutating, business_id: Business) -> dict[str, str]:
+    return await _set_automation(business_id, automation_id, "paused")
+
+
+@router.post("/automations/{automation_id}/resume")
+async def automation_resume(automation_id: UUID, _: Mutating, business_id: Business) -> dict[str, str]:
+    return await _set_automation(business_id, automation_id, "active")
+
+
+@router.post("/automation-runs/{run_id}/skip-wait")
+async def automation_skip_wait(run_id: UUID, _: Mutating, business_id: Business) -> dict[str, bool]:
+    try:
+        return {"sent": await admin.workspace.skip_wait(business_id, run_id)}
+    except LookupError as exc:
+        raise problem(404, "NOT_FOUND", str(exc)) from exc
+
+
+@router.get("/playbook")
+async def playbook(_: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.workspace.playbook(business_id)
+
+
+@router.get("/owner")
+async def owner_workspace(_: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.workspace.owner(business_id)
+
+
+@router.get("/catalogue/change-sets")
+async def change_sets(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.change_sets(business_id)
+
+
+@router.post("/catalogue/change-sets/{change_set_id}/revert")
+async def change_set_revert(change_set_id: UUID, _: Mutating, business_id: Business) -> dict[str, Any]:
+    try:
+        return await admin.workspace.revert_change_set(business_id, change_set_id)
+    except LookupError as exc:
+        raise problem(404, "NOT_FOUND", str(exc)) from exc
+    except ValueError as exc:  # already reverted / still a draft
+        raise problem(409, "NOT_APPLIED", str(exc)) from exc
+    except admin.workspace.ChangeConflict as exc:
+        raise problem(409, "CONFLICT", str(exc)) from exc
+
+
+@router.get("/imports")
+async def imports(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.imports(business_id)
+
+
+@router.get("/calls")
+async def calls(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.calls(business_id)

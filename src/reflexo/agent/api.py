@@ -8,6 +8,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from reflexo.agent import media_describe, sandbox
+from reflexo.agent.capabilities import CAPABILITIES
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
@@ -147,3 +148,6 @@ async def describe_media(business_id: UUID, media_object_id: UUID, *, owner_file
 
 
 __all__ += ["describe_media"]
+
+
+__all__ += ["CAPABILITIES"]  # risk-classed actions (ADR-015): name → label, verb, default authority
