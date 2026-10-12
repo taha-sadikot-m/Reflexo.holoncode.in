@@ -106,6 +106,15 @@ async def run_finish(inp: dict[str, Any], status: str, error: str | None) -> Non
 RUN_ACTIVITIES: list[Callable[..., Any]] = [run_load, run_step, run_until, register_wait, clear_wait, run_finish]
 
 
+def response_window(real_seconds: float, scale: float, min_seconds: float | None) -> float:
+    """How long a wait_for_event gives a person to respond. Demo scaling applies, but never below `min_seconds`
+    (and never beyond the real window): calendar time can be compressed, a person's reaction time cannot."""
+    scaled = real_seconds * scale
+    if scale >= 1 or not min_seconds:
+        return scaled
+    return min(real_seconds, max(scaled, float(min_seconds)))
+
+
 @workflow.defn(name="AutomationRunWorkflow")
 class AutomationRunWorkflow:
     def __init__(self) -> None:
@@ -146,7 +155,7 @@ class AutomationRunWorkflow:
                     await self._sleep(seconds * scale)
                     step_id = step.get("next")
                 elif kind == "wait_for_event":
-                    seconds = iso_seconds(step["timeout"]) * scale
+                    seconds = response_window(iso_seconds(step["timeout"]), scale, inp.get("response_window_min_s"))
                     expires = workflow.now() + timedelta(seconds=seconds + 60)
                     wait_id = await workflow.execute_activity(
                         register_wait,

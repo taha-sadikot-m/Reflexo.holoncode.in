@@ -234,3 +234,14 @@ def test_amount_from_a_tool_result_is_backed_without_a_reference() -> None:
     text = "COD sirf ₹1,500 tak ke orders pe hai, aapka total ₹1,800 hai. Payment link bhej doon?"
     assert failed(check(out(text, topic="payments"), records())) == ["amounts"]
     assert check(out(text, topic="payments"), records(amounts_paise={150000, 180000})).passed
+
+
+def test_buttons_without_text_take_the_text_block_before_them() -> None:
+    # live: [text, buttons(no text)] was rejected twice and the customer got a fallback
+    options = [{"id": "yes", "title": "Yes"}, {"id": "change", "title": "Change"}]
+    merged = out(
+        "x", blocks=[{"type": "text", "text": "Total ₹950. Confirm?"}, {"type": "buttons", "options": options}]
+    )
+    assert [b.type for b in merged.blocks] == ["buttons"] and merged.blocks[0].text == "Total ₹950. Confirm?"
+    with pytest.raises(ValueError):  # nothing to take: still invalid
+        out("x", blocks=[{"type": "buttons", "options": options}])

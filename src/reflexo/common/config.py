@@ -34,6 +34,10 @@ class Settings(BaseSettings):
 
     # Demo controls
     demo_time_scale: float = Field(default=1.0, gt=0, le=1.0)
+    # Demo time compresses calendar time, not people: a window for a customer or owner to respond ("reply YES within
+    # 2 hours") is scaled but never shorter than this (live: 2 h became 5 s and the owner was alerted before the
+    # customer could read the message). Timers ("1 day before delivery") stay fully scaled.
+    demo_response_window_min_s: int = 90
 
     # Pipeline (POC_03 §13)
     coalesce_window_ms: int = 1500

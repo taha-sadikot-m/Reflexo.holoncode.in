@@ -41,6 +41,7 @@ CUSTOMER_WA = "919811122233"
 def _settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("REFLEXO_TEMPORAL_TASK_QUEUE", f"test-{new_id().hex[-10:]}")
     monkeypatch.setenv("REFLEXO_DEMO_TIME_SCALE", str(60 / 86400))  # 1 day = 60 s → PT2H = 5 s
+    monkeypatch.setenv("REFLEXO_DEMO_RESPONSE_WINDOW_MIN_S", "0")  # tests here exercise the bare scaled timeout
     get_settings.cache_clear()
     temporal_client._client = None
     yield
@@ -219,3 +220,35 @@ async def test_delivery_reminder_fast_forwards(registry: Registry, db: Database,
         return any("Reminder: kal aapka order MB-1001 deliver hoga" in t for t in await customer_texts(db, shop))
 
     await eventually(reminded)
+
+
+async def test_a_late_customer_reply_still_counts_within_the_response_floor(
+    registry: Registry, db: Database, worker: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 12 Oct: PT2H at demo scale was 5 s, so the owner was told "not confirmed" before the customer could
+    read the message, and the customer's "ok" 44 s later went nowhere. Response windows have a floor."""
+    monkeypatch.setenv("REFLEXO_DEMO_RESPONSE_WINDOW_MIN_S", "20")
+    get_settings.cache_clear()
+    shop = await cod_shop(db)
+    await automations.install(shop["bid"], automations.demo.COD_CONFIRMATION, description_nl="COD confirm karwana")
+    await confirmed_cod_order(registry, shop)
+
+    async def waiting() -> bool:
+        return bool(
+            await q(db, "SELECT id FROM automation_waits WHERE business_id = :b AND status = 'waiting'", b=shop["bid"])
+        )
+
+    await eventually(waiting)
+    await asyncio.sleep(8)  # past the bare scaled window (5 s)
+    await deliver(
+        registry, db, "meta_whatsapp", wa_message(shop["pnid"], CUSTOMER_WA, f"wamid.{new_id()}", "ok"), shop["pnid"]
+    )
+
+    async def thanked() -> bool:
+        return "Thank you! Order confirmed ✅" in await customer_texts(db, shop)
+
+    await eventually(thanked)
+    told = await q(
+        db, "SELECT id FROM owner_notifications WHERE business_id = :b AND kind = 'automation'", b=shop["bid"]
+    )
+    assert told == []

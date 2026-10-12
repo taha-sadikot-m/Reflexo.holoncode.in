@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from reflexo.common.blocks import (
     ButtonsBlock,
@@ -59,6 +59,9 @@ class OutputFlags(BaseModel):
     possible_spam: bool = False
 
 
+CHOICE_TEXT_MAX = 1024  # body limit of ButtonsBlock / ListBlock (WhatsApp interactive body)
+
+
 class AgentOutput(BaseModel):
     """Arguments of the terminal `reply` tool."""
 
@@ -70,6 +73,30 @@ class AgentOutput(BaseModel):
     owner_question: OwnerQuestionDraft | None = None
     customer_facts: list[MemoryFact] = Field(default_factory=list)
     flags: OutputFlags = Field(default_factory=OutputFlags)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _choices_take_the_text_before_them(cls, data: Any) -> Any:
+        """A buttons/list block without its own text, right after a text block, uses that text as its body —
+        the intent is unambiguous, so normalise instead of rejecting (live: the reply and its repair both left
+        the buttons text empty and the customer got a fallback)."""
+        if not isinstance(data, dict) or not isinstance(data.get("blocks"), list):
+            return data
+        blocks: list[Any] = []
+        for block in data["blocks"]:
+            prev = blocks[-1] if blocks else None
+            if (
+                isinstance(block, dict)
+                and block.get("type") in ("buttons", "list")
+                and not block.get("text")
+                and isinstance(prev, dict)
+                and prev.get("type", "text") == "text"
+                and 0 < len(str(prev.get("text") or "")) <= CHOICE_TEXT_MAX
+            ):
+                blocks[-1] = {**block, "text": prev["text"]}
+            else:
+                blocks.append(block)
+        return {**data, "blocks": blocks}
 
 
 class GateCheck(BaseModel):

@@ -116,6 +116,7 @@ class Workflows:
                     "version_id": str(version_id),
                     "variables": variables,
                     "time_scale": time_scale,
+                    "response_window_min_s": get_settings().demo_response_window_min_s,
                 },
                 id=f"auto-{version_id}-{instance_key}",
                 task_queue=get_settings().temporal_task_queue,
