@@ -354,3 +354,20 @@ async def test_show_chat_button_brings_the_conversation_on_demand(
     await owner_says(registry, db, shop, callback=f"chat:{handle.ref.conversation_id}")
     last = (await owner_messages(db, shop))[-1]["text"]
     assert last.startswith("💬 Last messages") and "Eggless option hai?" in last
+
+
+async def test_simulated_conversations_never_reach_the_real_owner(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live 12 Oct: chaos/Lab customers sent '❓ Question …' to the owner's real Telegram."""
+    shop = await bakery(db)
+    fake.script(PRIMARY, classifier_or(ask_eggless()))
+    handle = await turn_for(registry, db, shop.pnid, wa_number(), "Eggless option hai?")
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE conversations SET simulated = true WHERE id = :c"), {"c": handle.ref.conversation_id}
+        )
+    await registry.require(TurnRunnerPort).run_turn(handle)  # type: ignore[type-abstract]
+    assert await owner_messages(db, shop) == []  # nothing on the real Telegram
+    [note] = await q(db, "SELECT kind FROM owner_notifications WHERE business_id = :b", b=shop.bid)
+    assert note.kind == "question"  # still recorded (admin Owner page shows it)

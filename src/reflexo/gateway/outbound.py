@@ -235,4 +235,5 @@ class Outbound:
                 "delivery_failed",
                 f"A reply could not be delivered ({result.error_code}).",
                 dedupe_key=f"delivery_failed:{row.message_id}",
+                about_conversation=row.conversation_id,
             )

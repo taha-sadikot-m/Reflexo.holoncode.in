@@ -230,4 +230,5 @@ class AutomationGuard:
             "to wait a minute.",
             dedupe_key=f"guard_error:{order.get('order_id')}",
             priority=PriorityClass.P1,
+            about_conversation=UUID(str(order["conversation_id"])) if order.get("conversation_id") else None,
         )

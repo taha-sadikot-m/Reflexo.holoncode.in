@@ -95,13 +95,15 @@ def _owner_text(v: OrderView, settings: dict[str, Any], headline: str) -> str:
     )
 
 
-async def _notify_owner(business_id: UUID, kind: str, body: str, dedupe: str) -> None:
+async def _notify_owner(business_id: UUID, kind: str, body: str, dedupe: str, about: UUID | None = None) -> None:
     notifier = _port(OwnerNotifyPort)
     if notifier is None:
         log.info("owner_notify_unavailable", kind=kind)
         return
     try:
-        await notifier.notify(business_id, kind, body, dedupe_key=dedupe, priority=PriorityClass.P1)
+        await notifier.notify(
+            business_id, kind, body, dedupe_key=dedupe, priority=PriorityClass.P1, about_conversation=about
+        )
     except Exception:  # a notification failure must never undo a payment
         log.exception("owner_notify_failed", kind=kind)
 
@@ -205,6 +207,7 @@ async def confirm_order(business_id: UUID, order_id: UUID, method: PaymentMethod
             "order_cod",
             _owner_text(confirmed.order, settings, "New COD order"),
             f"order_confirmed:{order_id}",
+            confirmed.order.conversation_id,
         )
     await emit(
         "order_confirm",
@@ -352,6 +355,7 @@ async def apply_paid(
             "refund_due",
             f"💸 {amount} paid for cancelled order {v.order_number} — refund needed.",
             f"refund_due:{link_id}",
+            v.conversation_id,
         )
         await emit("payment", PipelineEventStatus.OK, business_id=business_id, result="paid_after_cancel")
         return True
@@ -371,6 +375,7 @@ async def apply_paid(
         "order_confirmed",
         _owner_text(v, settings, "New order") + " paid ✅",
         f"order_confirmed:{v.order_id}",
+        v.conversation_id,
     )
     await emit(
         "payment",
@@ -471,6 +476,7 @@ async def cancel_order(
             "order_cancelled",
             f"❌ Order {v.order_number} cancelled by {who}" + (f": “{reason}”" if reason else ".") + refund,
             f"order_cancelled:{order_id}",
+            v.conversation_id,
         )
     await emit("order_cancel", PipelineEventStatus.OK, business_id=business_id, by=by, refund_due=int(paid))
     return CancelResult(
@@ -529,6 +535,7 @@ async def change_order(
             f"✏️ Order {after.order_number} changed by the customer: "
             + ", ".join(f"{k.replace('_', ' ')} → {v}" for k, v in changed.items()),
             f"order_changed:{order_id}:{new_id().hex[:8]}",  # every change is news
+            after.conversation_id,
         )
     await emit("order_change", PipelineEventStatus.OK, business_id=business_id, by=by, moved=moved)
     return after
@@ -576,7 +583,9 @@ async def refund_order(business_id: UUID, order_id: UUID, *, by: str, reason: st
                      amount_paise=int(link.amount_paise))  # fmt: skip
     amount = format_inr(int(link.amount_paise))
     how = f"refund {refund_id} started" if refund_id else "please refund it from the Razorpay dashboard"
-    await _notify_owner(business_id, "refund", f"💸 {amount} for {o.order_number}: {how}.", f"refund:{order_id}")
+    await _notify_owner(
+        business_id, "refund", f"💸 {amount} for {o.order_number}: {how}.", f"refund:{order_id}", v.conversation_id
+    )
     return {"refunded": amount, "order_number": o.order_number, "provider_refund": bool(refund_id)}
 
 

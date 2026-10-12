@@ -425,3 +425,26 @@ async def test_call_permission_webhook_never_reaches_the_desk(
     assert [j.payload["call"]["event"] for j in jobs] == ["permission_reply"]
     await controller(graph, bridges).handle_signal(jobs[0].payload)  # handled quietly: no Graph call, no session
     assert graph.actions == [] and bridges == {}
+
+
+async def test_bridge_survives_a_database_outage(
+    db: Database, graph: Graph, bridges: dict[str, FakeBridge], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 13 Oct: Docker restarted, one claim timed out, and the bridge process exited (calls dead until restart)."""
+    calls = {"n": 0}
+
+    class FlakyJobs:
+        async def claim(self, *_a: Any, **_k: Any) -> list[Any]:
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise TimeoutError
+            worker.stop()
+            return []
+
+    async def no_wait(_s: float) -> None:
+        return None
+
+    worker = BridgeWorker(controller(graph, bridges), FlakyJobs())  # type: ignore[arg-type]
+    monkeypatch.setattr(worker, "backoff", no_wait)
+    await asyncio.wait_for(worker.run(), timeout=20)
+    assert calls["n"] == 3  # two failures, then a normal claim — no exit in between

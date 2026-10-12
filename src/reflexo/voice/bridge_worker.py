@@ -50,13 +50,26 @@ class BridgeWorker:
         self._stop.set()
         self._wake.set()
 
+    async def backoff(self, seconds: float) -> None:
+        """Pause after a failed claim (overridden in tests)."""
+        await asyncio.sleep(seconds)
+
     async def run(self) -> None:
         recovered = await self.controller.recover()
         log.info("voice_bridge_start", worker=self.worker_id, recovered=recovered)
         loops = [asyncio.create_task(c) for c in (self._redis_wake(), self._pg_wake(), self._heartbeat())]
         try:
+            failures = 0
             while not self._stop.is_set():
-                for job in await self.jobs.claim(self.worker_id, LEASE_S, 4, only=[QUEUE]):
+                try:
+                    claimed = await self.jobs.claim(self.worker_id, LEASE_S, 4, only=[QUEUE])
+                    failures = 0
+                except Exception as exc:  # the database is briefly unreachable: back off, never exit (live 13 Oct)
+                    failures += 1
+                    log.warning("voice_bridge_claim_failed", error=type(exc).__name__, attempt=failures)
+                    await self.backoff(min(30.0, 2.0 * failures))
+                    continue
+                for job in claimed:
                     task = asyncio.create_task(self._run_job(job))
                     self._tasks.add(task)
                     task.add_done_callback(self._tasks.discard)

@@ -240,8 +240,14 @@ async def _notify_owner(ctx: RunContext, text_: str, priority: str, step_id: str
     notifier = ports.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
     if notifier is None:
         raise StepFailed("owner notifications unavailable")
+    conv = (ctx.variables.get("event") or {}).get("conversation_id")
     await notifier.notify(
-        ctx.business_id, "automation", text_, dedupe_key=ctx.key(step_id), priority=PriorityClass(priority)
+        ctx.business_id,
+        "automation",
+        text_,
+        dedupe_key=ctx.key(step_id),
+        priority=PriorityClass(priority),
+        about_conversation=UUID(conv) if conv else None,
     )
 
 

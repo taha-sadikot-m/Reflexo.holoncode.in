@@ -34,6 +34,7 @@ class OwnerNotifier:
         member_id: UUID | None = None,
         buttons: list[tuple[str, str]] | None = None,
         ref: dict[str, str] | None = None,
+        about_conversation: UUID | None = None,
     ) -> None:
         """`buttons` = [(option_id, title)] (tap = deterministic owner command); `ref` (e.g. question_id) is stored
         so a swipe-reply to this message can be traced back to what it was about."""
@@ -57,15 +58,24 @@ class OwnerNotifier:
             ).scalar_one_or_none()
             if nid is None:
                 return  # already notified (retried job, duplicate webhook)
+            simulated = bool(
+                about_conversation
+                and (
+                    await s.execute(
+                        text("SELECT simulated FROM conversations WHERE id = :c"), {"c": about_conversation}
+                    )
+                ).scalar_one_or_none()
+            )
+            # simulated traffic (Lab, chaos) reaches only the simulated owner device; real traffic never goes there
             bindings = (
                 await s.execute(
                     text("""SELECT b.member_id, b.channel, b.external_id FROM owner_channel_bindings b
                             JOIN team_members m ON m.id = b.member_id
-                            WHERE b.verified_at IS NOT NULL AND b.revoked_at IS NULL AND NOT b.simulated_only
+                            WHERE b.verified_at IS NOT NULL AND b.revoked_at IS NULL AND b.simulated_only = :sim
                               AND m.status = 'active' AND (CAST(:m AS uuid) IS NULL AND m.role = 'owner'
                                                            OR m.id = CAST(:m AS uuid))
                             ORDER BY b.is_primary DESC"""),
-                    {"m": member_id},
+                    {"m": member_id, "sim": simulated},
                 )
             ).all()
         target = next((b for ch in CHANNEL_PREFERENCE for b in bindings if str(b.channel) == ch), None)
@@ -83,6 +93,8 @@ class OwnerNotifier:
         thread_key = str(target.external_id).lstrip("+") if channel == "whatsapp" else str(target.external_id)
         async with get_db().tenant_session(business_id) as s:
             conv_id = await gateway.member_conversation(s, conn, thread_key, target.member_id)
+            if simulated:  # the Lab owner device: delivered by the Lab transport, never by the provider
+                await s.execute(text("UPDATE conversations SET simulated = true WHERE id = :c"), {"c": conv_id})
             await gateway.outbound().enqueue(
                 s,
                 business_id=business_id,

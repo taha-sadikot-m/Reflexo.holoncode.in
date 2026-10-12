@@ -54,6 +54,7 @@ class Notes:
         member_id: UUID | None = None,
         buttons: list[tuple[str, str]] | None = None,
         ref: dict[str, str] | None = None,
+        about_conversation: UUID | None = None,
     ) -> None:
         self.sent.append((kind, text_))
         self.buttons.append(buttons or [])

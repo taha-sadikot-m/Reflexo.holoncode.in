@@ -167,6 +167,7 @@ class ProposalService:
                 (f"lrn:{a.id}:o", "Just this once"),
             ],
             ref={"approval_id": str(a.id)},
+            about_conversation=UUID(a.subject["conversation_id"]) if a.subject.get("conversation_id") else None,
         )
 
     async def learn(self, business_id: UUID, approval_id: UUID, scope: str, member_id: UUID | None) -> str:

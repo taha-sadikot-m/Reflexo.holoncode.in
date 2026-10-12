@@ -377,6 +377,7 @@ class CustomerDesk:
                 "question",
                 body,
                 dedupe_key=f"oq:{qid}",
+                about_conversation=conv.id,
                 priority=PriorityClass.P1,
                 buttons=buttons,
                 ref={"question_id": str(qid)},
@@ -389,6 +390,7 @@ class CustomerDesk:
                 "question_followup",
                 body,
                 dedupe_key=f"oqf:{conv.id}:{int(time.time() // 600)}",
+                about_conversation=conv.id,
                 priority=PriorityClass.P1,
                 buttons=[show_chat],
             )
@@ -401,6 +403,7 @@ class CustomerDesk:
                 "handoff",
                 body,
                 dedupe_key=f"handoff:{conv.id}:{int(time.time() // 600)}",
+                about_conversation=conv.id,
                 priority=PriorityClass.P1,
                 buttons=[show_chat],
             )

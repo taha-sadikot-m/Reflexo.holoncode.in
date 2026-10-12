@@ -251,6 +251,7 @@ async def _propose(
             priority=PriorityClass.P1,
             buttons=[(f"apv:{proposal.id}:a", f"✅ Yes, {cap.verb}"[:20]), (f"apv:{proposal.id}:r", "❌ No")],
             ref={"approval_id": str(proposal.id)},
+            about_conversation=ctx.conversation_id,
         )
     return proposal
 
@@ -266,6 +267,7 @@ async def _fyi(ctx: ToolContext, cap: Capability, summary: str, reason: str, rul
         f"✅ Done for the customer: {cap.label.lower()} {summary}.\nReason: “{reason.strip()}” · ({basis})",
         dedupe_key=f"done:{cap.name}:{ctx.idem(cap.name)}",
         priority=PriorityClass.P3,
+        about_conversation=ctx.conversation_id,
     )
 
 
