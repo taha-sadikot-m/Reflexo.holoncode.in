@@ -9,7 +9,14 @@ import { ApiError } from "./lib/api";
 import { SessionProvider, useSession } from "./lib/session";
 import { Chaos } from "./pages/Chaos";
 import { Conversations } from "./pages/Conversations";
+import { Automations } from "./pages/Automations";
+import { Calls } from "./pages/Calls";
+import { History } from "./pages/History";
+import { Imports } from "./pages/Imports";
 import { Lab } from "./pages/Lab";
+import { Orders } from "./pages/Orders";
+import { Owner } from "./pages/Owner";
+import { Playbook } from "./pages/Playbook";
 import { Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
 import { Xray } from "./pages/Xray";
@@ -35,6 +42,13 @@ function App() {
         <Route path="conversations" element={<Conversations />} />
         <Route path="chaos" element={<Chaos />} />
         <Route path="lab" element={<Lab />} />
+        <Route path="orders" element={<Orders />} />
+        <Route path="playbook" element={<Playbook />} />
+        <Route path="automations" element={<Automations />} />
+        <Route path="owner" element={<Owner />} />
+        <Route path="history" element={<History />} />
+        <Route path="imports" element={<Imports />} />
+        <Route path="calls" element={<Calls />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
