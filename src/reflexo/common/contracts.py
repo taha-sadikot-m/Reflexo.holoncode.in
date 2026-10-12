@@ -481,6 +481,11 @@ class WorkflowPort(Protocol):
         """Request cancellation; False if the workflow is already gone."""
         ...
 
+    async def terminate(self, workflow_id: str, reason: str) -> bool:
+        """Stop at once, without running the workflow's own cleanup (its rows are being deleted, e.g. a demo
+        reset); False if the workflow is already gone."""
+        ...
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         """Deliver a signal; False if the workflow is gone (finished/timed out)."""
         ...

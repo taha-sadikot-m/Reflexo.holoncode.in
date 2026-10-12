@@ -8,6 +8,7 @@ Kurti Kraft and eval-bakes are always loaded in full.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import time
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import reflexo.knowledge.api as knowledge
 from reflexo.common.config import Settings, get_settings
+from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import Database, ServiceReason
 from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
@@ -32,6 +34,7 @@ log = get_logger(__name__)
 SEED_DIR = Path(__file__).resolve().parents[3] / "config" / "seeds"
 Mode = Literal["onboarding", "full"]
 DEMO_SLUGS = ("meeras-bakes", "kurti-kraft", "eval-bakes")
+TERMINATE_BUDGET_S = 20.0
 
 OWNER_SCOPES = [
     "knowledge.write",
@@ -52,6 +55,8 @@ OWNER_SCOPES = [
 class SeedReport:
     businesses: dict[str, UUID] = field(default_factory=dict)
     seconds: float = 0.0
+    workflows_terminated: int = 0
+    workflows_unreachable: bool = False  # Temporal did not answer: live workflows of the old data may linger
 
 
 def read_seed(name: str) -> dict[str, Any]:
@@ -261,11 +266,69 @@ async def wipe(db: Database) -> int:
         return int(result.rowcount or 0) if isinstance(result, CursorResult) else 0
 
 
-async def reset(db: Database, mode: Mode = "onboarding", settings: Settings | None = None) -> SeedReport:
-    """`demo-reset`: wipe + reseed. Temporal workflow termination is added with the workflows module (WP-11)."""
+async def live_workflows(db: Database) -> list[str]:
+    """Workflows still running for the demo businesses: automation runs, imports, approvals that wait on a timer."""
+    async with db.service_session(ServiceReason.SEED) as s:
+        rows = (
+            await s.execute(
+                text("""
+            WITH demo AS (SELECT id FROM businesses WHERE slug = ANY(:slugs))
+            SELECT workflow_id FROM automation_runs
+             WHERE business_id IN (SELECT id FROM demo) AND status IN ('running', 'waiting') AND workflow_id IS NOT NULL
+            UNION
+            SELECT workflow_id FROM import_runs
+             WHERE business_id IN (SELECT id FROM demo) AND status IN ('queued', 'extracting', 'review')
+               AND workflow_id IS NOT NULL
+            UNION
+            SELECT workflow_id FROM approval_requests
+             WHERE business_id IN (SELECT id FROM demo) AND status = 'pending' AND workflow_id IS NOT NULL"""),
+                {"slugs": list(DEMO_SLUGS)},
+            )
+        ).all()
+    return [r.workflow_id for r in rows]
+
+
+async def _terminate(workflows: WorkflowPort, ids: list[str]) -> tuple[int, int]:
+    """(terminated, failed). Best effort per workflow: one that cannot be stopped must not block the reset."""
+    done = failed = 0
+    for wf in ids:
+        try:
+            done += await workflows.terminate(wf, "demo reset")
+        except Exception as exc:  # Temporal unreachable / RPC error: reported, the reset goes on
+            failed += 1
+            log.warning("demo_reset_terminate_failed", workflow_id=wf, error=type(exc).__name__)
+    return done, failed
+
+
+async def reset(
+    db: Database,
+    mode: Mode = "onboarding",
+    settings: Settings | None = None,
+    workflows: WorkflowPort | None = None,
+) -> SeedReport:
+    """`demo-reset`: terminate the demo businesses' live workflows (their rows are about to go: a timer firing
+    later would act on nothing, or retry forever), then wipe + reseed. Temporal being down does not block the
+    reset — it is reported, and those workflows fail harmlessly when they wake."""
     started = time.perf_counter()
+    ids = await live_workflows(db) if workflows else []
+    terminated, unreachable = 0, False
+    if ids and workflows:
+        try:
+            terminated, failed = await asyncio.wait_for(_terminate(workflows, ids), TERMINATE_BUDGET_S)
+            unreachable = failed > 0
+        except TimeoutError:
+            unreachable = True
+            log.warning("demo_reset_terminate_timeout", workflows=len(ids))
     deleted = await wipe(db)
     report = await load(db, mode, settings)
+    report.workflows_terminated, report.workflows_unreachable = terminated, unreachable
     report.seconds = time.perf_counter() - started
-    log.info("demo_reset", mode=mode, deleted=deleted, seconds=round(report.seconds, 2))
+    log.info(
+        "demo_reset",
+        mode=mode,
+        deleted=deleted,
+        workflows=len(ids),
+        terminated=terminated,
+        seconds=round(report.seconds, 2),
+    )
     return report

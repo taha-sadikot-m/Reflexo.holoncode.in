@@ -306,3 +306,5 @@ def sign_meta(raw_body: bytes) -> str:
 
 
 __all__ += ["sign_meta"]
+
+__all__ += ["clear_connection_cache"]  # after a demo reset: route to the new connection rows at once

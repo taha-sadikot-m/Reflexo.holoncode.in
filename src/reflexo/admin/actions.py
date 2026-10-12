@@ -1,13 +1,18 @@
-"""Admin mutations on conversations (POC_07 §2 Conversations): reply as team, take over, release."""
+"""Admin mutations (POC_07 §2): reply as team, take over, release; the demo reset (Settings)."""
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
 
 import reflexo.gateway.api as gateway
+from reflexo.admin import seeding
+from reflexo.common import ports
 from reflexo.common.config import get_settings
+from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
 
@@ -54,3 +59,28 @@ async def set_takeover(business_id: UUID, conversation_id: UUID, active: bool) -
         )
         if updated.scalar_one_or_none() is None:
             raise LookupError("conversation not found")
+
+
+_reset_lock = asyncio.Lock()
+
+
+async def demo_reset(mode: str) -> dict[str, Any]:
+    """The Settings page's reset button = `make demo-reset [FULL=1]`: stop the demo businesses' workflows, wipe,
+    reseed. Business ids change; one reset at a time."""
+    if mode not in ("onboarding", "full"):
+        raise ValueError("mode must be onboarding or full")
+    if _reset_lock.locked():
+        raise RuntimeError("a reset is already running")
+    async with _reset_lock:
+        report = await seeding.reset(
+            get_db(),
+            "full" if mode == "full" else "onboarding",
+            workflows=ports.registry.optional(WorkflowPort),  # type: ignore[type-abstract]
+        )
+    gateway.clear_connection_cache()  # this process routes to the new rows at once (workers: within the TTL)
+    return {
+        "businesses": {slug: str(bid) for slug, bid in report.businesses.items()},
+        "seconds": round(report.seconds, 1),
+        "workflows_terminated": report.workflows_terminated,
+        "workflows_unreachable": report.workflows_unreachable,
+    }

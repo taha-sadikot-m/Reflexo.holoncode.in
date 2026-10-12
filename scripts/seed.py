@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 
-from reflexo.admin.seeding import load, reset
+from reflexo.admin.seeding import Mode, load, reset
 from reflexo.common.config import get_settings
 from reflexo.common.db import Database
 from reflexo.common.logging import configure_logging
+from reflexo.workflows.api import Workflows
 
 
 async def _main(action: str, full: bool) -> None:
@@ -16,10 +17,14 @@ async def _main(action: str, full: bool) -> None:
     configure_logging("reflexo-seed", s.log_level)
     db = Database(s.database_url, s.database_service_url)
     try:
-        mode = "full" if full else "onboarding"
-        report = await (reset(db, mode) if action == "reset" else load(db, mode))
+        mode: Mode = "full" if full else "onboarding"
+        report = await (reset(db, mode, workflows=Workflows()) if action == "reset" else load(db, mode))
         for slug, bid in report.businesses.items():
             print(f"{slug:14s} {bid}")
+        if action == "reset":
+            print(f"workflows terminated: {report.workflows_terminated}")
+            if report.workflows_unreachable:
+                print("WARNING: some workflows could not be stopped (is Temporal running?)")
         print(f"done in {report.seconds:.2f}s")
     finally:
         await db.dispose()
