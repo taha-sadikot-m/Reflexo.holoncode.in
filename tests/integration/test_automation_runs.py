@@ -252,3 +252,61 @@ async def test_a_late_customer_reply_still_counts_within_the_response_floor(
         db, "SELECT id FROM owner_notifications WHERE business_id = :b AND kind = 'automation'", b=shop["bid"]
     )
     assert told == []
+
+
+async def test_cancelling_an_order_ends_its_runs_and_frees_capacity(
+    registry: Registry, db: Database, worker: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 12 Oct: after "I want to cancel", the COD wait still told the owner "not confirmed" and the reminder
+    still fired. A cancelled order ends every run about it — no automation needs its own "on cancel" branch."""
+    monkeypatch.setenv("REFLEXO_DEMO_RESPONSE_WINDOW_MIN_S", "60")  # the wait outlives the test unless cancelled
+    get_settings.cache_clear()
+    shop = await cod_shop(db)
+    await automations.install(shop["bid"], automations.demo.DAILY_CAKE_LIMIT, description_nl="8 cake roz")
+    await automations.install(shop["bid"], automations.demo.COD_CONFIRMATION, description_nl="COD confirm karwana")
+    order = await confirmed_cod_order(registry, shop)
+
+    async def waiting() -> bool:
+        return bool(
+            await q(
+                db,
+                "SELECT id FROM automation_waits WHERE run_id IN (SELECT id FROM automation_runs "
+                "WHERE instance_key = :k) AND status = 'waiting'",
+                k=str(order.order_id),
+            )
+        )
+
+    await eventually(waiting)
+    [used] = await q(db, "SELECT value FROM automation_counters WHERE business_id = :b", b=shop["bid"])
+    assert used.value == 1
+
+    result = await commerce.cancel_order(shop["bid"], order.order_id, by="customer", reason="plans changed")
+    assert result.status == "cancelled" and result.refund_due_paise == 0
+    assert await run_jobs(registry, "automations.route") >= 1  # order.cancelled → router ends the runs
+
+    runs = await q(db, "SELECT status FROM automation_runs WHERE instance_key = :k", k=str(order.order_id))
+    assert runs and {str(r.status) for r in runs} <= {"cancelled", "completed"}
+    assert not await waiting()
+    [freed] = await q(db, "SELECT value FROM automation_counters WHERE business_id = :b", b=shop["bid"])
+    assert freed.value == 0
+
+    async def workflow_cancelled() -> bool:
+        handle = (await temporal_client.client()).get_workflow_handle(
+            f"auto-{
+                (
+                    await q(
+                        db,
+                        'SELECT automation_version_id FROM automation_runs WHERE instance_key = :k AND '
+                        'workflow_id IS NOT NULL',
+                        k=str(order.order_id),
+                    )
+                )[0].automation_version_id
+            }-{order.order_id}"
+        )
+        return (await handle.describe()).status.name in ("CANCELED", "COMPLETED")
+
+    await eventually(workflow_cancelled)
+    kinds = [r.kind for r in await q(db, "SELECT kind FROM owner_notifications WHERE business_id = :b", b=shop["bid"])]
+    assert "order_cancelled" in kinds and "automation" not in kinds  # told about the cancel, never "not confirmed"
+    again = await commerce.cancel_order(shop["bid"], order.order_id, by="customer")
+    assert again.status == "already_cancelled"

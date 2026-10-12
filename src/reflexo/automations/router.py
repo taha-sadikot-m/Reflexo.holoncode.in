@@ -64,7 +64,11 @@ class AutomationRouter:
                     {"e": UUID(job.payload["event_id"])},
                 )
             ).first()
-        if row is None or row.type not in TRIGGER_BY_EVENT:
+        if row is None:
+            return
+        if row.type == "order.cancelled":  # a run about an order has nothing left to do once the order is gone
+            await self.end_runs_for(business_id, str((row.payload or {}).get("order_id")), "order cancelled")
+        if row.type not in TRIGGER_BY_EVENT:
             return
         variables = await event_variables(
             business_id,
@@ -74,6 +78,30 @@ class AutomationRouter:
             conversation_id=row.conversation_id,
         )
         await self.route(business_id, row.type, row.id, variables)
+
+    async def end_runs_for(self, business_id: UUID, instance_key: str, reason: str) -> int:
+        """End every live run of this instance (e.g. an order): reminders and confirmation waits for a cancelled
+        order must not fire. Generic for every automation — none of them needs its own "on cancel" branch."""
+        async with get_db().tenant_session(business_id) as s:
+            runs = (
+                await s.execute(
+                    text("""SELECT id, workflow_id FROM automation_runs
+                            WHERE instance_key = :k AND status IN ('running', 'waiting')"""),
+                    {"k": instance_key},
+                )
+            ).all()
+            if runs:
+                await s.execute(
+                    text("UPDATE automation_waits SET status = 'cancelled' WHERE run_id = ANY(:r) AND status = 'waiting'"),
+                    {"r": [r.id for r in runs]},
+                )
+        for r in runs:
+            await finish_run(business_id, r.id, "cancelled", reason)  # first: a late "failed" cannot overwrite it
+            if r.workflow_id:
+                await ports.registry.require(WorkflowPort).cancel(r.workflow_id)  # type: ignore[type-abstract]
+        if runs:
+            log.info("automation_runs_ended", business_id=str(business_id), instance=instance_key, runs=len(runs))
+        return len(runs)
 
     async def route(self, business_id: UUID, event_type: str, event_id: UUID, variables: dict[str, Any]) -> str:
         trigger_type = TRIGGER_BY_EVENT.get(event_type)

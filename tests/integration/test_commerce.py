@@ -40,6 +40,7 @@ class FakeRazorpay:
         self.created: list[dict[str, Any]] = []
         self.remote_status = "created"
         self.tag = new_id().hex[-8:]  # provider ids are globally unique, also across tests on one database
+        self.cancelled = []
 
     configured = True
 
@@ -61,6 +62,15 @@ class FakeRazorpay:
             status="created",
             amount=kw["amount_paise"],
             reference_id=kw["reference_id"],
+        )
+
+    cancelled: list[str]
+
+    async def cancel_payment_link(self, link_id: str) -> PaymentLink:
+        self.cancelled.append(link_id)
+        c = next(c for c in self.created if c["id"] == link_id)
+        return PaymentLink(
+            id=link_id, short_url=c["url"], status="cancelled", amount=c["amount_paise"], reference_id=c["reference_id"]
         )
 
     async def fetch_payment_link(self, link_id: str) -> PaymentLink:
@@ -634,3 +644,32 @@ async def test_payment_events_without_link_reference_are_processed_quietly(
     assert len(rows) == 2 and all(r.processed_at is not None for r in rows)
     after = len(await q(db, "SELECT id FROM outbound_messages WHERE conversation_id = :c", c=shop["conv"]))
     assert after == before  # no "didn't go through" message mid-checkout
+
+
+async def test_cancel_invariants_and_payment_after_cancel(registry: Registry, db: Database, rzp: FakeRazorpay) -> None:
+    shop = await shop_with_customer(db)
+    order = await ready_order(shop)
+    linked = await commerce.confirm_order(shop["bid"], order.order_id, "razorpay_link", idem="cx1")
+    assert linked.status == "awaiting_payment"
+    result = await commerce.cancel_order(shop["bid"], order.order_id, by="customer", reason="ordered twice")
+    assert result.status == "cancelled" and result.payment_link_cancelled
+    assert rzp.cancelled == [rzp.created[0]["id"]]
+    [row] = await q(db, "SELECT status, cancelled_by, cancel_reason FROM orders WHERE id = :o", o=order.order_id)
+    assert (str(row.status), row.cancelled_by, row.cancel_reason) == ("cancelled", "customer", "ordered twice")
+
+    # the customer paid the (already cancelled) link anyway: money with no live order → truth + refund alert
+    [link] = await q(db, "SELECT id FROM payment_links WHERE order_id = :o", o=order.order_id)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(text("UPDATE payment_links SET status = 'created' WHERE id = :l"), {"l": link.id})
+    assert await commerce.apply_paid(shop["bid"], link.id, payment_id="pay_late", amount_paid=None, source="webhook")
+    [still] = await q(db, "SELECT status FROM orders WHERE id = :o", o=order.order_id)
+    assert str(still.status) == "cancelled"
+    kinds = [r.kind for r in await q(db, "SELECT kind FROM owner_notifications WHERE business_id = :b", b=shop["bid"])]
+    assert "refund_due" in kinds and "order_confirmed" not in kinds
+
+    delivered = await ready_order(shop)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(text("UPDATE orders SET status = 'delivered' WHERE id = :o"), {"o": delivered.order_id})
+    with pytest.raises(commerce.CommerceError) as err:
+        await commerce.cancel_order(shop["bid"], delivered.order_id, by="customer")
+    assert err.value.code == "NOT_CANCELLABLE"

@@ -452,6 +452,10 @@ class WorkflowPort(Protocol):
         """Start `AutomationRunWorkflow` (id `auto-<version>-<instance key>`); False if one is already running."""
         ...
 
+    async def cancel(self, workflow_id: str) -> bool:
+        """Request cancellation; False if the workflow is already gone."""
+        ...
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         """Deliver a signal; False if the workflow is gone (finished/timed out)."""
         ...

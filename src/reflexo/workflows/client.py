@@ -125,6 +125,16 @@ class Workflows:
             return False
         return True
 
+    async def cancel(self, workflow_id: str) -> bool:
+        c = await client()
+        try:
+            await c.get_workflow_handle(workflow_id).cancel()
+        except RPCError as exc:
+            if exc.status == RPCStatusCode.NOT_FOUND:
+                return False
+            raise
+        return True
+
     async def signal(self, workflow_id: str, name: str, payload: dict[str, Any]) -> bool:
         c = await client()
         try:

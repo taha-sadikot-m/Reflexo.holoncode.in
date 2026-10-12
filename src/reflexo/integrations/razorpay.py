@@ -157,5 +157,9 @@ class RazorpayClient:
     async def fetch_payment_link(self, link_id: str) -> PaymentLink:
         return PaymentLink.from_api(await self._request("GET", f"/payment_links/{link_id}"))
 
+    async def cancel_payment_link(self, link_id: str) -> PaymentLink:
+        """Only an unpaid (`created`) link can be cancelled; Razorpay answers 400 otherwise."""
+        return PaymentLink.from_api(await self._request("POST", f"/payment_links/{link_id}/cancel"))
+
     async def aclose(self) -> None:
         await self._client.aclose()

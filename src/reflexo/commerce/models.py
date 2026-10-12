@@ -112,3 +112,15 @@ class ConfirmResult(BaseModel):
     decline_code: str | None = None
     decline_reason: str | None = None
     alternatives: list[str] = []
+
+
+# Capability invariants (POC_10 §3): facts about the world, not business policy. Whether the business *wants* a
+# cancellation is the playbook's question; whether one is *possible* is answered here.
+NOT_CANCELLABLE = {"out_for_delivery": "it is already on its way", "delivered": "it has been delivered"}
+
+
+class CancelResult(BaseModel):
+    status: Literal["cancelled", "already_cancelled"]
+    order: OrderView
+    payment_link_cancelled: bool = False
+    refund_due_paise: int = 0  # already paid: the owner decides and executes the refund (capability refund.request)

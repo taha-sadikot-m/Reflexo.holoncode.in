@@ -17,7 +17,14 @@ from sqlalchemy import text
 import reflexo.integrations.api as integrations
 import reflexo.knowledge.api as knowledge
 from reflexo.commerce import orders
-from reflexo.commerce.models import CommerceError, ConfirmResult, OrderView, PaymentMethod
+from reflexo.commerce.models import (
+    NOT_CANCELLABLE,
+    CancelResult,
+    CommerceError,
+    ConfirmResult,
+    OrderView,
+    PaymentMethod,
+)
 from reflexo.common.blocks import OrderSummaryView, PaymentLinkView
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import (
@@ -323,6 +330,31 @@ async def apply_paid(
         )
         v = await orders.view(s, link.order_id)
         await _event(s, business_id, "payment.captured", v, payment_link_id=str(link_id), source=source)
+        if v.status == "cancelled":  # money arrived for an order that no longer exists: never "confirmed"
+            await _event(s, business_id, "payment.orphaned", v, payment_link_id=str(link_id), amount=link.amount_paise)
+    if v.status == "cancelled":
+        amount = format_inr(int(link.amount_paise))
+        await _send_customer(
+            business_id,
+            v.conversation_id,
+            [
+                {
+                    "type": "text",
+                    "text": f"Payment of {amount} received, but order {v.order_number} was cancelled. "
+                    "The shop will refund it — they'll be in touch 🙏",
+                }
+            ],
+            f"paid:{link_id}",
+        )
+        await _notify_owner(
+            business_id,
+            "refund_due",
+            f"💸 {amount} paid for cancelled order {v.order_number} — refund needed.",
+            f"refund_due:{link_id}",
+        )
+        await emit("payment", PipelineEventStatus.OK, business_id=business_id, result="paid_after_cancel")
+        return True
+    async with get_db().tenant_session(business_id) as s:
         await _event(s, business_id, "order.confirmed", v)
     await _send_customer(
         business_id,
@@ -374,6 +406,73 @@ async def apply_expired(business_id: UUID, link_id: UUID, status: str = "expired
     guard = _port(OrderGuardPort)
     if guard is not None:
         await guard.release(business_id, v.order_id, "payment_link_expired")
+
+
+async def cancel_order(business_id: UUID, order_id: UUID, *, by: str, reason: str | None = None) -> CancelResult:
+    """The `order.cancel` capability's effect (POC_10 §3). Only invariants are checked here — whether the business
+    allows it is the playbook's decision, made before this is called. Generic side effects, in one place:
+    a live payment link is cancelled, capacity reserved by guards is released, `order.cancelled` is emitted (the
+    automation router ends every run for this order), the owner is told unless they did it themselves."""
+    link_to_cancel: str | None = None
+    async with get_db().tenant_session(business_id) as s:
+        row = (
+            await s.execute(text("SELECT status, payment_status FROM orders WHERE id = :o FOR UPDATE"), {"o": order_id})
+        ).first()
+        if row is None:
+            raise CommerceError("NOT_FOUND", "order not found")
+        status = str(row.status)
+        if status == "cancelled":
+            return CancelResult(status="already_cancelled", order=await orders.view(s, order_id))
+        if status in NOT_CANCELLABLE:
+            raise CommerceError("NOT_CANCELLABLE", f"cannot cancel: {NOT_CANCELLABLE[status]}")
+        live = (
+            await s.execute(
+                text("""SELECT id, provider_link_id FROM payment_links WHERE order_id = :o AND status = 'created'
+                        ORDER BY created_at DESC"""),
+                {"o": order_id},
+            )
+        ).all()
+        for link in live:
+            await s.execute(
+                text("UPDATE payment_links SET status = 'cancelled' WHERE id = :id AND status = 'created'"),
+                {"id": link.id},
+            )
+            link_to_cancel = link_to_cancel or link.provider_link_id
+        paid = (
+            await s.execute(
+                text("""SELECT COALESCE(sum(amount_paise), 0) FROM payment_links
+                        WHERE order_id = :o AND status = 'paid'"""),
+                {"o": order_id},
+            )
+        ).scalar_one()
+        await s.execute(
+            text("""UPDATE orders SET status = 'cancelled', cancelled_at = now(), cancelled_by = :by,
+                                      cancel_reason = :why, updated_at = now() WHERE id = :o"""),
+            {"by": by, "why": (reason or "")[:500] or None, "o": order_id},
+        )
+        v = await orders.view(s, order_id)
+        await _event(s, business_id, "order.cancelled", v, by=by, reason=reason, refund_due_paise=int(paid))
+    if link_to_cancel and integrations.razorpay().configured:
+        try:  # the local row is already cancelled; a late payment on it is caught by apply_paid
+            await integrations.razorpay().cancel_payment_link(link_to_cancel)
+        except Exception:
+            log.warning("payment_link_cancel_failed", order_id=str(order_id), exc_info=True)
+    guard = _port(OrderGuardPort)
+    if guard is not None:
+        await guard.release(business_id, order_id, "order_cancelled")
+    if by != "owner":
+        refund = f" Paid {format_inr(int(paid))} — refund needed." if paid else ""
+        who = "the customer" if by == "customer" else by
+        await _notify_owner(
+            business_id,
+            "order_cancelled",
+            f"❌ Order {v.order_number} cancelled by {who}" + (f": “{reason}”" if reason else ".") + refund,
+            f"order_cancelled:{order_id}",
+        )
+    await emit("order_cancel", PipelineEventStatus.OK, business_id=business_id, by=by, refund_due=int(paid))
+    return CancelResult(
+        status="cancelled", order=v, payment_link_cancelled=bool(link_to_cancel), refund_due_paise=int(paid)
+    )
 
 
 async def handle_payment_event(log_id: UUID) -> None:
