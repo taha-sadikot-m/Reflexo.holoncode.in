@@ -15,7 +15,7 @@ from sqlalchemy import text
 from reflexo.common.contracts import BlockHydrator, EmbedderPort, JobEnqueuer, JobHandlerRegistry, JobRow
 from reflexo.common.db import get_db
 from reflexo.common.ports import Registry
-from reflexo.knowledge import changesets, imports, indexer, profile, search
+from reflexo.knowledge import changesets, imports, indexer, playbook, profile, search
 from reflexo.knowledge.changesets import add, apply, apply_now, begin, preview, revert
 from reflexo.knowledge.hydrator import KnowledgeHydrator
 from reflexo.knowledge.models import (
@@ -265,3 +265,4 @@ async def detail_schemas(business_id: UUID) -> list[dict[str, Any]]:
 
 
 __all__ += ["imports"]
+__all__ += ["playbook"]  # playbook rules (ADR-015): match, rules, add_rule, FIELDS

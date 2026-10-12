@@ -131,3 +131,50 @@ async def pending(business_id: UUID, limit: int = 10) -> list[Approval]:
             )
         ).all()
     return [Approval(r.id, str(r.kind), dict(r.subject), dict(r.preview), r.short_code, str(r.status)) for r in rows]
+
+
+def _approval(r: Any) -> Approval:
+    return Approval(r.id, str(r.kind), dict(r.subject), dict(r.preview), r.short_code, str(r.status))
+
+
+async def get(business_id: UUID, approval_id: UUID) -> Approval | None:
+    async with get_db().tenant_session(business_id) as s:
+        r = (
+            await s.execute(
+                text("SELECT id, kind, subject, preview, short_code, status FROM approval_requests WHERE id = :id"),
+                {"id": approval_id},
+            )
+        ).first()
+    return _approval(r) if r else None
+
+
+async def record_outcome(business_id: UUID, approval_id: UUID, outcome: dict[str, Any]) -> None:
+    """What deciding the request did (the executed action's result) — read by the relay turn and the admin."""
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("""UPDATE approval_requests SET decision = COALESCE(decision, '{}'::jsonb) || CAST(:o AS jsonb)
+                    WHERE id = :id"""),
+            {"o": json.dumps({"outcome": outcome}, default=str), "id": approval_id},
+        )
+
+
+async def outcome(business_id: UUID, approval_id: UUID) -> dict[str, Any] | None:
+    async with get_db().tenant_session(business_id) as s:
+        d = (
+            await s.execute(text("SELECT decision FROM approval_requests WHERE id = :id"), {"id": approval_id})
+        ).scalar_one_or_none()
+    return dict(d) if d else None
+
+
+async def open_for(business_id: UUID, *, kind: str, conversation_id: UUID) -> list[Approval]:
+    """Pending requests of one kind that concern a conversation (proposals the customer is waiting on)."""
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id, kind, subject, preview, short_code, status FROM approval_requests
+                        WHERE status = 'pending' AND expires_at > now() AND kind = CAST(:k AS approval_kind)
+                          AND subject->>'conversation_id' = :c ORDER BY created_at"""),
+                {"k": kind, "c": str(conversation_id)},
+            )
+        ).all()
+    return [_approval(r) for r in rows]

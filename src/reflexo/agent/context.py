@@ -16,11 +16,13 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+import reflexo.approvals.api as approvals
 import reflexo.commerce.api as commerce
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent import language as lang
 from reflexo.agent import prompts
+from reflexo.agent.proposals import decided_block
 from reflexo.agent.tools.customer import card_json
 from reflexo.agent.tools.orders import STATUS_MEANING
 from reflexo.common.contracts import TurnRef
@@ -102,7 +104,14 @@ async def prepare(ref: TurnRef) -> PreparedContext:
             )
         ).first()
     return await build_context(
-        ref.business_id, conv, inbound, history, relay_row=relay_row, pending=pending, started=started
+        ref.business_id,
+        conv,
+        inbound,
+        history,
+        relay_row=relay_row,
+        pending=pending,
+        started=started,
+        shop_blocks=await _shop_blocks(ref),
     )
 
 
@@ -114,6 +123,7 @@ async def build_context(
     *,
     relay_row: Any = None,
     pending: Any = None,
+    shop_blocks: list[str] | None = None,
     started: float | None = None,
 ) -> PreparedContext:
     """Lay out the prompt from loaded rows. Also used without a real conversation (onboarding preview sandbox)."""
@@ -217,6 +227,7 @@ async def build_context(
             *([open_order_block] if open_order_block else []),
             *([waiting_block] if waiting_block else []),
             *([relay_block] if relay_block else []),
+            *(shop_blocks or []),
             "# NOW — new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
             f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
             "Reply by calling `reply`.",
@@ -258,6 +269,28 @@ def without_customer_words(value: Any) -> Any:
     if isinstance(value, list):
         return [without_customer_words(v) for v in value]
     return value
+
+
+async def _shop_blocks(ref: TurnRef) -> list[str]:
+    """What the shop has decided or is still deciding for this conversation (ADR-015 awareness): the relay of a
+    decided proposal, and proposals the owner has not answered yet — so the agent never claims an outcome."""
+    blocks: list[str] = []
+    if proposal_id := ref.hints.get("proposal_id"):
+        a = await approvals.get(ref.business_id, UUID(str(proposal_id)))
+        if a is not None:
+            blocks.append(decided_block(a, await approvals.outcome(ref.business_id, a.id)))
+    waiting = [
+        f"- {a.preview.get('label', 'an action')}: {a.preview.get('summary', '')} (code {a.short_code})"
+        for a in await approvals.open_for(ref.business_id, kind="tool_call", conversation_id=ref.conversation_id)
+        if str(a.id) != str(proposal_id)
+    ]
+    if waiting:
+        blocks.append(
+            "# WAITING ON THE SHOP — you proposed these to the owner, no answer yet\n"
+            + "\n".join(waiting)
+            + "\nIf the customer asks, say the shop is deciding and you will update them; never say it is done."
+        )
+    return blocks
 
 
 async def _none() -> None:

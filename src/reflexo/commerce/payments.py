@@ -408,7 +408,9 @@ async def apply_expired(business_id: UUID, link_id: UUID, status: str = "expired
         await guard.release(business_id, v.order_id, "payment_link_expired")
 
 
-async def cancel_order(business_id: UUID, order_id: UUID, *, by: str, reason: str | None = None) -> CancelResult:
+async def cancel_order(
+    business_id: UUID, order_id: UUID, *, by: str, reason: str | None = None, notify_owner: bool = True
+) -> CancelResult:
     """The `order.cancel` capability's effect (POC_10 §3). Only invariants are checked here — whether the business
     allows it is the playbook's decision, made before this is called. Generic side effects, in one place:
     a live payment link is cancelled, capacity reserved by guards is released, `order.cancelled` is emitted (the
@@ -460,7 +462,7 @@ async def cancel_order(business_id: UUID, order_id: UUID, *, by: str, reason: st
     guard = _port(OrderGuardPort)
     if guard is not None:
         await guard.release(business_id, order_id, "order_cancelled")
-    if by != "owner":
+    if notify_owner and by != "owner":  # the agent sends its own FYI citing the rule it acted on
         refund = f" Paid {format_inr(int(paid))} — refund needed." if paid else ""
         who = "the customer" if by == "customer" else by
         await _notify_owner(

@@ -201,7 +201,7 @@ class RenderedProfile(BaseModel):
 
 # ---------------------------------------------------------------- change sets
 
-EntityType = Literal["offering", "variant", "qa", "profile", "detail_schema"]
+EntityType = Literal["offering", "variant", "qa", "profile", "detail_schema", "playbook_rule"]
 ChangeOp = Literal["create", "update", "delete"]
 
 

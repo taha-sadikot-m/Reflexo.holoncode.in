@@ -19,7 +19,7 @@ from sqlalchemy import text
 import reflexo.approvals.api as approvals
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
-from reflexo.common.contracts import AnswerResult, QuestionAnswerPort, WorkflowPort
+from reflexo.common.contracts import AnswerResult, ProposalPort, QuestionAnswerPort, WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.logging import get_logger
@@ -266,6 +266,10 @@ async def execute_decision(
             str(subject["workflow_id"]), "approval_decided", {"approve": approve, "approval_id": str(a.id)}
         )
         return "" if delivered else "That review has already ended — send it again if you still want it."
+    if a.kind == "tool_call":  # an action the agent proposed (ADR-015): the agent carries out the decision
+        return await registry.require(ProposalPort).decided(  # type: ignore[type-abstract]
+            business_id, a.id, approve, member_id
+        )
     if not approve:
         return "Cancelled — nothing changed."
     try:

@@ -92,7 +92,9 @@ class AutomationRouter:
             ).all()
             if runs:
                 await s.execute(
-                    text("UPDATE automation_waits SET status = 'cancelled' WHERE run_id = ANY(:r) AND status = 'waiting'"),
+                    text(
+                        "UPDATE automation_waits SET status = 'cancelled' WHERE run_id = ANY(:r) AND status = 'waiting'"
+                    ),
                     {"r": [r.id for r in runs]},
                 )
         for r in runs:

@@ -271,6 +271,14 @@ class AnswerResult:
     already_answered: bool = False
 
 
+class ProposalPort(Protocol):
+    """Provided by agent (ADR-015): carry out the owner's decision on an action the agent proposed — exactly the
+    stored action, no new LLM decision — tell the customer, and offer to learn a rule. Returns the owner-facing
+    reply."""
+
+    async def decided(self, business_id: UUID, approval_id: UUID, approve: bool, member_id: UUID | None) -> str: ...
+
+
 class QuestionAnswerPort(Protocol):
     """Provided by agent: the ask-the-owner loop's answer side (POC_04 §7 steps 4-7)."""
 

@@ -253,18 +253,22 @@ class QuestionService:
         return datetime.combine(local.date(), time(23, 59, 59), tzinfo=local.tzinfo)
 
     async def _relay_message(self, s: AsyncSession, conversation_id: UUID, source_turn_id: UUID | None) -> UUID | None:
-        """The customer message the relay turn answers: the question's own message, else their latest one."""
-        if source_turn_id is not None:
-            ids = (
-                await s.execute(text("SELECT message_ids FROM conversation_turns WHERE id = :t"), {"t": source_turn_id})
-            ).scalar_one_or_none()
-            if ids:
-                return UUID(str(ids[-1]))
-        latest: UUID | None = (
-            await s.execute(
-                text("""SELECT id FROM messages WHERE conversation_id = :c AND direction = 'inbound'
-                        ORDER BY created_at DESC LIMIT 1"""),
-                {"c": conversation_id},
-            )
+        return await relay_message(s, conversation_id, source_turn_id)
+
+
+async def relay_message(s: AsyncSession, conversation_id: UUID, source_turn_id: UUID | None) -> UUID | None:
+    """The customer message the relay turn answers: the question's own message, else their latest one."""
+    if source_turn_id is not None:
+        ids = (
+            await s.execute(text("SELECT message_ids FROM conversation_turns WHERE id = :t"), {"t": source_turn_id})
         ).scalar_one_or_none()
-        return latest
+        if ids:
+            return UUID(str(ids[-1]))
+    latest: UUID | None = (
+        await s.execute(
+            text("""SELECT id FROM messages WHERE conversation_id = :c AND direction = 'inbound'
+                    ORDER BY created_at DESC LIMIT 1"""),
+            {"c": conversation_id},
+        )
+    ).scalar_one_or_none()
+    return latest

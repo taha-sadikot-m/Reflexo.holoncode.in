@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime, time
 from typing import Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from reflexo.common.config import get_settings
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
 from reflexo.common.money import format_inr
+from reflexo.common.timeutil import utcnow
 
 EDITABLE = ("draft",)
 TRUTHY = {"yes", "y", "haan", "ha", "han", "true", "1", "eggless", "ji"}
@@ -549,3 +551,40 @@ async def open_order(business_id: UUID, customer_id: UUID) -> OrderView | None:
 
 def summary_lines(v: OrderView) -> list[str]:
     return [f"{ln.quantity} × {ln.name} — {format_inr(ln.line_total_paise)}" for ln in v.lines]
+
+
+async def situation(business_id: UUID, order_id: UUID) -> dict[str, Any]:
+    """The facts a playbook rule may test about an order (POC_10 §4; field names match `knowledge.playbook.FIELDS`).
+    Computed here, where the data lives, so rules and capabilities never re-derive them."""
+    settings = await knowledge.business_settings(business_id)
+    tz = ZoneInfo(str(settings.get("timezone") or "Asia/Kolkata"))
+    async with get_db().tenant_session(business_id) as s:
+        o = (await s.execute(text("SELECT * FROM orders WHERE id = :id"), {"id": order_id})).first()
+        if o is None:
+            raise CommerceError("NOT_FOUND", "order not found")
+        lines = await _lines(s, order_id)
+        categories, _, _ = await _item_scope(s, business_id, lines)
+        past = (
+            await s.execute(
+                text("""SELECT count(*) FROM orders WHERE customer_id = :c AND id <> :o
+                          AND status IN ('confirmed', 'preparing', 'out_for_delivery', 'delivered')"""),
+                {"c": o.customer_id, "o": order_id},
+            )
+        ).scalar_one()
+    now = utcnow()
+    until: float | None = None
+    if o.delivery_date:
+        starts = [r[0] for r in time_ranges(o.delivery_slot or "")]
+        start_min = starts[-1] if starts else 9 * 60  # unknown slot: the start of a working day
+        local = datetime.combine(o.delivery_date, time(start_min // 60 % 24, start_min % 60), tzinfo=tz)
+        until = round((local - now).total_seconds() / 3600, 1)
+    return {
+        "order.status": str(o.status),
+        "order.payment_method": str(o.payment_method) if o.payment_method else None,
+        "order.payment_status": str(o.payment_status),
+        "order.total_rupees": int(o.total_paise) / 100,
+        "order.hours_until_delivery": until,
+        "order.hours_since_placed": round((now - o.created_at).total_seconds() / 3600, 1),
+        "order.categories": sorted(categories),
+        "customer.orders_count": int(past),
+    }

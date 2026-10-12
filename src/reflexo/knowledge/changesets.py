@@ -60,6 +60,11 @@ _SCHEMA = {
     "source_message_id": "uuid",
 }
 
+_PLAYBOOK_RULE = {
+    "capability": None, "effect": None, "conditions": "jsonb", "says": None, "scope": "answer_scope",
+    "customer_id": "uuid", "source": None, "source_ref": "uuid", "status": "record_status",
+}  # fmt: skip
+
 
 @dataclass(frozen=True)
 class _Entity:
@@ -74,6 +79,7 @@ ENTITIES: dict[str, _Entity] = {
     "variant": _Entity("offering_variants", _VARIANT, False, "name"),
     "qa": _Entity("qa_entries", _QA, True, "question"),
     "detail_schema": _Entity("order_detail_schemas", _SCHEMA, False, "name"),
+    "playbook_rule": _Entity("playbook_rules", _PLAYBOOK_RULE, False, "says"),
 }
 SOURCE_BY_ORIGIN = {
     "owner_command": "owner_chat", "learning": "owner_chat", "import": "import", "onboarding": "onboarding",

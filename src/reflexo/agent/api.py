@@ -14,6 +14,7 @@ from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, t
 from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_messages
 from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, ModelProvider
 from reflexo.agent.output_gate import extract_amounts
+from reflexo.agent.proposals import ProposalService
 from reflexo.agent.questions import SLA_QUEUE, QuestionService
 from reflexo.agent.runs import record_run
 from reflexo.agent.tools.base import ToolContext, run_tool
@@ -23,6 +24,7 @@ from reflexo.common.contracts import (
     JobHandlerRegistry,
     JobRow,
     ModelGatewayPort,
+    ProposalPort,
     QuestionAnswerPort,
     TurnRunnerPort,
 )
@@ -86,6 +88,7 @@ def register(registry: Registry, provider: ModelProvider | None = None) -> None:
     registry.provide(TurnRunnerPort, CustomerDesk(registry, _gateway))  # type: ignore[type-abstract]
     questions = QuestionService(registry, _gateway)
     registry.provide(QuestionAnswerPort, questions)  # type: ignore[type-abstract]
+    registry.provide(ProposalPort, ProposalService(registry))  # type: ignore[type-abstract]
     jobs = registry.optional(JobHandlerRegistry)  # type: ignore[type-abstract]
     if jobs is not None:
 
