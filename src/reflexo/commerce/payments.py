@@ -534,6 +534,52 @@ async def change_order(
     return after
 
 
+async def refund_order(business_id: UUID, order_id: UUID, *, by: str, reason: str | None = None) -> dict[str, Any]:
+    """The `refund.request` capability's effect (POC_10 §3): refund the order's captured online payment in full.
+    Invariants only — whether to refund is the owner's decision (money: proposed by default). Without a provider
+    payment (or Razorpay not configured) the refund is recorded and the owner is told to do it by hand."""
+    async with get_db().tenant_session(business_id) as s:
+        o = (
+            await s.execute(
+                text("SELECT order_number, payment_status FROM orders WHERE id = :o FOR UPDATE"), {"o": order_id}
+            )
+        ).first()
+        if o is None:
+            raise CommerceError("NOT_FOUND", "order not found")
+        if str(o.payment_status) == "refunded":
+            raise CommerceError("ALREADY_REFUNDED", "this order was already refunded")
+        link = (
+            await s.execute(
+                text("""SELECT id, amount_paise, provider_payment_id FROM payment_links
+                        WHERE order_id = :o AND status = 'paid' ORDER BY paid_at DESC LIMIT 1"""),
+                {"o": order_id},
+            )
+        ).first()
+        if str(o.payment_status) != "paid" or link is None:
+            raise CommerceError("NOTHING_TO_REFUND", "nothing was paid online for this order")
+    refund_id: str | None = None
+    if link.provider_payment_id and integrations.razorpay().configured:
+        try:
+            refund = await integrations.razorpay().refund_payment(
+                link.provider_payment_id, int(link.amount_paise), {"order": o.order_number, "by": by}
+            )
+            refund_id = str(refund.get("id"))
+        except Exception as exc:
+            log.warning("refund_failed", order=o.order_number, error=str(exc)[:200])
+            raise CommerceError("REFUND_FAILED", "the payment provider refused the refund") from exc
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("UPDATE orders SET payment_status = 'refunded', updated_at = now() WHERE id = :o"), {"o": order_id}
+        )
+        v = await orders.view(s, order_id)
+        await _event(s, business_id, "payment.refunded", v, by=by, reason=reason, refund_id=refund_id,
+                     amount_paise=int(link.amount_paise))  # fmt: skip
+    amount = format_inr(int(link.amount_paise))
+    how = f"refund {refund_id} started" if refund_id else "please refund it from the Razorpay dashboard"
+    await _notify_owner(business_id, "refund", f"💸 {amount} for {o.order_number}: {how}.", f"refund:{order_id}")
+    return {"refunded": amount, "order_number": o.order_number, "provider_refund": bool(refund_id)}
+
+
 async def handle_payment_event(log_id: UUID) -> None:
     """Job `commerce.payment_event`: one verified, deduplicated Razorpay webhook."""
     async with get_db().service_session(ServiceReason.INTEGRATION_ROUTING) as s:

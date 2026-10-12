@@ -77,6 +77,14 @@ async def _change(business_id: UUID, args: dict[str, Any], by: str) -> dict[str,
     }
 
 
+async def _refund(business_id: UUID, args: dict[str, Any], by: str) -> dict[str, Any]:
+    return await commerce.refund_order(business_id, UUID(args["order_id"]), by=by, reason=args.get("reason"))
+
+
+def _nothing_to_refund(sit: dict[str, Any]) -> str | None:
+    return None if sit.get("order.payment_status") == "paid" else "nothing was paid online for this order"
+
+
 def _not_changeable(sit: dict[str, Any]) -> str | None:
     status = str(sit.get("order.status"))
     return "it was cancelled" if status == "cancelled" else commerce.NOT_CANCELLABLE.get(status)
@@ -101,6 +109,15 @@ CAPABILITIES: dict[str, Capability] = {
         default=lambda sit: "allow" if sit.get("order.status") == "draft" else _by_risk("commitment"),
         invariant=_not_changeable,
         execute=_change,
+    ),
+    "refund.request": Capability(
+        name="refund.request",
+        risk="money",
+        label="Refunding an order",
+        verb="refund",
+        default=lambda sit: _by_risk("money"),
+        invariant=_nothing_to_refund,
+        execute=_refund,
     ),
 }
 
@@ -130,9 +147,18 @@ async def request(
     cap = CAPABILITIES[name]
     if ctx.customer_id is None:
         raise ToolError("NOT_APPLICABLE", "no customer in this conversation")
-    order = await commerce.get_order(ctx.business_id, UUID(args["order_id"]))
-    if order is None or order.customer_id != ctx.customer_id:  # only the customer's own orders
-        raise ToolError("NOT_FOUND", "no such order for this customer", guidance="Use order_status to find it.")
+    try:
+        order_id = UUID(str(args["order_id"]))
+    except ValueError:
+        order_id = None
+    order = await commerce.get_order(ctx.business_id, order_id) if order_id else None
+    if order is None or order.customer_id != ctx.customer_id:  # only the customer's own orders, never a guessed id
+        raise ToolError(
+            "NOT_FOUND",
+            "no such order for this customer",
+            guidance="Use an order_id from THIS CUSTOMER'S ORDERS or order_status. If they have no order with us, "
+            "say so kindly; a complaint without an order goes to the owner (handoff).",
+        )
     situation = await commerce.situation(ctx.business_id, order.order_id)
     summary = describe_order(order)
     if changes := args.get("changes"):

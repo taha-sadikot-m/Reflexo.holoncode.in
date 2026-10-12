@@ -21,6 +21,7 @@ import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner_api
 from reflexo.common.contracts import TurnRunnerPort
 from reflexo.common.db import Database, ServiceReason
+from reflexo.common.ids import new_id
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.knowledge.playbook import Condition
 from reflexo.pipeline import api as pipeline_api
@@ -494,3 +495,53 @@ async def test_a_full_day_or_a_paid_total_cannot_change(
     assert err.value.code == "NOT_CHANGEABLE" and "total would become" in str(err.value)
     [after] = await q(db, "SELECT total_paise, address FROM orders WHERE id = :o", o=order.order_id)
     assert (after.total_paise, after.address) == (before.total_paise, None)  # rolled back, nothing half-changed
+
+
+# ---------------------------------------------------------------- refund.request: money is proposed by default
+
+
+async def test_a_refund_is_proposed_and_executed_once_approved(
+    registry: Registry, db: Database, fake: agent.FakeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refunds: list[tuple[str, int]] = []
+
+    async def refund_payment(payment_id: str, amount_paise: int, notes: dict[str, str]) -> dict[str, Any]:
+        refunds.append((payment_id, amount_paise))
+        return {"id": "rfnd_test", "amount": amount_paise, "status": "processed"}
+
+    monkeypatch.setattr(integrations.razorpay(), "refund_payment", refund_payment, raising=False)
+    shop = await bakery(db)
+    wa = wa_number()
+    order, conv = await placed_order(registry, db, fake, shop, wa)
+    async with db.service_session(ServiceReason.ADMIN) as s:  # paid online
+        await s.execute(
+            text("""INSERT INTO payment_links (id, business_id, order_id, customer_id, provider, amount_paise, status,
+                                               expires_at, paid_at, provider_link_id, short_url, idempotency_key,
+                                               provider_payment_id)
+                    SELECT :id, business_id, id, customer_id, 'razorpay', total_paise, 'paid', now() + interval '1 day',
+                           now(), 'plink_t', 'https://rzp.io/t', :k, 'pay_t' FROM orders WHERE id = :o"""),
+            {"id": new_id(), "k": f"t-{new_id().hex}", "o": order.order_id},
+        )
+        await s.execute(text("UPDATE orders SET payment_status = 'paid' WHERE id = :o"), {"o": order.order_id})
+
+    def script(a: agent.Attempt) -> agent.FakeReply:
+        results = tool_results(a)
+        if not results:
+            return call(
+                "refund_request", order_id=str(order.order_id), reason="cake kharab tha",
+                note_for_owner="Taha says the cake was bad; paid online. Suggest a refund.",
+            )  # fmt: skip
+        return reply("send", "Maine shop se pooch liya hai.", topic="returns_refunds_cancellation")
+
+    fake.script(PRIMARY, learning(script, []))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "refund chahiye"))
+    assert (await outbound_texts(db, conv))[-1] == "Maine shop se pooch liya hai."  # not forced into a handoff
+    assert refunds == []  # money: nothing happens before the owner decides
+    [proposal] = await q(
+        db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid
+    )
+    await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
+    assert refunds == [("pay_t", order.total_paise)]
+    [row] = await q(db, "SELECT payment_status FROM orders WHERE id = :o", o=order.order_id)
+    assert str(row.payment_status) == "refunded"
+    assert any("refund rfnd_test started" in str(m) for m in await owner_messages(db, shop))

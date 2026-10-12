@@ -66,4 +66,19 @@ async def order_change(ctx: ToolContext, args: OrderChangeArgs, s: AsyncSession)
     )
 
 
-ACTION_TOOLS = ["order_cancel", "order_change"]
+class RefundRequestArgs(BaseModel):
+    order_id: str = Field(description="The paid order the customer wants their money back for")
+    reason: str = Field(description=REASON_DESC, max_length=500)
+    note_for_owner: str = Field(description=NOTE_DESC, max_length=600)
+
+
+@tool("refund_request", RefundRequestArgs, desks=ACTION_DESKS, side_effect=True)
+async def refund_request(ctx: ToolContext, args: RefundRequestArgs, s: AsyncSession) -> dict[str, Any]:
+    """The customer wants their money back for a paid order (e.g. after a problem with it, or a cancelled paid
+    order). Returns outcome: done | declined | asked_owner | not_possible (with the reason)."""
+    return await capabilities.request(
+        ctx, s, "refund.request", {"order_id": args.order_id}, reason=args.reason, note_for_owner=args.note_for_owner
+    )
+
+
+ACTION_TOOLS = ["order_cancel", "order_change", "refund_request"]

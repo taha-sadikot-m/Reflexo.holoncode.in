@@ -157,6 +157,12 @@ class RazorpayClient:
     async def fetch_payment_link(self, link_id: str) -> PaymentLink:
         return PaymentLink.from_api(await self._request("GET", f"/payment_links/{link_id}"))
 
+    async def refund_payment(self, payment_id: str, amount_paise: int, notes: dict[str, str]) -> dict[str, Any]:
+        """Refund a captured payment (full or partial). Returns Razorpay's refund entity (id, amount, status)."""
+        if amount_paise <= 0:
+            raise RazorpayError("amount must be positive", code="VALIDATION_FAILED")
+        return await self._request("POST", f"/payments/{payment_id}/refund", {"amount": amount_paise, "notes": notes})
+
     async def cancel_payment_link(self, link_id: str) -> PaymentLink:
         """Only an unpaid (`created`) link can be cancelled; Razorpay answers 400 otherwise."""
         return PaymentLink.from_api(await self._request("POST", f"/payment_links/{link_id}/cancel"))

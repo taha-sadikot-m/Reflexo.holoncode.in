@@ -96,6 +96,8 @@ async def test_devanagari_reply(registry: Registry, db: Database) -> None:
 
 
 async def test_refund_handoff(registry: Registry, db: Database) -> None:
+    """No order on record for this customer: a refund cannot be proposed (refund.request needs their paid order), so
+    the complaint goes to the owner. With a paid order the agent proposes the refund instead (test_learning)."""
     bid, pnid = await make_bakery(db)
     run, _texts, _ = await ask(registry, db, pnid, "919800009003", "Kal ka cake kharab tha, mujhe refund chahiye")
     assert str(run.outcome) == "handoff"
