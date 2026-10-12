@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from reflexo.agent.schemas import (
+    CAPABILITY_TOPICS,
     GROUNDED_TOPICS,
     HANDOFF_TOPICS,
     AgentOutput,
@@ -342,7 +343,8 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
     # 7. tier rules (rewrite, not fail)
     rewritten: str | None = None
     if output.action == "send":
-        if output.topic in HANDOFF_TOPICS or output.flags.angry:
+        backed = output.topic in CAPABILITY_TOPICS and records.capability_decided
+        if (output.topic in HANDOFF_TOPICS and not backed) or output.flags.angry:
             rewritten = "handoff"
         elif output.topic == "discount_negotiation" and not records.discount_texts:
             rewritten = "ask_owner"

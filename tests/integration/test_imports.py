@@ -114,6 +114,19 @@ async def wait_for(db: Database, run_id: UUID, statuses: set[str], within_s: flo
         await asyncio.sleep(0.3)
 
 
+async def owner_message_with(db: Database, shop: Bakery, needle: str, within_s: float = 15) -> dict[str, Any]:
+    """The latest owner message containing `needle`. A workflow's status changes before the activity that sends
+    its message runs, so reading "the last message" right after a status change races under load."""
+    deadline = asyncio.get_running_loop().time() + within_s
+    while True:
+        for m in reversed(await owner_messages(db, shop)):
+            if needle in m.get("text", ""):
+                return m
+        if asyncio.get_running_loop().time() > deadline:
+            raise AssertionError(f"no owner message with {needle!r}")
+        await asyncio.sleep(0.2)
+
+
 async def price_of(db: Database, shop: Bakery, offering: str, variant: str) -> int:
     [row] = await q(
         db,
@@ -147,11 +160,7 @@ async def test_excel_import_reviewed_and_applied(registry: Registry, db: Databas
     review = await wait_for(db, run_id, {"review", "failed"})
     assert str(review.status) == "review", review.error
     assert review.stats == {"found": 3, "new": 1, "changed": 1, "unchanged": 0, "needs_review": 1}
-    for _ in range(50):  # status 'review' is set before the activity that sends the summary (race under load)
-        if "prices_oct.xlsx" in (await owner_messages(db, shop))[-1].get("text", ""):
-            break
-        await asyncio.sleep(0.2)
-    summary = (await owner_messages(db, shop))[-1]
+    summary = await owner_message_with(db, shop, "prices_oct.xlsx")
     body = summary["text"]
     assert "prices_oct.xlsx" in body and "3" not in body.split("\n")[0][:5]
     assert "Chocolate Truffle Cake 1 kg price: ₹950 → ₹999" in body and "Lemon Tart — ₹380" in body
@@ -182,7 +191,7 @@ async def test_cancel_button_applies_nothing(registry: Registry, db: Database, w
         shop.bid, fid, mode="catalog_update", member_id=shop.owner, reply_conversation_id=conv
     )
     await wait_for(db, run_id, {"review"})
-    summary = (await owner_messages(db, shop))[-1]
+    summary = await owner_message_with(db, shop, "prices.xlsx")
     cancel = summary["reply_markup"]["inline_keyboard"][1][0]["callback_data"].removeprefix("o:")
     await owner_says(registry, db, shop, callback=cancel)
     await wait_for(db, run_id, {"cancelled"})

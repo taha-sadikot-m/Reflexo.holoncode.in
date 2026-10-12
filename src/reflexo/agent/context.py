@@ -29,6 +29,7 @@ from reflexo.agent.tools.orders import STATUS_MEANING
 from reflexo.common import ports
 from reflexo.common.contracts import ShopProceduresPort, TurnRef
 from reflexo.common.db import get_db
+from reflexo.common.money import format_inr
 from reflexo.common.timeutil import to_business_tz, utcnow
 
 HISTORY = 20
@@ -50,6 +51,7 @@ class PreparedContext:
     open_question: dict[str, Any] | None = None  # owner question still unanswered for this conversation
     recent_lines: list[str] = field(default_factory=list)  # last messages, formatted (owner notifications)
     relay: dict[str, Any] | None = None  # relay turn: the owner's answer to pass on (question, answer, qa id)
+    shop_decided: bool = False  # relay turn of a decided proposal (THE SHOP DECIDED)
     # What the business/system told the model this turn (profile, zones, Q&A, cards, open order without the
     # customer's own words, the owner's relayed answer). The output gate trusts amounts from here; never from
     # the customer's messages or from the rules prompt's illustrative examples.
@@ -105,7 +107,7 @@ async def prepare(ref: TurnRef) -> PreparedContext:
                 {"c": ref.conversation_id},
             )
         ).first()
-    return await build_context(
+    prepared = await build_context(
         ref.business_id,
         conv,
         inbound,
@@ -115,6 +117,8 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         started=started,
         shop_blocks=await _shop_blocks(ref, conv.customer.id if conv.customer else None),
     )
+    prepared.shop_decided = bool(ref.hints.get("proposal_id"))
+    return prepared
 
 
 async def build_context(
@@ -136,12 +140,13 @@ async def build_context(
     # speculative retrieval starts first so its two queries get pool connections before the other loads
     spec_task = asyncio.create_task(knowledge.speculative(business_id, inbound_text, customer_id=customer_id))
     await asyncio.sleep(0)
-    profile, settings, qas, biz_profile, order = await asyncio.gather(
+    profile, settings, qas, biz_profile, order, placed = await asyncio.gather(
         knowledge.profile_block(business_id),
         knowledge.business_settings(business_id),
         knowledge.qa_block(business_id),
         knowledge.get_profile(business_id),
         commerce.open_order(business_id, customer_id) if customer_id else _none(),
+        commerce.active_orders(business_id, customer_id) if customer_id else _empty(),
     )
     spec = await spec_task
 
@@ -180,6 +185,18 @@ async def build_context(
         "# OPEN ORDER (in progress — use this order_id with the order tools; reference it as order:<order_id>)\n"
         + json.dumps(order_view, ensure_ascii=False)
         if order_view
+        else ""
+    )
+    placed_block = (
+        "# THIS CUSTOMER'S ORDERS (placed and still live — use the order_id with order_status / order actions)\n"
+        + "\n".join(
+            f"- order_id {o.order_id} · {o.order_number} · {o.status} ({STATUS_MEANING.get(o.status, o.status)}) · "
+            + ", ".join(f"{ln.quantity} × {ln.name}" for ln in o.lines)
+            + f" · {o.delivery_date or 'no date'} {o.delivery_slot or ''} · {format_inr(o.total_paise)}"
+            for o in placed
+            if not order or o.order_id != order.order_id
+        )
+        if any(not order or o.order_id != order.order_id for o in placed)
         else ""
     )
     open_question = (
@@ -227,6 +244,7 @@ async def build_context(
             + (f"summary: {conv.summary}\n" if conv.summary else "")
             + ("\n".join(_fmt_message(m, tz) for m in history) or "(new conversation)"),
             *([open_order_block] if open_order_block else []),
+            *([placed_block] if placed_block else []),
             *([waiting_block] if waiting_block else []),
             *([relay_block] if relay_block else []),
             *(shop_blocks or []),
@@ -257,6 +275,7 @@ async def build_context(
                 qa_lines,
                 json.dumps(cards, ensure_ascii=False),
                 json.dumps(without_customer_words(order_view), ensure_ascii=False) if order_view else "",
+                *(json.dumps(without_customer_words(o.tool_view()), ensure_ascii=False) for o in placed),
                 relay["answer"] if relay else "",
                 f"{now_local.strftime('%a %d %b %Y, %H:%M')} {_upcoming_days(now_local)}",
             ]
@@ -312,6 +331,10 @@ async def _shop_blocks(ref: TurnRef, customer_id: UUID | None) -> list[str]:
 
 async def _none() -> None:
     return None
+
+
+async def _empty() -> list[Any]:
+    return []
 
 
 def holding_text(settings: dict[str, Any], language: str) -> str:

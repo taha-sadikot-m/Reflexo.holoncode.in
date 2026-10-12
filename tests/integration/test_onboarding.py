@@ -34,7 +34,15 @@ from reflexo.workflows.imports import ImportWorkflow
 from reflexo.workflows.onboarding import ONBOARDING_ACTIVITIES, OnboardingPreviewWorkflow
 from tests.integration.test_ask_owner import bakery, claim_pending, owner_messages, owner_says, q
 from tests.integration.test_customer_desk import PRIMARY, turn_for
-from tests.integration.test_imports import PRICE_SHEET, XLSX, _xlsx, owner_conversation, owner_file, wait_for
+from tests.integration.test_imports import (
+    PRICE_SHEET,
+    XLSX,
+    _xlsx,
+    owner_conversation,
+    owner_file,
+    owner_message_with,
+    wait_for,
+)
 
 pytestmark = pytest.mark.integration
 QUESTIONS = ["Truffle 1kg kitne ka hai?", "Eggless milta hai?", "Delivery Kothrud mein?", "COD hai?", "Timing?"]
@@ -159,7 +167,8 @@ async def test_onboarding_from_menu_to_live(
     )
     await wait_for(db, run_id, {"review"})
     assert (await owner_api.onboarding.get(shop.bid))["state"] == "extracting"
-    code = re.search(r"YES (\d{4})", (await owner_messages(db, shop))[-1]["text"]).group(1)  # type: ignore[union-attr]
+    summary = (await owner_message_with(db, shop, "menu.xlsx"))["text"]
+    code = re.search(r"YES (\d{4})", summary).group(1)  # type: ignore[union-attr]
     await owner_says(registry, db, shop, f"YES {code}")
     await wait_for(db, run_id, {"committed"})
 

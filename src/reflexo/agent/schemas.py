@@ -36,6 +36,9 @@ GROUNDED_TOPICS = frozenset(
      "hours_location_contact"}
 )  # fmt: skip
 HANDOFF_TOPICS = frozenset({"returns_refunds_cancellation", "complaint", "human_request"})
+# ...unless a capability decided it this turn (ADR-015): an action tool ran under the owner's playbook, or the
+# owner's decision is being relayed. Then the reply reports a real outcome and is not overridden.
+CAPABILITY_TOPICS = frozenset({"returns_refunds_cancellation"})
 
 
 class RecordRef(BaseModel):
@@ -153,3 +156,4 @@ class GroundingRecords(BaseModel):
     allowed_emails: set[str] = Field(default_factory=set)
     block_offering_ids: set[str] = Field(default_factory=set)  # offerings that product/carousel blocks may show
     known_numbers: set[str] = Field(default_factory=set)  # plain numbers the system showed the model this turn
+    capability_decided: bool = False  # an action tool ran this turn, or the owner's decision is being relayed

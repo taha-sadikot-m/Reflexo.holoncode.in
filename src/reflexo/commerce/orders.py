@@ -553,6 +553,25 @@ async def order_status(business_id: UUID, customer_id: UUID, order_number: str |
         return await view(s, oid) if oid else None
 
 
+async def active_orders(business_id: UUID, customer_id: UUID, limit: int = 3) -> list[OrderView]:
+    """The customer's placed orders that are still live (not delivered or cancelled), soonest delivery first —
+    what a shop employee knows about a customer when they write in."""
+    async with get_db().tenant_session(business_id) as s:
+        ids = (
+            (
+                await s.execute(
+                    text("""SELECT id FROM orders WHERE customer_id = :c
+                          AND status IN ('awaiting_payment', 'confirmed', 'preparing', 'out_for_delivery')
+                        ORDER BY delivery_date NULLS LAST, created_at DESC LIMIT :n"""),
+                    {"c": customer_id, "n": limit},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [await view(s, i) for i in ids]
+
+
 async def order_by_number(business_id: UUID, order_number: str) -> OrderView | None:
     async with get_db().tenant_session(business_id) as s:
         oid = (

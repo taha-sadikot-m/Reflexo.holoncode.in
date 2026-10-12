@@ -23,6 +23,7 @@ from reflexo.agent.context import PreparedContext, without_customer_words
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.model_gateway.langchain import GatewayChatModel
 from reflexo.agent.schemas import AgentOutput, GateResult
+from reflexo.agent.tools.actions import ACTION_TOOLS
 from reflexo.agent.tools.base import TOOLS, ToolContext, run_tools
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import TurnHandle
@@ -216,6 +217,8 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         customer_phone=customer.phone_e164 if customer else None,
         wa_display_number=deps.wa_display_number,
         trusted_texts=[p.trusted_facts, *_tool_facts(state)],
+        capability_decided=p.shop_decided
+        or any(isinstance(m, ToolMessage) and m.name in ACTION_TOOLS for m in state["messages"]),
     )
     result: GateResult = output_gate.check(output, records)
     await emit(

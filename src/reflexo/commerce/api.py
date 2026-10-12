@@ -19,6 +19,7 @@ from reflexo.commerce.models import (
     PaymentMethod,
 )
 from reflexo.commerce.orders import (
+    active_orders,
     get_order,
     open_order,
     order_by_number,
@@ -47,6 +48,7 @@ __all__ = [
     "ItemRef",
     "OrderView",
     "PaymentMethod",
+    "active_orders",
     "apply_paid",
     "cancel_order",
     "change_order",

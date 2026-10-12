@@ -181,7 +181,11 @@ def test_product_block_for_foreign_offering_fails() -> None:
 
 def test_tier_rewrites() -> None:
     refund = check(out("Refund mil jayega", topic="returns_refunds_cancellation"), records())
-    assert refund.passed and refund.rewritten_action == "handoff"
+    assert refund.passed and refund.rewritten_action == "handoff"  # an unbacked refund/cancel claim → a human
+    backed = check(
+        out("Aapka order cancel ho gaya", topic="returns_refunds_cancellation"), records(capability_decided=True)
+    )
+    assert backed.passed and backed.rewritten_action is None  # an action tool decided it by the owner's rules
     angry = check(out("Sorry!", topic="other", flags={"angry": True}), records())
     assert angry.rewritten_action == "handoff"
     haggle = check(out("Thoda kam ho jayega", topic="discount_negotiation"), records())
