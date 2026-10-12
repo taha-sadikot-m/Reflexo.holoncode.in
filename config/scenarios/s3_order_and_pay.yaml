@@ -1,0 +1,14 @@
+id: s3_order_and_pay
+title: "Order and pay (Razorpay sim)"
+covers: "F02 grounded answer → F03 order, payment link, paid webhook → confirmed"
+actors:
+  rahul: {role: customer}
+steps:
+  - {actor: rahul, send_text: "Hi! 1 kg chocolate truffle cake chahiye, parso shaam 4-8 baje, Kothrud 411038 delivery, eggless nahi"}
+  - {wait_for: {reply_contains: ["₹", "total"]}, timeout_s: 90}
+  - {actor: rahul, send_text: "haan sab sahi hai, confirm karo, online pay karunga"}
+  - {wait_for: {payment_link_created: true}, timeout_s: 90}
+  - {pay_last_link: rahul}
+  - {wait_for: {payment_status: paid}, timeout_s: 30}
+  - {assert: {order_status: confirmed}}
+  - {wait_for: {reply_contains: "Payment received"}, timeout_s: 30}

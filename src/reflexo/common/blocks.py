@@ -119,6 +119,7 @@ class PaymentLinkView(BaseModel):
     url: str
     amount_display: str
     description: str
+    status: str = "created"  # the link's state at render time: created | paid | expired | cancelled | failed
 
 
 class OrderSummaryView(BaseModel):

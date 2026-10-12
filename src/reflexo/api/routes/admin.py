@@ -252,3 +252,58 @@ async def sim_thread(actor: Annotated[int, Query(ge=1, le=99)], _: Authed, busin
 @router.post("/sim/razorpay/pay/{payment_link_id}")
 async def sim_pay(payment_link_id: UUID, _: Mutating, business_id: Business) -> dict[str, int]:
     return {"status": await admin.sim.pay_link(business_id, payment_link_id)}
+
+
+class SimOwnerBody(BaseModel):
+    text: str | None = Field(default=None, max_length=4000)
+    option_id: str | None = Field(default=None, max_length=100)
+    option_title: str | None = Field(default=None, max_length=100)
+
+
+@router.post("/sim/owner/send")
+async def sim_owner_send(body: SimOwnerBody, _: Mutating, business_id: Business) -> dict[str, Any]:
+    """The Lab's owner device (simulated owner binding)."""
+    if not body.text and not body.option_id:
+        raise problem(422, "VALIDATION_FAILED", "text or option_id required")
+    try:
+        result = await admin.sim.owner_says(
+            business_id, text_=body.text, option_id=body.option_id, option_title=body.option_title
+        )
+    except LookupError as exc:
+        raise problem(409, "NO_SIM_OWNER", str(exc)) from None
+    return {"status": result.status, "external_message_id": result.external_message_id}
+
+
+@router.get("/sim/owner/thread")
+async def sim_owner_thread(_: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.sim.owner_thread(business_id)
+
+
+# ---------------------------------------------------------------- Lab scenarios (POC_07 §3.3)
+
+
+@router.get("/scenarios")
+async def scenarios_list(_: Authed) -> dict[str, Any]:
+    return {"scenarios": admin.scenarios.catalogue(), "runs": admin.scenarios.recent()}
+
+
+@router.post("/scenarios/{scenario_id}/run", status_code=202)
+async def scenario_run(scenario_id: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+    try:
+        run = admin.scenarios.start(scenario_id, business_id)
+    except LookupError:
+        raise problem(404, "NOT_FOUND", f"unknown scenario {scenario_id}") from None
+    return {"id": run.id, "status": run.status}
+
+
+@router.get("/scenarios/runs/{run_id}")
+async def scenario_run_detail(run_id: str, _: Authed) -> dict[str, Any]:
+    run = admin.scenarios.get(run_id)
+    if run is None:
+        raise problem(404, "NOT_FOUND", "unknown run")
+    return run
+
+
+@router.post("/scenarios/runs/{run_id}/stop")
+async def scenario_stop(run_id: str, _: Mutating) -> dict[str, bool]:
+    return {"stopped": admin.scenarios.stop(run_id)}

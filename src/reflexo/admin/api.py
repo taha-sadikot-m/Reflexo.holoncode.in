@@ -3,7 +3,7 @@
 Admin API, X-ray stream, Simulation Lab scenarios, chaos endpoints, evals. Spec: POC_07, POC_08 §4.
 """
 
-from reflexo.admin import chaos, sim
+from reflexo.admin import chaos, scenarios, sim
 from reflexo.admin.actions import reply_as_team, set_takeover
 from reflexo.admin.auth import COOKIE, CSRF_HEADER, Session, check_credentials
 from reflexo.admin.auth import issue as issue_session
@@ -29,6 +29,7 @@ __all__ = [
     "recent_chaos",
     "record_login_failure",
     "reply_as_team",
+    "scenarios",
     "set_takeover",
     "sim",
     "trace_detail",

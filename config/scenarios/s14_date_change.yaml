@@ -1,0 +1,17 @@
+id: s14_date_change
+title: "Change a placed order (asks the owner first)"
+covers: "ADR-015 order.change: proposal with the requested date → owner approves → date moved, customer told"
+actors:
+  aman: {role: customer}
+steps:
+  - {actor: aman, send_text: "1 kg chocolate truffle cake, parso shaam 4-8 baje, Kothrud 411038, eggless nahi. Online pay karunga"}
+  - {wait_for: {reply_contains: ["₹", "total"]}, timeout_s: 90}
+  - {actor: aman, send_text: "haan confirm"}
+  - {wait_for: {payment_link_created: true}, timeout_s: 90}
+  - {pay_last_link: aman}
+  - {wait_for: {order_status: confirmed}, timeout_s: 30}
+  - {actor: aman, send_text: "Can you deliver it one day later instead? Same time slot"}
+  - {wait_for: {owner_message_contains: "changing a placed order"}, timeout_s: 90}
+  - {actor: owner, tap_option: "Yes"}
+  - {actor: aman, wait_for: {order_changed: delivery_date}, timeout_s: 60}
+  - {wait_for: {owner_message_contains: "Done"}, timeout_s: 30}

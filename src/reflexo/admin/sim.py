@@ -149,16 +149,11 @@ async def pay_link(business_id: UUID, payment_link_id: UUID) -> int:
 
 async def thread(business_id: UUID, actor: int, limit: int = 50) -> dict[str, Any]:
     """What the simulated customer's phone shows: their messages and the rendered replies (provider payloads)."""
+    return await thread_by_key(business_id, actor_wa_id(actor), limit)
+
+
+async def _items(business_id: UUID, conv: UUID, limit: int) -> dict[str, Any]:
     async with get_db().tenant_session(business_id) as s:
-        conv = (
-            await s.execute(
-                text("""SELECT id FROM conversations WHERE thread_key = :t AND simulated ORDER BY created_at DESC
-                        LIMIT 1"""),
-                {"t": actor_wa_id(actor)},
-            )
-        ).scalar_one_or_none()
-        if conv is None:
-            return {"conversation_id": None, "items": []}
         inbound = (
             await s.execute(
                 text("""SELECT created_at, content_text, interactive_reply FROM messages
@@ -171,6 +166,14 @@ async def thread(business_id: UUID, actor: int, limit: int = 50) -> dict[str, An
                 text("""SELECT created_at, rendered_payload, status FROM outbound_messages
                         WHERE conversation_id = :c ORDER BY created_at DESC, part_index LIMIT :n"""),
                 {"c": conv, "n": limit},
+            )
+        ).all()
+        links = (
+            await s.execute(
+                text("""SELECT p.id, p.amount_paise, p.status, p.short_url, o.order_number FROM payment_links p
+                        JOIN orders o ON o.id = p.order_id WHERE o.conversation_id = :c
+                        ORDER BY p.created_at DESC LIMIT 5"""),
+                {"c": conv},
             )
         ).all()
     items = [
@@ -186,4 +189,95 @@ async def thread(business_id: UUID, actor: int, limit: int = 50) -> dict[str, An
         for r in outbound
     ]
     items.sort(key=lambda i: str(i["at"]))
-    return {"conversation_id": str(conv), "items": items[-limit:]}
+    return {
+        "conversation_id": str(conv),
+        "items": items[-limit:],
+        "payment_links": [
+            {
+                "id": str(r.id),
+                "amount_paise": r.amount_paise,
+                "status": str(r.status),
+                "url": r.short_url,
+                "order_number": r.order_number,
+            }
+            for r in links
+        ],
+    }
+
+
+# ---------------------------------------------------------------- the simulated owner (POC_07 §3.2)
+
+
+async def sim_owner_wa_id(business_id: UUID) -> str | None:
+    """The business's simulated owner number (an `owner_channel_bindings` row flagged `simulated_only`)."""
+    async with get_db().service_session(ServiceReason.ADMIN) as s:
+        ext: str | None = (
+            await s.execute(
+                text("""SELECT external_id FROM owner_channel_bindings WHERE business_id = :b AND simulated_only
+                          AND channel = 'whatsapp' AND revoked_at IS NULL LIMIT 1"""),
+                {"b": business_id},
+            )
+        ).scalar_one_or_none()
+    return ext.lstrip("+") if ext else None
+
+
+async def owner_says(
+    business_id: UUID, *, text_: str | None = None, option_id: str | None = None, option_title: str | None = None
+) -> SimResult:
+    """The simulated owner writes (or taps a button) on WhatsApp — the real ingress, accepted as the owner only
+    because the event is signed and flagged simulated."""
+    wa_id = await sim_owner_wa_id(business_id)
+    if wa_id is None:
+        raise LookupError("this business has no simulated owner binding")
+    pnid = await whatsapp_number(business_id)
+    mid = f"wamid.SIMOWN{new_id().hex}"
+    if option_id:
+        message: dict[str, Any] = {
+            "id": mid,
+            "type": "interactive",
+            "interactive": {"type": "button_reply", "button_reply": {"id": option_id, "title": option_title or ""}},
+        }
+    else:
+        message = {"id": mid, "type": "text", "text": {"body": text_ or ""}}
+    raw = json.dumps(_payload(pnid, wa_id, "Owner (Lab)", message)).encode()
+    return SimResult(await post_raw(raw), mid, wa_id)
+
+
+async def owner_thread(business_id: UUID, limit: int = 50) -> dict[str, Any]:
+    wa_id = await sim_owner_wa_id(business_id)
+    return await thread_by_key(business_id, wa_id, limit) if wa_id else {"conversation_id": None, "items": []}
+
+
+async def thread_by_key(business_id: UUID, thread_key: str, limit: int = 50) -> dict[str, Any]:
+    """Like `thread`, for any simulated WhatsApp thread key (customer or owner device)."""
+    async with get_db().tenant_session(business_id) as s:
+        conv = (
+            await s.execute(
+                text("""SELECT id FROM conversations WHERE thread_key = :t AND simulated ORDER BY created_at DESC
+                        LIMIT 1"""),
+                {"t": thread_key},
+            )
+        ).scalar_one_or_none()
+    if conv is None:
+        return {"conversation_id": None, "items": []}
+    return await _items(business_id, conv, limit)
+
+
+def payload_text(payload: dict[str, Any]) -> str:
+    """What a person reads in a rendered WhatsApp payload (text, caption or interactive body)."""
+    kind = payload.get("type")
+    if kind == "text":
+        return str((payload.get("text") or {}).get("body", ""))
+    if kind == "interactive":
+        return str(((payload.get("interactive") or {}).get("body") or {}).get("text", ""))
+    if kind in ("image", "document"):
+        return str((payload.get(kind) or {}).get("caption", ""))
+    return ""
+
+
+def payload_options(payload: dict[str, Any]) -> list[tuple[str, str]]:
+    """(id, title) of the buttons or list rows a person can tap."""
+    action = (payload.get("interactive") or {}).get("action") or {}
+    if "buttons" in action:
+        return [(b["reply"]["id"], b["reply"]["title"]) for b in action["buttons"]]
+    return [(r["id"], r["title"]) for sec in action.get("sections", []) for r in sec.get("rows", [])]

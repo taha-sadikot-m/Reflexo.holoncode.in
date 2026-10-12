@@ -153,6 +153,11 @@ class Renderer:
             return self._carousel(views)
         if isinstance(b, PaymentLinkBlock):
             link = await self._need_hydrator().payment_link(business_id, b.payment_link_id)
+            if link.status != "created":  # already paid / expired: say so, never offer a dead or used link
+                state = "✅ Paid" if link.status == "paid" else f"This payment link has {link.status}."
+                card = f"{link.description}\nAmount: {link.amount_display}\n{state}"
+                self._text.append(card)
+                return [IRText(card)]
             # the status is stated by the card itself, not left to the model's sentence (live: "your order is
             # confirmed!" next to a link that had not been paid)
             text = f"{link.description}\nAmount: {link.amount_display}\n⏳ Confirms automatically once paid"

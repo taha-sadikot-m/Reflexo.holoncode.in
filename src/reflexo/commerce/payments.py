@@ -673,13 +673,16 @@ class CommerceViews:
                     {"id": payment_link_id},
                 )
             ).first()
-        if r is None or not r.short_url or str(r.status) != "created":
+        if r is None or not r.short_url:
             raise LookupError("payment link not available")
+        # rendered in its current state: a link paid (or expired) between the tool call and the send must not
+        # fail the turn (live 13 Oct: paid within a second, the reply fell back and the owner got a question)
         return PaymentLinkView(
             payment_link_id=payment_link_id,
             url=r.short_url,
             amount_display=format_inr(r.amount_paise),
             description=f"Order {r.order_number}",
+            status=str(r.status),
         )
 
     async def order_summary(self, business_id: UUID, order_id: UUID) -> OrderSummaryView:

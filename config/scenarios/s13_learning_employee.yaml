@@ -1,0 +1,32 @@
+id: s13_learning_employee
+title: "It learns how you work (cancellation)"
+covers: "ADR-015: proposal → owner decides → 'Always' → next customer handled alone → FYI citing the rule"
+actors:
+  rahul: {role: customer}
+  priya: {role: customer}
+steps:
+  # Rahul orders and pays
+  - {actor: rahul, send_text: "1 kg chocolate truffle cake, parso shaam 4-8 baje, Kothrud 411038, eggless nahi. Online pay karunga"}
+  - {wait_for: {reply_contains: ["₹", "total"]}, timeout_s: 90}
+  - {actor: rahul, send_text: "haan confirm karo"}
+  - {wait_for: {payment_link_created: true}, timeout_s: 90}
+  - {pay_last_link: rahul}
+  - {wait_for: {order_status: confirmed}, timeout_s: 30}
+  # ...then wants to cancel: nothing in the playbook yet → the owner decides
+  - {actor: rahul, send_text: "Sorry, mujhe yeh order cancel karna hai, plans change ho gaye"}
+  - {wait_for: {owner_message_contains: "wants"}, timeout_s: 90}
+  - {actor: owner, tap_option: "Yes"}
+  - {wait_for: {owner_message_contains: "Next time"}, timeout_s: 60}
+  - {actor: owner, tap_option: "Always"}
+  - {wait_for: {owner_message_contains: "From now on"}, timeout_s: 30}
+  - {actor: rahul, wait_for: {order_status: cancelled}, timeout_s: 30}
+  # Priya: same situation, now handled without asking
+  - {actor: priya, send_text: "1 kg chocolate truffle cake, parso shaam 4-8 baje, Kothrud 411038, eggless nahi. Online pay"}
+  - {wait_for: {reply_contains: ["₹", "total"]}, timeout_s: 90}
+  - {actor: priya, send_text: "haan confirm"}
+  - {wait_for: {payment_link_created: true}, timeout_s: 90}
+  - {pay_last_link: priya}
+  - {wait_for: {order_status: confirmed}, timeout_s: 30}
+  - {actor: priya, send_text: "please cancel my order, I can't make it"}
+  - {wait_for: {order_status: cancelled}, timeout_s: 90}
+  - {wait_for: {owner_message_contains: "your rule"}, timeout_s: 30}

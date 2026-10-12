@@ -277,6 +277,7 @@ async def build_context(
                 json.dumps(without_customer_words(order_view), ensure_ascii=False) if order_view else "",
                 *(json.dumps(without_customer_words(o.tool_view()), ensure_ascii=False) for o in placed),
                 relay["answer"] if relay else "",
+                *(shop_blocks or []),  # the shop's rules, decisions and open items: written by the system
                 f"{now_local.strftime('%a %d %b %Y, %H:%M')} {_upcoming_days(now_local)}",
             ]
         ),

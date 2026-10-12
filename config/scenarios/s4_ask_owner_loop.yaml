@@ -1,0 +1,10 @@
+id: s4_ask_owner_loop
+title: "Ask the owner, learn the answer"
+covers: "F05: unknown fact → owner question → owner answers → relayed to the customer → saved as Q&A"
+actors:
+  priya: {role: customer}
+steps:
+  - {actor: priya, send_text: "Kya aap cake ke saath birthday candles bhi dete ho?"}
+  - {wait_for: {owner_message_contains: "candle"}, timeout_s: 90}
+  - {owner_answer_last_question: "Haan, 5 candles free dete hain har cake ke saath"}
+  - {actor: priya, wait_for: {reply_contains: ["candle"]}, timeout_s: 90}

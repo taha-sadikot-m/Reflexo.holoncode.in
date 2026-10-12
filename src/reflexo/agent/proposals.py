@@ -215,12 +215,16 @@ def _draft_rule(cap: Capability, learn: dict[str, Any], says: str) -> knowledge.
 def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str:
     """Prompt context for the relay turn: what was asked, what the owner decided, what happened."""
     outcome = (decision or {}).get("outcome") or {}
+    # the order may no longer be "live" (cancelled): give its id so the reply can cite it (live 13 Oct: the relay
+    # cited "MB-1030", failed the references check twice and fell back after the owner had already approved)
+    order_id = (a.subject.get("args") or {}).get("order_id")
+    cite = f"\nReference the order as order:{order_id}." if order_id else ""
     if a.subject.get("owner_initiated"):
         why = f" (reason: “{a.subject['reason']}”)" if a.subject.get("reason") else ""
         return (
             "# THE SHOP DECIDED — tell the customer now\n"
             f"The shop itself did this: {str(a.preview.get('summary', '')).lower()}{why}; status now "
-            f"{outcome.get('status')}. Tell the customer kindly in their language, briefly (action=send)."
+            f"{outcome.get('status')}. Tell the customer kindly in their language, briefly (action=send).{cite}"
         )
     asked = f"{a.preview.get('label', 'an action').lower()} {a.preview.get('summary', '')}"
     if not outcome.get("approved"):
@@ -237,5 +241,5 @@ def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str
     return (
         "# THE SHOP DECIDED — tell the customer now\n"
         f"They had asked for: {asked} (their reason: “{a.subject.get('reason', '')}”). {result}\n"
-        "Say it in their language, briefly (action=send). Do not ask the shop again."
+        f"Say it in their language, briefly (action=send). Do not ask the shop again.{cite}"
     )

@@ -35,6 +35,8 @@ class FakeSigner:
 
 
 class FakeHydrator:
+    link_status = "created"
+
     async def product(self, business_id: UUID, offering_id: UUID, variant_id: UUID | None) -> ProductView:
         return ProductView(
             offering_id=offering_id,
@@ -49,7 +51,11 @@ class FakeHydrator:
 
     async def payment_link(self, business_id: UUID, payment_link_id: UUID) -> PaymentLinkView:
         return PaymentLinkView(
-            payment_link_id=payment_link_id, url="https://rzp.io/l/abc", amount_display="₹950", description="Order #12"
+            payment_link_id=payment_link_id,
+            url="https://rzp.io/l/abc",
+            amount_display="₹950",
+            description="Order #12",
+            status=self.link_status,
         )
 
     async def order_summary(self, business_id: UUID, order_id: UUID) -> OrderSummaryView:
@@ -180,6 +186,17 @@ async def test_payment_link_button_or_text() -> None:
     assert isinstance(tg.parts[0], IRLink) and tg.parts[0].url == "https://rzp.io/l/abc"
     assert isinstance(wa.parts[0], IRText) and "https://rzp.io/l/abc" in wa.parts[0].text
     assert "https://rzp.io/l/abc" in wa.text_fallback
+
+
+@pytest.mark.parametrize(("status", "shown"), [("paid", "✅ Paid"), ("expired", "has expired")])
+async def test_a_used_or_dead_link_renders_its_state_not_the_link(
+    status: str, shown: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 13 Oct: paid a second after creation, the reply's link card failed to render and the turn fell back."""
+    monkeypatch.setattr(FakeHydrator, "link_status", status)
+    wa = await renderer("meta_whatsapp").render(BIZ, [PaymentLinkBlock(payment_link_id=new_id())])
+    [part] = wa.parts
+    assert isinstance(part, IRText) and shown in part.text and "rzp.io" not in part.text
 
 
 async def test_order_summary_text() -> None:
