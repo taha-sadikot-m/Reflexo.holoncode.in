@@ -4,7 +4,7 @@ Admin API, X-ray stream, Simulation Lab scenarios, chaos endpoints, evals. Spec:
 """
 
 from reflexo.admin import chaos, scenarios, sim, workspace
-from reflexo.admin.actions import reply_as_team, set_takeover
+from reflexo.admin.actions import demo_reset, reply_as_team, set_takeover
 from reflexo.admin.auth import COOKIE, CSRF_HEADER, Session, check_credentials
 from reflexo.admin.auth import issue as issue_session
 from reflexo.admin.auth import record_failure as record_login_failure
@@ -23,6 +23,7 @@ __all__ = [
     "check_credentials",
     "conversation_thread",
     "conversations",
+    "demo_reset",
     "health",
     "issue_session",
     "login_throttled",

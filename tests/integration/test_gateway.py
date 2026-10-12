@@ -14,6 +14,7 @@ import httpx
 import pytest
 from sqlalchemy import text
 
+import reflexo.admin.api as admin
 import reflexo.gateway.api as gateway_api
 from reflexo.api.main import app
 from reflexo.common.contracts import InboundProcessorPort, InboxEvent, OutboundRow, SendStatus
@@ -529,6 +530,20 @@ async def test_link_code_merges_telegram_customer_into_whatsapp(registry: Regist
     async with db.tenant_session(shop.business_id) as s:
         again = await identity.consume_link_code(s, shop.business_id, code, tg_conv.customer_id)
     assert again.status == "expired"
+
+    # admin (CHK-F13-1): one customer, both identities, one history across channels
+    [listed] = await admin.workspace.customers(shop.business_id)
+    assert listed["merged"] == 1 and {i["channel"] for i in listed["identities"]} == {"telegram", "whatsapp"}
+    view = await admin.workspace.customer_detail(shop.business_id, tg_conv.customer_id)
+    assert view is not None
+    assert {(i["channel"], i["linked_via"]) for i in view["identities"]} == {
+        ("telegram", "first_contact"),
+        ("whatsapp", "link_code"),
+    }
+    assert [(h["channel"], h["text"]) for h in view["history"] if h["direction"] == "inbound"] == [
+        ("telegram", "hi"),
+        ("whatsapp", code.lower()),
+    ]
 
 
 async def test_expired_and_unknown_link_codes(db: Database) -> None:

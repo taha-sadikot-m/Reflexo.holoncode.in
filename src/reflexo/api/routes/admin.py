@@ -411,3 +411,32 @@ async def imports(_: Authed, business_id: Business) -> list[dict[str, Any]]:
 @router.get("/calls")
 async def calls(_: Authed, business_id: Business) -> list[dict[str, Any]]:
     return await admin.workspace.calls(business_id)
+
+
+@router.get("/settings")
+async def settings_view(_: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.workspace.settings_view(business_id)
+
+
+@router.post("/demo-reset")
+async def demo_reset(
+    _: Mutating, mode: Annotated[str, Query(pattern="^(onboarding|full)$")] = "onboarding"
+) -> dict[str, Any]:
+    """`make demo-reset [FULL=1]` from the Settings page: every demo business is wiped and reseeded (new ids)."""
+    try:
+        return await admin.demo_reset(mode)
+    except RuntimeError as exc:
+        raise problem(409, "BUSY", str(exc)) from exc
+
+
+@router.get("/customers")
+async def customers(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+    return await admin.workspace.customers(business_id)
+
+
+@router.get("/customers/{customer_id}")
+async def customer(customer_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+    found = await admin.workspace.customer_detail(business_id, customer_id)
+    if found is None:
+        raise problem(404, "NOT_FOUND", "customer not found")
+    return found

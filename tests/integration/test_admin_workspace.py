@@ -127,3 +127,18 @@ async def test_automations_pause_resume_and_capacity(db: Database, client: httpx
     assert (await client.get("/admin/api/orders/capacity", params=p)).json() == []
     assert (await client.get("/admin/api/imports", params=p)).json() == []
     assert (await client.get("/admin/api/calls", params=p)).json() == []
+
+
+async def test_demo_reset_from_the_settings_page(db: Database, client: httpx.AsyncClient) -> None:
+    csrf = await login(client)
+    h = {"X-CSRF-Token": csrf}
+    assert (await client.post("/admin/api/demo-reset", params={"mode": "full"})).status_code == 403
+    assert (await client.post("/admin/api/demo-reset", params={"mode": "nope"}, headers=h)).status_code == 422
+    r = await client.post("/admin/api/demo-reset", params={"mode": "full"}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert set(body["businesses"]) == {"meeras-bakes", "kurti-kraft", "eval-bakes"} and body["seconds"] < 60
+    meera = body["businesses"]["meeras-bakes"]
+    settings = (await client.get("/admin/api/settings", params={"business_id": meera})).json()
+    assert {c["channel"] for c in settings["connections"]} >= {"whatsapp", "telegram"}
+    assert isinstance(settings["flags"], dict)

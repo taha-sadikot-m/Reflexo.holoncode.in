@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 import reflexo.agent.api as agent
 import reflexo.knowledge.api as knowledge
-from reflexo.common import ports
+from reflexo.common import flags, ports
 from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.logging import mask_phone_numbers
@@ -676,3 +676,158 @@ async def calls(business_id: UUID, limit: int = 30) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+# ---------------------------------------------------------------- settings
+
+
+async def settings_view(business_id: UUID) -> dict[str, Any]:
+    """Runtime flags and this business's channel connections (read-only here; the reset lives in actions)."""
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id, channel, provider, display_name, roles, customer_mode, job_description, status,
+                               external_account_id
+                        FROM channel_connections ORDER BY channel""")
+            )
+        ).all()
+    return {
+        "flags": await flags.runtime_flags(),
+        "connections": [
+            {
+                "id": str(r.id),
+                "channel": str(r.channel),
+                "provider": str(r.provider),
+                "display_name": r.display_name,
+                "roles": [str(x) for x in r.roles],
+                "customer_mode": str(r.customer_mode),
+                "job_description": r.job_description,
+                "status": str(r.status),
+                "account": mask_phone_numbers(r.external_account_id or ""),
+            }
+            for r in rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------- customers (F13: one customer across channels)
+
+
+async def customers(business_id: UUID, limit: int = 100) -> list[dict[str, Any]]:
+    async with get_db().tenant_session(business_id) as s:
+        rows = (
+            await s.execute(
+                text("""
+            SELECT c.id, c.display_name, c.phone_e164, c.language, c.last_seen_at, c.created_at,
+                   (SELECT coalesce(json_agg(json_build_object('channel', i.channel, 'linked_via', i.linked_via)
+                                              ORDER BY i.created_at), '[]')
+                      FROM identity_map i WHERE i.customer_id = c.id) AS identities,
+                   (SELECT count(*) FROM orders o WHERE o.customer_id = c.id AND o.status <> 'draft') AS orders,
+                   (SELECT count(*) FROM customers m WHERE m.merged_into = c.id) AS merged
+            FROM customers c WHERE c.merged_into IS NULL
+            ORDER BY c.last_seen_at DESC NULLS LAST LIMIT :n"""),
+                {"n": limit},
+            )
+        ).all()
+    return [
+        {
+            "id": str(r.id),
+            "name": _who(r.display_name, r.phone_e164),
+            "language": r.language,
+            "identities": r.identities,
+            "orders": int(r.orders),
+            "merged": int(r.merged),
+            "last_seen_at": _iso(r.last_seen_at),
+            "created_at": _iso(r.created_at),
+        }
+        for r in rows
+    ]
+
+
+async def customer_detail(business_id: UUID, customer_id: UUID, limit: int = 200) -> dict[str, Any] | None:
+    """One customer with every identity (and how it was linked), memory, orders, and the merged history: the
+    messages of all their conversations on every channel, in time order (CHK-F13-1)."""
+    async with get_db().tenant_session(business_id) as s:
+        c = (
+            await s.execute(
+                text("""SELECT id, display_name, phone_e164, language, tags, memory, summary, merged_into,
+                               first_seen_at, last_seen_at FROM customers WHERE id = :id"""),
+                {"id": customer_id},
+            )
+        ).first()
+        if c is None:
+            return None
+        identities = (
+            await s.execute(
+                text("""SELECT channel, external_id, display_name, linked_via, last_inbound_at, created_at
+                        FROM identity_map WHERE customer_id = :id ORDER BY created_at"""),
+                {"id": customer_id},
+            )
+        ).all()
+        merged = (
+            await s.execute(
+                text("SELECT id, display_name, created_at FROM customers WHERE merged_into = :id ORDER BY created_at"),
+                {"id": customer_id},
+            )
+        ).all()
+        order_rows = (
+            await s.execute(
+                text("""SELECT id, order_number, status, total_paise, source_channel, created_at FROM orders
+                        WHERE customer_id = :id AND status <> 'draft' ORDER BY created_at DESC LIMIT 20"""),
+                {"id": customer_id},
+            )
+        ).all()
+        history = (
+            await s.execute(
+                text("""SELECT m.created_at, m.direction, m.author, m.content_text, cv.channel, cv.id AS conversation_id
+                        FROM messages m JOIN conversations cv ON cv.id = m.conversation_id
+                        WHERE cv.customer_id = :id ORDER BY m.created_at DESC LIMIT :n"""),
+                {"id": customer_id, "n": limit},
+            )
+        ).all()
+    return {
+        "id": str(c.id),
+        "name": _who(c.display_name, c.phone_e164),
+        "phone": mask_phone_numbers(c.phone_e164) if c.phone_e164 else None,
+        "language": c.language,
+        "tags": list(c.tags or []),
+        "facts": (c.memory or {}).get("facts", []),
+        "summary": c.summary,
+        "merged_into": str(c.merged_into) if c.merged_into else None,
+        "first_seen_at": _iso(c.first_seen_at),
+        "last_seen_at": _iso(c.last_seen_at),
+        "identities": [
+            {
+                "channel": str(i.channel),
+                "external_id": mask_phone_numbers(i.external_id),
+                "display_name": i.display_name,
+                "linked_via": i.linked_via,
+                "last_inbound_at": _iso(i.last_inbound_at),
+                "created_at": _iso(i.created_at),
+            }
+            for i in identities
+        ],
+        "merged_from": [{"id": str(m.id), "name": m.display_name, "created_at": _iso(m.created_at)} for m in merged],
+        "orders": [
+            {
+                "id": str(o.id),
+                "order_number": o.order_number,
+                "status": str(o.status),
+                "total_rupees": _rupees(o.total_paise),
+                "channel": str(o.source_channel) if o.source_channel else None,
+                "created_at": _iso(o.created_at),
+            }
+            for o in order_rows
+        ],
+        "history": [
+            {
+                "at": _iso(h.created_at),
+                "direction": str(h.direction),
+                "author": str(h.author),
+                "text": mask_phone_numbers(h.content_text or ""),
+                "channel": str(h.channel),
+                "conversation_id": str(h.conversation_id),
+            }
+            for h in reversed(history)
+        ],
+    }
