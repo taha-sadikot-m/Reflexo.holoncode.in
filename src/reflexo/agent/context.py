@@ -198,9 +198,10 @@ async def build_context(
         else ""
     )
     waiting_block = (
-        f'# WAITING ON THE OWNER\nAsked at {open_question["asked"]}: "{open_question["question"]}". If the '
-        "customer only asks for an update, say you are still checking with the team (action=send); do not ask the "
-        "owner again."
+        f'# WAITING ON THE OWNER\nAsked at {open_question["asked"]}: "{open_question["question"]}". This covers only '
+        "that question: if the customer asks about it again, say you are still checking with the team (action=send) "
+        "and do not ask the owner again. Anything else in their message — a new order, another question — you "
+        "handle now as usual."
         if open_question
         else ""
     )
