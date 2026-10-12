@@ -5,6 +5,7 @@ just the first capability."""
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID
@@ -334,3 +335,76 @@ async def test_just_this_once_learns_nothing(registry: Registry, db: Database, f
     assert not await q(db, "SELECT id FROM playbook_rules WHERE business_id = :b", b=shop.bid)
     texts = [str(m) for m in await owner_messages(db, shop)]
     assert any("ask you again next time" in t for t in texts) and any("Already saved" in t for t in texts)
+
+
+# ---------------------------------------------------------------- the owner teaches / acts in words
+
+
+async def test_the_owner_teaches_a_rule_in_words(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:
+    from tests.integration.test_owner_desk import owner_turn, read_back_reply, steps
+
+    shop = await bakery(db)
+    wa = wa_number()
+    order, conv = await placed_order(registry, db, fake, shop, wa)
+    fake.script(
+        PRIMARY,
+        steps(
+            call(
+                "playbook_change",
+                capability="order.cancel",
+                effect="allow",
+                conditions=[{"field": "order.hours_until_delivery", "op": "gte", "value": 24}],
+                says="cancellation 24 ghante pehle tak free hai",
+            ),
+            read_back_reply,
+        ),
+    )
+    await owner_turn(registry, db, shop, "cancellation 24 ghante pehle tak free hai")
+    read_back = str((await owner_messages(db, shop))[-1])
+    assert "➕ Cancelling an order: I do it myself when hours left until delivery is at least 24" in read_back
+    assert not await knowledge.playbook.rules(shop.bid)  # nothing changes before YES
+    code = re.search(r"YES (\d{4})", read_back).group(1)  # type: ignore[union-attr]
+    await owner_says(registry, db, shop, f"YES {code}")
+    [rule] = await knowledge.playbook.rules(shop.bid)
+    assert rule.source == "owner_instruction" and rule.effect == "allow"
+
+    fake.script(PRIMARY, asks_to_cancel(order.order_id, SAY))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "cancel please"))
+    assert await status_of(db, order.order_id) == "cancelled"
+    assert (await outbound_texts(db, conv))[-1] == SAY["done"]
+
+
+async def test_the_owner_acts_on_an_order_and_the_customer_is_told(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    from tests.integration.test_owner_desk import owner_turn, read_back_reply, steps
+
+    shop = await bakery(db)
+    wa = wa_number()
+    order, conv = await placed_order(registry, db, fake, shop, wa)
+    fake.script(
+        PRIMARY,
+        steps(
+            call("order_action", order_number=order.order_number, action="cancel", reason="oven toot gaya"),
+            read_back_reply,
+        ),
+    )
+    await owner_turn(registry, db, shop, f"{order.order_number} cancel kar do, oven toot gaya")
+    read_back = str((await owner_messages(db, shop))[-1])
+    assert f"Cancelling an order: {order.order_number}" in read_back
+    code = re.search(r"YES (\d{4})", read_back).group(1)  # type: ignore[union-attr]
+    await owner_says(registry, db, shop, f"YES {code}")
+    [row] = await q(db, "SELECT status, cancelled_by FROM orders WHERE id = :o", o=order.order_id)
+    assert (str(row.status), row.cancelled_by) == ("cancelled", "owner")
+    assert not any("Next time" in str(m) for m in await owner_messages(db, shop))  # nothing to learn from this
+
+    relay = await claim_pending(registry, db, conv)
+    seen: list[str] = []
+
+    def relay_reply(a: agent.Attempt) -> agent.FakeReply:
+        seen.append("\n".join(m.content or "" for m in a.messages))
+        return reply("send", "Sorry, the shop had to cancel your order.", topic="other")
+
+    fake.script(PRIMARY, relay_reply)
+    await registry.require(TurnRunnerPort).run_turn(relay)  # type: ignore[type-abstract]
+    assert "The shop itself did this" in seen[0] and "oven toot gaya" in seen[0]

@@ -18,7 +18,15 @@ from reflexo.commerce.models import (
     OrderView,
     PaymentMethod,
 )
-from reflexo.commerce.orders import get_order, open_order, order_status, situation, start_order, update_order
+from reflexo.commerce.orders import (
+    get_order,
+    open_order,
+    order_by_number,
+    order_status,
+    situation,
+    start_order,
+    update_order,
+)
 from reflexo.commerce.payments import CommerceViews, apply_paid, cancel_order, confirm_order, grounding_amounts
 from reflexo.common.contracts import CommerceViewsPort, JobHandlerRegistry, JobRow
 from reflexo.common.ports import Registry
@@ -38,6 +46,7 @@ __all__ = [
     "get_order",
     "grounding_amounts",
     "open_order",
+    "order_by_number",
     "order_status",
     "register",
     "situation",

@@ -19,9 +19,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import reflexo.approvals.api as approvals
+import reflexo.commerce.api as commerce
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner
+from reflexo.agent.capabilities import CAPABILITIES, describe_order
 from reflexo.agent.language import detect as detect_language
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
@@ -31,6 +33,7 @@ from reflexo.common.money import format_inr
 from reflexo.common.timeutil import to_business_tz, utcnow
 
 OWNER = {"owner"}
+Condition = knowledge.playbook.Condition
 
 
 def _paise(rupees: float | int | str) -> int:
@@ -585,6 +588,102 @@ class OwnerReply(BaseModel):
     text: str = Field(min_length=1, max_length=3500, description="Your message to the owner (brief)")
 
 
+# ---------------------------------------------------------------- the playbook (ADR-015)
+
+
+class PlaybookChangeArgs(BaseModel):
+    capability: str = Field(
+        description="The action the rule is about: " + ", ".join(f"{c.name} ({c.label})" for c in CAPABILITIES.values())
+    )
+    effect: Literal["allow", "deny", "propose"] = Field(
+        description="allow = do it yourself; deny = say no; propose = ask me first"
+    )
+    conditions: list[Condition] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Only when … (empty = always). Fields: " + ", ".join(knowledge.playbook.FIELDS),
+    )
+    says: str = Field(description="The owner's own words, quoted", max_length=400)
+    replaces_existing: bool = Field(
+        default=True, description="The owner's new instruction replaces earlier business-wide rules for this action"
+    )
+
+
+@tool("playbook_change", PlaybookChangeArgs, desks=OWNER, side_effect=True)
+async def playbook_change(ctx: ToolContext, args: PlaybookChangeArgs, s: AsyncSession) -> dict[str, Any]:
+    """The owner tells you how they want an action handled ("cancellation sirf 24 ghante pehle tak", "date change
+    ke liye mujhse poochna", "drafts tum khud cancel kar sakti ho"). Read-back of the exact rule + confirmation."""
+    cap = CAPABILITIES.get(args.capability)
+    if cap is None:
+        raise ToolError("VALIDATION_FAILED", f"unknown action {args.capability}", guidance="Pick one from the list.")
+    rule = knowledge.playbook.PlaybookRule(
+        id=UUID(int=0), capability=cap.name, effect=args.effect, conditions=args.conditions, says=args.says,
+        source="owner_instruction",
+    )  # fmt: skip
+    cs = await knowledge.begin(ctx.business_id, "owner_command", f"Playbook: {cap.label}", member_id=ctx.member_id)
+    lines = []
+    if args.replaces_existing:
+        for old in await knowledge.playbook.rules(ctx.business_id, capability=cap.name):
+            if old.scope == "global":
+                await knowledge.add(cs, "playbook_rule", "update", old.id, {"status": "archived"})
+                lines.append(f"➖ {old.readback(cap.label)}")
+    await knowledge.add(
+        cs,
+        "playbook_rule",
+        "create",
+        None,
+        {
+            "capability": cap.name,
+            "effect": args.effect,
+            "conditions": [c.model_dump() for c in args.conditions],
+            "says": args.says,
+            "scope": "global",
+            "source": "owner_instruction",
+            "status": "active",
+        },
+    )
+    lines.append(f"➕ {rule.readback(cap.label)}")
+    return await _confirmation(ctx, {"change_set_id": str(cs.id)}, "Playbook rule", lines)
+
+
+class OrderActionArgs(BaseModel):
+    order_number: str = Field(description="e.g. MB-1028")
+    action: Literal["cancel"] = Field(description="What to do with the order")
+    reason: str = Field(default="", max_length=300, description="Why, in the owner's words (told to the customer)")
+
+
+@tool("order_action", OrderActionArgs, desks=OWNER, side_effect=True)
+async def order_action(ctx: ToolContext, args: OrderActionArgs, s: AsyncSession) -> dict[str, Any]:
+    """The owner wants something done to an order (e.g. "MB-1028 cancel kar do"). Read-back + confirmation; then
+    it is done and the customer is told."""
+    order = await commerce.order_by_number(ctx.business_id, args.order_number)
+    if order is None:
+        raise ToolError("NOT_FOUND", f"no order {args.order_number}", guidance="Check the order number (orders_list).")
+    cap = CAPABILITIES[f"order.{args.action}"]
+    situation = await commerce.situation(ctx.business_id, order.order_id)
+    if why_not := cap.invariant(situation):
+        raise ToolError("NOT_POSSIBLE", f"can't: {why_not}", guidance="Tell the owner why.")
+    conv = await gateway.conversation_view(s, order.conversation_id) if order.conversation_id else None
+    name = (conv.customer.display_name if conv and conv.customer else None) or "the customer"
+    summary = describe_order(order)
+    return await _confirmation(
+        ctx,
+        {
+            "capability": cap.name,
+            "args": {"order_id": str(order.order_id)},
+            "reason": args.reason,
+            "by": "owner",
+            "owner_initiated": True,
+            "conversation_id": str(order.conversation_id) if order.conversation_id else None,
+            "customer_id": str(order.customer_id),
+            "customer_name": name,
+        },
+        summary,
+        [f"{cap.label}: {summary}" + (f" — reason: “{args.reason}”" if args.reason else ""), f"I'll tell {name}."],
+        kind="tool_call",
+    )
+
+
 @tool("reply_owner", OwnerReply, desks=OWNER, terminal=True)
 async def reply_owner(ctx: ToolContext, args: OwnerReply) -> dict[str, Any]:
     """Finish the turn with your message to the owner. Call exactly once, last."""
@@ -605,6 +704,8 @@ OWNER_TOOLS = [
     "orders_list",
     "import_from_file",
     "confirm_pending",
+    "playbook_change",
+    "order_action",
     "start_automation_builder",
     "onboarding_answer",
     "onboarding_finish",

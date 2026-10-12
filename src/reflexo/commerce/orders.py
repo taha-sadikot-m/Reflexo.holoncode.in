@@ -526,6 +526,14 @@ async def order_status(business_id: UUID, customer_id: UUID, order_number: str |
         return await view(s, oid) if oid else None
 
 
+async def order_by_number(business_id: UUID, order_number: str) -> OrderView | None:
+    async with get_db().tenant_session(business_id) as s:
+        oid = (
+            await s.execute(text("SELECT id FROM orders WHERE order_number = :n"), {"n": order_number.strip().upper()})
+        ).scalar_one_or_none()
+        return await view(s, oid) if oid else None
+
+
 async def get_order(business_id: UUID, order_id: UUID) -> OrderView | None:
     async with get_db().tenant_session(business_id) as s:
         exists = (await s.execute(text("SELECT 1 FROM orders WHERE id = :o"), {"o": order_id})).first()

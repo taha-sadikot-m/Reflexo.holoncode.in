@@ -58,16 +58,19 @@ class ProposalService:
         outcome: dict[str, Any]
         if approve:
             try:
-                result = await cap.execute(business_id, {**sub["args"], "reason": sub.get("reason")}, "customer")
+                by = str(sub.get("by") or "customer")  # the customer asked; or the owner did it themselves
+                result = await cap.execute(business_id, {**sub["args"], "reason": sub.get("reason")}, by)
                 outcome = {"approved": True, "done": True, **result}
             except commerce.CommerceError as exc:  # the world changed since the proposal (e.g. now delivered)
                 outcome = {"approved": True, "done": False, "reason": str(exc)}
         else:
             outcome = {"approved": False}
-        if outcome.get("done") or not approve:
+        learnable = not sub.get("owner_initiated")  # the owner acting directly is not a decision to generalise
+        if learnable and (outcome.get("done") or not approve):
             outcome["learn"] = await self._generalise(business_id, cap, sub, approve)
         await approvals.record_outcome(business_id, approval_id, outcome)
-        await self._relay(business_id, a)
+        if sub.get("conversation_id") and (approve or not sub.get("owner_initiated")):
+            await self._relay(business_id, a)
         if "learn" in outcome:
             await self._offer_to_learn(business_id, a, cap, outcome["learn"], name)
         await emit(
@@ -211,6 +214,13 @@ def _draft_rule(cap: Capability, learn: dict[str, Any], says: str) -> knowledge.
 def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str:
     """Prompt context for the relay turn: what was asked, what the owner decided, what happened."""
     outcome = (decision or {}).get("outcome") or {}
+    if a.subject.get("owner_initiated"):
+        why = f" (reason: “{a.subject['reason']}”)" if a.subject.get("reason") else ""
+        return (
+            "# THE SHOP DECIDED — tell the customer now\n"
+            f"The shop itself did this: {str(a.preview.get('summary', '')).lower()}{why}; status now "
+            f"{outcome.get('status')}. Tell the customer kindly in their language, briefly (action=send)."
+        )
     asked = f"{a.preview.get('label', 'an action').lower()} {a.preview.get('summary', '')}"
     if not outcome.get("approved"):
         result = "The owner decided not to do it. Tell them kindly and offer what is possible instead."
