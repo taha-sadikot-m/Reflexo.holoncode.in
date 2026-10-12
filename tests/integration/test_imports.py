@@ -147,6 +147,10 @@ async def test_excel_import_reviewed_and_applied(registry: Registry, db: Databas
     review = await wait_for(db, run_id, {"review", "failed"})
     assert str(review.status) == "review", review.error
     assert review.stats == {"found": 3, "new": 1, "changed": 1, "unchanged": 0, "needs_review": 1}
+    for _ in range(50):  # status 'review' is set before the activity that sends the summary (race under load)
+        if "prices_oct.xlsx" in (await owner_messages(db, shop))[-1].get("text", ""):
+            break
+        await asyncio.sleep(0.2)
     summary = (await owner_messages(db, shop))[-1]
     body = summary["text"]
     assert "prices_oct.xlsx" in body and "3" not in body.split("\n")[0][:5]
