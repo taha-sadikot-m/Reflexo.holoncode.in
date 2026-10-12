@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import reflexo.knowledge.api as knowledge
 from reflexo.commerce.models import CommerceError, DetailField, ItemRef, OrderLine, OrderView
+from reflexo.common.config import get_settings
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
 from reflexo.common.money import format_inr
@@ -67,6 +68,47 @@ DAY_PARTS = {
 _SLOT_START = re.compile(r"^\s*(\d{1,2})(?::\d{2})?\s*(am|pm)?", re.IGNORECASE)
 
 
+_TIME = r"(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?"
+_RANGE = re.compile(rf"^\s*{_TIME}\s*(?:-|–|to|se)\s*{_TIME}\s*$", re.IGNORECASE)
+_POINT = re.compile(rf"^\s*(?:at\s+)?{_TIME}\s*$", re.IGNORECASE)
+
+
+def _minutes(hour: str, minute: str | None, meridiem: str | None) -> int:
+    h = int(hour) % 12 + (12 if meridiem.lower() == "pm" else 0) if meridiem else int(hour)
+    return h * 60 + int(minute or 0)
+
+
+def time_ranges(text_in: str) -> list[tuple[int, int]]:
+    """Readings of a slot or time as minute ranges: "4pm-8pm", "16:00-20:00", "4-8 pm", "5pm" (a point). Without
+    am/pm anywhere ("4-8", "5") both the 24 h reading and the pm reading are returned."""
+    if m := _RANGE.match(text_in):
+        h1, m1, a1, h2, m2, a2 = m.groups()
+        if a2 and not a1:  # "4-8pm" → 4pm; "10-1pm" → 10am (the start comes before the end)
+            a1 = a2 if int(h1) % 12 <= int(h2) % 12 else ("am" if a2.lower() == "pm" else "pm")
+        start, end = _minutes(h1, m1, a1), _minutes(h2, m2, a2)
+        readings = [(start, end)]
+        if not (a1 or a2) and int(h1) <= 12 and int(h2) <= 12:
+            readings.append((start + 720, end + 720))
+        return [r for r in readings if r[0] < r[1]]
+    if m := _POINT.match(text_in):
+        point = _minutes(*m.groups())
+        return [(point, point)] if m.group(3) or int(m.group(1)) > 12 else [(point, point), (point + 720, point + 720)]
+    return []
+
+
+def _covers(slot: tuple[int, int], wanted: tuple[int, int]) -> bool:
+    if wanted[0] == wanted[1]:  # a point belongs to the slot it starts: "4pm" is 4pm-8pm, not 1pm-4pm
+        return slot[0] <= wanted[0] < slot[1]
+    return slot[0] <= wanted[0] and wanted[1] <= slot[1]
+
+
+def _slot_for_time(value: str, options: list[str]) -> str | None:
+    """The one slot option that `value` names as a time range or falls inside ("16:00-20:00" → "4pm-8pm")."""
+    wanted = time_ranges(value)
+    hits = {option for option in options for r in time_ranges(option) for w in wanted if _covers(r, w)}
+    return hits.pop() if len(hits) == 1 else None
+
+
 def _day_part(slot: str) -> str | None:
     """'4pm-8pm' -> 'evening' (by the slot's start hour)."""
     m = _SLOT_START.match(slot)
@@ -96,7 +138,11 @@ async def _validate_value(
     if field.type == "slot":
         options = {o.lower().replace(" ", ""): o for o in field.options}
         key = str(value).lower().replace(" ", "")
-        if key not in options:  # "evening" / "shaam" -> the one slot in that part of the day, if unambiguous
+        if key not in options:
+            # the same time written differently ("16:00-20:00", "4-8 pm", "5pm") → the slot that covers it
+            if by_time := _slot_for_time(str(value), field.options):
+                return by_time, None
+            # "evening" / "shaam" -> the one slot in that part of the day, if unambiguous
             part = next((p for p, words in DAY_PARTS.items() if key in words), None)
             matches = [o for o in field.options if part and _day_part(o) == part]
             if len(matches) == 1:
@@ -485,13 +531,17 @@ async def get_order(business_id: UUID, order_id: UUID) -> OrderView | None:
 
 
 async def open_order(business_id: UUID, customer_id: UUID) -> OrderView | None:
-    """The customer's order still in progress (draft or awaiting payment): what the next turn continues."""
+    """The customer's order still in progress: what the next turn continues. A draft idle for `draft_idle_hours`
+    is an abandoned cart, not "in progress" (live: today's truffle was added to yesterday's forgotten draft and
+    the merged total broke the COD limit). Awaiting payment stays open: the customer holds a live payment link."""
     async with get_db().tenant_session(business_id) as s:
         oid = (
             await s.execute(
-                text("""SELECT id FROM orders WHERE customer_id = :c AND status IN ('draft', 'awaiting_payment')
+                text("""SELECT id FROM orders WHERE customer_id = :c
+                          AND (status = 'awaiting_payment'
+                               OR (status = 'draft' AND updated_at > now() - make_interval(hours => :idle)))
                         ORDER BY created_at DESC LIMIT 1"""),
-                {"c": customer_id},
+                {"c": customer_id, "idle": get_settings().draft_idle_hours},
             )
         ).scalar_one_or_none()
         return await view(s, oid) if oid else None

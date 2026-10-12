@@ -8,13 +8,14 @@ from __future__ import annotations
 from uuid import UUID
 
 from reflexo.commerce import payments
-from reflexo.commerce.models import CommerceError, ConfirmResult, ItemRef, OrderView, PaymentMethod
+from reflexo.commerce.models import CUSTOMER_ENTERED, CommerceError, ConfirmResult, ItemRef, OrderView, PaymentMethod
 from reflexo.commerce.orders import get_order, open_order, order_status, start_order, update_order
 from reflexo.commerce.payments import CommerceViews, apply_paid, confirm_order, grounding_amounts
 from reflexo.common.contracts import CommerceViewsPort, JobHandlerRegistry, JobRow
 from reflexo.common.ports import Registry
 
 __all__ = [
+    "CUSTOMER_ENTERED",
     "CommerceError",
     "ConfirmResult",
     "ItemRef",

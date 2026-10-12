@@ -119,4 +119,4 @@ class GroundingRecords(BaseModel):
     allowed_phones: set[str] = Field(default_factory=set)  # digits only
     allowed_emails: set[str] = Field(default_factory=set)
     block_offering_ids: set[str] = Field(default_factory=set)  # offerings that product/carousel blocks may show
-    open_order_status: str | None = None  # the customer's order still in progress (draft / awaiting_payment)
+    known_numbers: set[str] = Field(default_factory=set)  # plain numbers the system showed the model this turn

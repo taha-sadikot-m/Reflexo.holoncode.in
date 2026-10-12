@@ -7,17 +7,19 @@ archived a second ago simply does not resolve.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from urllib.parse import urlparse
 from uuid import UUID
 
 import reflexo.commerce.api as commerce
 import reflexo.knowledge.api as knowledge
-from reflexo.agent.output_gate import extract_amounts
+from reflexo.agent.output_gate import extract_amounts, stated_amounts
 from reflexo.agent.schemas import AgentOutput, GroundingRecords
 from reflexo.common.blocks import CarouselBlock, OrderSummaryBlock, PaymentLinkBlock, ProductBlock
 
 _DISCOUNT_HINT = re.compile(r"%|discount|off\b|chhoot|छूट", re.IGNORECASE)
 _NUMBERS = re.compile(r"\d+")
+_GROUPED_NUMBERS = re.compile(r"\d[\d,]*\d|\d")  # "1,100" stays one number
 PROFILE_SECTIONS = {"about", "hours", "delivery", "policies", "payments", "contact", "profile"}
 
 
@@ -36,9 +38,16 @@ async def hydrate(
     customer_phone: str | None,
     business_phone: str | None = None,
     wa_display_number: str | None = None,
+    trusted_texts: Sequence[str] = (),
 ) -> GroundingRecords:
+    """`trusted_texts`: what the business data and our tools told the model this turn (never the customer's own
+    words). Their amounts are facts even when the model does not list a record for them — provenance, not
+    citation: live, "COD only up to ₹1,500" from order_confirm's decline was refused and the turn fell back."""
     rec = GroundingRecords(business_id=business_id)
     refs = [(r.type, r.id) for r in output.referenced_records]
+    for fact in trusted_texts:
+        rec.amounts_paise |= stated_amounts(fact)
+        rec.known_numbers |= {n.replace(",", "") for n in _GROUPED_NUMBERS.findall(fact)}
 
     # ---- catalogue: offerings, variants, and offerings shown in product/carousel blocks
     block_ids: set[UUID] = set()
@@ -111,12 +120,6 @@ async def hydrate(
     block_links = {str(b.payment_link_id) for b in output.blocks if isinstance(b, PaymentLinkBlock)}
     order_ids = {u for t, i in refs if t == "order" and (u := _uuid(i))} | {UUID(i) for i in block_orders}
     link_ids = {u for t, i in refs if t == "payment_link" and (u := _uuid(i))} | {UUID(i) for i in block_links}
-    # The customer's own in-progress order is live state of this conversation (OPEN ORDER block, tool results):
-    # its amounts back the read-back even when the model forgets to list it (live: total ₹1,100 "not grounded").
-    in_progress = await commerce.open_order(business_id, customer_id) if customer_id is not None else None
-    if in_progress is not None:
-        rec.open_order_status = str(in_progress.status)
-        order_ids.add(in_progress.order_id)
     commerce_facts = await commerce.grounding_amounts(business_id, list(order_ids), list(link_ids))
     rec.amounts_paise |= commerce_facts["amounts"]
     rec.allowed_urls |= commerce_facts["urls"]

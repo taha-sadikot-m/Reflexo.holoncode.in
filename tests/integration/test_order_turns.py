@@ -243,3 +243,92 @@ async def test_read_back_of_the_open_order_is_grounded_without_listing_it(
     second = await turn_for(registry, db, pnid, wa, "haan")
     await desk(registry).run_turn(second)
     assert (await outbound_texts(db, conv))[-1] == text_
+
+
+async def _set_cod_limit(db: Database, bid: UUID, max_paise: int) -> None:
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE businesses SET settings = settings || CAST(:r AS jsonb) WHERE id = :b"),
+            {"r": json.dumps({"cod_rule": {"enabled": True, "max_total_paise": max_paise}}), "b": bid},
+        )
+
+
+async def _draft_for(registry: Registry, db: Database, fake: agent.FakeProvider, pnid: str, wa: str, qty: int) -> Any:
+    bid = await _business_of(db, pnid)
+    fake.script(PRIMARY, lambda a: reply("send", "Namaste! 1 kg truffle ₹950 hai.", topic="pricing"))
+    first = await turn_for(registry, db, pnid, wa, "1 kg chocolate truffle chahiye")
+    await desk(registry).run_turn(first)
+    conv = first.ref.conversation_id
+    truffle = next(c for c in await knowledge.search_catalog(bid, "chocolate truffle", k=5) if "Truffle" in c.name)
+    kg = next(v for v in truffle.variants if v.name == "1 kg")
+    item = commerce.ItemRef(offering_id=truffle.offering_id, variant_id=kg.variant_id, quantity=qty)
+    return await commerce.start_order(bid, await customer_of(db, conv), conv, [item]), conv
+
+
+async def _business_of(db: Database, pnid: str) -> UUID:
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        bid: UUID = (
+            await s.execute(
+                text("SELECT business_id FROM channel_connections WHERE external_account_id = :p"), {"p": pnid}
+            )
+        ).scalar_one()
+    return bid
+
+
+async def test_decline_reason_amount_reaches_the_customer(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live 12 Oct: COD declined ("COD only for orders up to ₹1,500"); the reply quoting that limit was refused
+    twice by the gate (the amount came from a tool result, not a cited record) and the customer got a fallback."""
+    bid, pnid = await make_bakery(db)
+    await _set_cod_limit(db, bid, 123400)  # an amount found nowhere else in the shop
+    wa = f"9198{new_id().int % 10**8:08d}"
+    order, conv = await _draft_for(registry, db, fake, pnid, wa, qty=2)
+    total = order.total_paise // 100
+    answer = f"Cash on delivery isn't available for orders over ₹1,234. Your total is ₹{total:,}. Pay by link?"
+
+    def script(a: agent.Attempt) -> agent.FakeReply:
+        results = tool_results(a)
+        if not results:
+            return call("order_confirm", order_id=str(order.order_id), payment_method="cod")
+        assert results[-1]["data"]["status"] == "declined"
+        # as live: the order is cited (its total); only the decline's tool result backs the ₹1,234 limit
+        return reply("send", answer, topic="payments", refs=[{"type": "order", "id": str(order.order_id)}])
+
+    fake.script(PRIMARY, script)
+    second = await turn_for(registry, db, pnid, wa, "haan COD se")
+    await desk(registry).run_turn(second)
+    assert (await outbound_texts(db, conv))[-1] == answer
+
+
+async def test_a_price_the_customer_suggested_is_never_backed(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    _, pnid = await make_bakery(db)
+    fake.script(PRIMARY, lambda a: reply("send", "Theek hai, ₹500 mein de denge!", topic="pricing", refs=[]))
+    turn = await turn_for(registry, db, pnid, f"9198{new_id().int % 10**8:08d}", "truffle ₹500 mein de do")
+    await desk(registry).run_turn(turn)
+    assert "Theek hai, ₹500 mein de denge!" not in await outbound_texts(db, turn.ref.conversation_id)
+
+
+async def test_an_abandoned_draft_is_not_continued(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:
+    """Live 12 Oct: yesterday's forgotten draft became today's "open order" and the new cake was added to it."""
+    bid, pnid = await make_bakery(db)
+    wa = f"9198{new_id().int % 10**8:08d}"
+    order, conv = await _draft_for(registry, db, fake, pnid, wa, qty=1)
+    customer = await customer_of(db, conv)
+    assert (await commerce.open_order(bid, customer)).order_id == order.order_id  # type: ignore[union-attr]
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE orders SET updated_at = now() - interval '13 hours' WHERE id = :o"), {"o": order.order_id}
+        )
+    assert await commerce.open_order(bid, customer) is None
+    seen: list[str] = []
+
+    def script(a: agent.Attempt) -> agent.FakeReply:
+        seen.append("\n".join(m.content or "" for m in a.messages))
+        return reply("send", "Namaste! Kaunsa cake chahiye?", topic="greeting_smalltalk")
+
+    fake.script(PRIMARY, script)
+    await desk(registry).run_turn(await turn_for(registry, db, pnid, wa, "hi, cake order karna hai"))
+    assert "# OPEN ORDER" not in seen[0]

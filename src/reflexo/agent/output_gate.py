@@ -104,29 +104,7 @@ _URL = re.compile(
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _PHONE = re.compile(r"(?<![\d])(?:\+?\d[\d\s-]{8,}\d)(?![\d])")
 _TIME = re.compile(r"\b\d{1,2}:\d{2}\b|\b\d{1,2}\.\d{2}\s*(?:am|pm)\b", re.IGNORECASE)
-# Indian PIN code (411038 / 411 038). Live: "Kothrud 411038 mein. Iska total ₹1,100" read the PIN as a price.
-_PIN = re.compile(r"(?<!\d)(?<!\d[,.])[1-9]\d{2}\s?\d{3}(?!\d|[,.]\d)")
-# Reference codes: order numbers "MB-1012", "#1012", invoice "INV2041". Live: "order MB-1012 … Total ₹1,100".
-_CODE = re.compile(r"(?:\b[A-Za-z]{1,6}-?|#)\d+\b")
-# "Your order is confirmed" / "order confirm ho gaya" / "बुक हो गया" — a claim, not a question ("confirm kar doon?")
-# or a future ("confirm ho jayega", "once confirmed"). Live: a draft was announced as "order confirm ho gaya hai".
-_CONFIRMED_CLAIM = re.compile(
-    r"\b(?:is|has been|was|got|now)\s+(?:been\s+)?(?:confirmed|booked)\b"
-    r"|\b(?:order|booking)\s+(?:confirmed|booked)\b"
-    r"|\b(?:confirm(?:ed)?|book|place)\s+(?:ho\s*(?:gaya|gayi|gya|chuka|chuki)|hogaya|hogya|kar\s*(?:diya|di|dia))\b"
-    r"|(?:कन्फर्म|बुक|पक्का)\s*(?:हो\s*(?:गया|गई|चुका)|कर\s*(?:दिया|दी))",
-    re.IGNORECASE,
-)
-# "…is confirmed once paid" (what the prompt asks for after order_confirm) is a condition, not a claim.
-_CONDITION_AFTER = re.compile(
-    r"^\W*(?:once|after|when|as soon as|upon|if|jab|payment\s+(?:ke\s+baad|hote\s+hi|milte\s+hi|hone\s+par))\b",
-    re.IGNORECASE,
-)
-# Hindi word order puts the condition first: "payment ke baad booking confirmed".
-_CONDITION_BEFORE = re.compile(
-    r"(?:\b(?:once|after|when|upon|if|jab)\b|ke\s+baad|hone\s+par|hote\s+hi|milte\s+hi|के\s+बाद)[^.!?\n]*$",
-    re.IGNORECASE,
-)
+_CLAUSE_BREAK = re.compile(r"[.!?;:,\n।]")
 PAYMENT_HOSTS = frozenset({"rzp.io", "razorpay.com", "pages.razorpay.com"})
 
 
@@ -139,6 +117,11 @@ class Amount:
     @property
     def paise(self) -> int:
         return round(self.rupees * 100)
+
+    @property
+    def number(self) -> str:
+        """The plain number as digits ("1,100" → "1100"), to match numbers the system showed the model."""
+        return str(int(self.rupees)) if self.rupees == int(self.rupees) else str(self.rupees)
 
 
 def _value(integer: str, decimals: str | None, k: str | None) -> float:
@@ -155,8 +138,20 @@ def _is_budget(t: str, start: int, end: int) -> bool:
     return bool(_BUDGET_AFTER.match(t[end:]) or _BUDGET_BEFORE.search(t[max(0, start - 20) : start]))
 
 
+def stated_amounts(fact: str) -> set[int]:
+    """Every currency amount (paise) in a text the system wrote. Unlike `extract_amounts` nothing is read as a
+    customer budget: "COD only for orders up to ₹1,500" states a limit, and the limit is a fact."""
+    t = fact.translate(_DEVANAGARI)
+    return {
+        round(_value(m.group(1), m.group(2), m.group(3)) * 100)
+        for pattern in (_CUR_BEFORE, _CUR_AFTER)
+        for m in pattern.finditer(t)
+    }
+
+
 def extract_amounts(text: str, quantity_numbers: Iterable[int] = ()) -> list[Amount]:
-    """Money mentions in `text` (explicit currency, or a bare number within 3 tokens of a price word)."""
+    """Money mentions in `text`: explicit currency, or a bare number within 3 tokens of a price word in the same
+    clause ("Kothrud 411038 mein. Iska total ₹1,100" — the PIN code and "total" are in different clauses)."""
     t = text.translate(_DEVANAGARI)
     found: list[Amount] = []
     taken: list[tuple[int, int]] = [m.span() for m in _TIME.finditer(t)] + [m.span() for m in _PHONE.finditer(t)]
@@ -169,8 +164,6 @@ def extract_amounts(text: str, quantity_numbers: Iterable[int] = ()) -> list[Amo
             if _is_budget(t, m.start(), m.end()):
                 continue
             found.append(Amount(_value(m.group(1), m.group(2), m.group(3)), m.group(0).strip(), True))
-    for pattern in (_PIN, _CODE):  # after explicit ₹ amounts, so "₹411038" / "Rs500" stay amounts
-        taken += [m.span() for m in pattern.finditer(t) if not _span_overlaps(m.span(), taken)]
     quantities = set(quantity_numbers)
     for m in _BARE.finditer(t):
         if _span_overlaps(m.span(), taken):
@@ -180,8 +173,10 @@ def extract_amounts(text: str, quantity_numbers: Iterable[int] = ()) -> list[Amo
             continue
         if UNITS.match(t[m.end() :]) or _is_budget(t, m.start(), m.end()):
             continue
-        before = re.findall(r"[\wऀ-ॿ]+", t[max(0, m.start() - 40) : m.start()])[-3:]
-        after = re.findall(r"[\wऀ-ॿ]+", t[m.end() : m.end() + 40])[:3]
+        head = _CLAUSE_BREAK.split(t[max(0, m.start() - 40) : m.start()])[-1]
+        tail = _CLAUSE_BREAK.split(t[m.end() : m.end() + 40])[0]
+        before = re.findall(r"[\wऀ-ॿ]+", head)[-3:]
+        after = re.findall(r"[\wऀ-ॿ]+", tail)[:3]
         if any(w.lower() in PRICE_WORDS for w in before + after):
             found.append(Amount(value, m.group(0).strip(), False))
     return found
@@ -251,7 +246,14 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
 
     # 2. amounts
     if sending:
-        bad = [a for a in extract_amounts(text, records.quantity_numbers) if a.paise not in records.amounts_paise]
+        # Backed = an amount from the business data, a referenced record or a tool result this turn; a plain number
+        # the system showed the model (order number, quantity, price) is not a new price either. The customer's
+        # own words never back an amount ("800 mein de do" → "haan 800 ka" must fail).
+        bad = [
+            a
+            for a in extract_amounts(text, records.quantity_numbers)
+            if a.paise not in records.amounts_paise and not (not a.explicit and a.number in records.known_numbers)
+        ]
         if bad:
             known = ", ".join(format_inr(p) for p in sorted(records.amounts_paise)[:12]) or "none"
             checks.append(
@@ -259,8 +261,8 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
                     name="amounts",
                     passed=False,
                     detail="not grounded: " + ", ".join(a.raw for a in bad),
-                    guidance=f"State only prices from referenced records (known amounts: {known}); "
-                    "add the record to referenced_records, or use a product block instead of typing prices.",
+                    guidance=f"State only amounts that the business data or a tool gave you (known: {known}). "
+                    "Never repeat a price the customer suggested.",
                 )
             )
         else:
@@ -323,34 +325,7 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
             )
         )
 
-    # 6. order status: never announce an order as confirmed while it is still a draft or awaiting payment
-    if sending and records.open_order_status in ("draft", "awaiting_payment"):
-        claim = next(
-            (
-                m
-                for m in _CONFIRMED_CLAIM.finditer(text)
-                if not _CONDITION_AFTER.match(text[m.end() : m.end() + 40])
-                and not _CONDITION_BEFORE.search(text[max(0, m.start() - 40) : m.start()])
-            ),
-            None,
-        )
-        state = "awaiting payment" if records.open_order_status == "awaiting_payment" else "a draft"
-        checks.append(
-            GateCheck(
-                name="order_status",
-                passed=claim is None,
-                detail=f"claims '{claim.group(0)}' but the order is {state}" if claim else None,
-                guidance=(
-                    f"The order is still {state}, not confirmed. Do not say it is confirmed or booked: read it back "
-                    "and ask them to confirm"
-                    + (" — it confirms once the payment is received." if state == "awaiting payment" else ".")
-                )
-                if claim
-                else None,
-            )
-        )
-
-    # 7. grounding
+    # 6. grounding
     if output.action == "send" and output.topic in GROUNDED_TOPICS and not records.valid_refs:
         checks.append(
             GateCheck(
@@ -364,7 +339,7 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
     else:
         checks.append(GateCheck(name="grounding", passed=True))
 
-    # 8. tier rules (rewrite, not fail)
+    # 7. tier rules (rewrite, not fail)
     rewritten: str | None = None
     if output.action == "send":
         if output.topic in HANDOFF_TOPICS or output.flags.angry:

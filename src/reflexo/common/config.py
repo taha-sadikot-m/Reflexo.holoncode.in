@@ -127,7 +127,12 @@ class Settings(BaseSettings):
     # knowledge / search (POC_05 §6)
     search_k: int = 5
     search_trgm_threshold: float = Field(default=0.3, ge=0.05, le=1.0)
-    speculative_budget_ms: int = 120
+    # Ceiling, not a target: prepare waits for the other context loads anyway (~200 ms in a live turn), and a miss
+    # costs a whole extra model call. Live: a 120 ms cap timed out at 125 ms while prepare took 209 ms.
+    speculative_budget_ms: int = 800
+
+    # orders
+    draft_idle_hours: int = 12  # an unfinished draft untouched this long is abandoned; a new chat starts fresh
 
     # Seed identities (used by scripts/seed.py; real values come from .env)
     seed_owner_wa_e164: str = "+919999900000"

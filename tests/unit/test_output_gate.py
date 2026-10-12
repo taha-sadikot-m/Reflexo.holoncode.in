@@ -66,7 +66,6 @@ TRUFFLE = uuid4()
         ("Pune 411 038, total ₹1,100", [1100]),
         ("total ₹411038", [411038]),  # with a currency marker it is an amount and still checked
         ("Aapka order MB-1012 draft ho gaya hai. Total ₹1,100", [1100]),  # live: order number read as a price
-        ("order #1012 ka total ₹1,100", [1100]),
         ("Total Rs500 only", [500]),
     ],
 )
@@ -224,37 +223,14 @@ def test_discount_phrasings_are_caught(text: str) -> None:
     assert "discounts" in failed(check(out(text), records(amounts_paise={10000, 5000, 20000, 1500})))
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Aapka order confirm ho gaya hai 🎂",  # live: said about a draft
-        "Your order is confirmed!",
-        "Order confirmed, thank you",
-        "Cake book ho gaya hai",
-        "Maine order confirm kar diya hai",
-        "आपका ऑर्डर कन्फर्म हो गया है",
-    ],
-)
-def test_confirmed_claim_on_an_unconfirmed_order_fails(text: str) -> None:
-    for status in ("draft", "awaiting_payment"):
-        r = check(out(text, topic="booking_appointments"), records(open_order_status=status))
-        assert failed(r) == ["order_status"], (text, status)
-    assert check(out(text, topic="booking_appointments"), records(open_order_status=None)).passed  # really confirmed
+def test_numbers_the_system_showed_are_not_new_prices() -> None:
+    text = "Order 1012 ka total ₹950 hai"  # the order number sits next to "ka"
+    assert check(out(text), records(known_numbers={"1012"})).passed
+    assert failed(check(out(text), records())) == ["amounts"]
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Kya main order confirm kar doon?",
-        "Payment ke baad order confirm ho jayega",
-        "Once confirmed, we will start baking",
-        "Order abhi confirm nahi hua hai",
-        "Your order is not confirmed yet",
-        "Please confirm the order: Truffle 1 kg ₹950",
-        "Here is your payment link — your order is confirmed once paid.",  # what the prompt asks for
-        "Order confirm ho jayega, payment ke baad booking confirmed",
-        "Your order is confirmed as soon as the payment arrives",
-    ],
-)
-def test_asking_to_confirm_is_not_a_claim(text: str) -> None:
-    assert check(out(text, topic="booking_appointments"), records(open_order_status="draft")).passed, text
+def test_amount_from_a_tool_result_is_backed_without_a_reference() -> None:
+    # live: order_confirm declined with "COD only for orders up to ₹1,500"; the reply quoted it and was refused
+    text = "COD sirf ₹1,500 tak ke orders pe hai, aapka total ₹1,800 hai. Payment link bhej doon?"
+    assert failed(check(out(text, topic="payments"), records())) == ["amounts"]
+    assert check(out(text, topic="payments"), records(amounts_paise={150000, 180000})).passed

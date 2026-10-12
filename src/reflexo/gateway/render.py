@@ -153,7 +153,9 @@ class Renderer:
             return self._carousel(views)
         if isinstance(b, PaymentLinkBlock):
             link = await self._need_hydrator().payment_link(business_id, b.payment_link_id)
-            text = f"{link.description}\nAmount: {link.amount_display}"
+            # the status is stated by the card itself, not left to the model's sentence (live: "your order is
+            # confirmed!" next to a link that had not been paid)
+            text = f"{link.description}\nAmount: {link.amount_display}\n⏳ Confirms automatically once paid"
             self._text.append(f"{text}\n{link.url}")
             if self.m.link_button:
                 return [IRLink(text, link.url, "Pay now")]

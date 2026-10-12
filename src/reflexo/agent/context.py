@@ -22,6 +22,7 @@ import reflexo.knowledge.api as knowledge
 from reflexo.agent import language as lang
 from reflexo.agent import prompts
 from reflexo.agent.tools.customer import card_json
+from reflexo.agent.tools.orders import STATUS_MEANING
 from reflexo.common.contracts import TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.timeutil import to_business_tz, utcnow
@@ -45,6 +46,10 @@ class PreparedContext:
     open_question: dict[str, Any] | None = None  # owner question still unanswered for this conversation
     recent_lines: list[str] = field(default_factory=list)  # last messages, formatted (owner notifications)
     relay: dict[str, Any] | None = None  # relay turn: the owner's answer to pass on (question, answer, qa id)
+    # What the business/system told the model this turn (profile, zones, Q&A, cards, open order without the
+    # customer's own words, the owner's relayed answer). The output gate trusts amounts from here; never from
+    # the customer's messages or from the rules prompt's illustrative examples.
+    trusted_facts: str = ""
 
 
 def _fmt_message(m: gateway.MessageView, tz: str) -> str:
@@ -158,7 +163,7 @@ async def build_context(
     default_language = customer.language if customer and customer.language else settings.get("default_language")
     language_guess = lang.detect(inbound_text, default=str(default_language or "hi-Latn"))
     now_local = to_business_tz(utcnow(), tz)
-    order_view = order.tool_view() if order else None
+    order_view = {**order.tool_view(), "status_meaning": STATUS_MEANING.get(order.status)} if order else None
     open_order_block = (
         "# OPEN ORDER (in progress — use this order_id with the order tools; reference it as order:<order_id>)\n"
         + json.dumps(order_view, ensure_ascii=False)
@@ -231,7 +236,27 @@ async def build_context(
         open_question=open_question,
         relay=relay,
         recent_lines=[_fmt_message(m, tz) for m in [*history, *inbound]][-6:],
+        trusted_facts="\n".join(
+            [
+                profile.text,
+                "\n".join(z.label for z in biz_profile.delivery.zones),
+                qa_lines,
+                json.dumps(cards, ensure_ascii=False),
+                json.dumps(without_customer_words(order_view), ensure_ascii=False) if order_view else "",
+                relay["answer"] if relay else "",
+                f"{now_local.strftime('%a %d %b %Y, %H:%M')} {_upcoming_days(now_local)}",
+            ]
+        ),
     )
+
+
+def without_customer_words(value: Any) -> Any:
+    """A tool/order payload minus the parts that echo the customer's own input (commerce.CUSTOMER_ENTERED)."""
+    if isinstance(value, dict):
+        return {k: without_customer_words(v) for k, v in value.items() if k not in commerce.CUSTOMER_ENTERED}
+    if isinstance(value, list):
+        return [without_customer_words(v) for v in value]
+    return value
 
 
 async def _none() -> None:

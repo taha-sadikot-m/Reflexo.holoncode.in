@@ -64,9 +64,25 @@ async def _open_order_id(ctx: ToolContext, value: str) -> UUID:
     return current.order_id
 
 
+# What each status means to the customer — the model describes the order from this, never from its own guess
+# (live: "your order is confirmed!" while it was awaiting payment).
+STATUS_MEANING = {
+    "draft": "not placed yet — still being put together with the customer",
+    "awaiting_payment": "not confirmed yet — it confirms automatically when the payment arrives",
+    "confirmed": "confirmed",
+    "preparing": "confirmed and being prepared",
+    "out_for_delivery": "on its way to the customer",
+    "delivered": "delivered",
+    "cancelled": "cancelled",
+}
+
+
 def _guide(view: commerce.OrderView) -> dict[str, Any]:
     out = view.tool_view()
+    out["status_meaning"] = STATUS_MEANING.get(view.status, view.status)
     out["reference"] = {"type": "order", "id": str(view.order_id)}
+    if view.status != "draft":
+        return out  # past the draft stage the next step depends on what just happened: the caller says it
     if view.detail_errors:
         out["next"] = (
             "Some details were not accepted (see not_accepted and its guidance): explain why in one line, offer the "
@@ -163,8 +179,8 @@ async def order_confirm(ctx: ToolContext, args: OrderConfirmArgs, s: AsyncSessio
     if result.status == "awaiting_payment" and result.payment_link_id:
         out["reference"] = {"type": "payment_link", "id": str(result.payment_link_id)}
         out["next"] = (
-            "Send a payment_link block with this payment_link_id (never type the URL) and say the order is "
-            "confirmed as soon as the payment goes through."
+            "Send a payment_link block with this payment_link_id (never type the URL). The order now waits for this "
+            "payment (see status_meaning): ask them to pay with the link."
         )
     elif result.status == "confirmed":
         out["next"] = "Send an order_summary block for this order_id and thank the customer."

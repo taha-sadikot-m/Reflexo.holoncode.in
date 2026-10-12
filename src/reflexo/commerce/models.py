@@ -77,7 +77,8 @@ class OrderView(BaseModel):
     detail_errors: list[dict[str, Any]] = Field(default_factory=list)
 
     def tool_view(self) -> dict[str, Any]:
-        """Compact view for the model: displays only, ids for references."""
+        """Compact view for the model: displays only, ids for references. Keys in CUSTOMER_ENTERED echo what the
+        customer typed (address, message on cake, rejected values); everything else is computed by us."""
         return {
             "order_id": str(self.order_id),
             "order_number": self.order_number,
@@ -98,6 +99,9 @@ class OrderView(BaseModel):
             ],
             **({"not_accepted": self.detail_errors} if self.detail_errors else {}),
         }
+
+
+CUSTOMER_ENTERED = frozenset({"details", "not_accepted"})  # tool_view keys holding the customer's own words
 
 
 class ConfirmResult(BaseModel):

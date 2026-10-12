@@ -19,7 +19,7 @@ from langgraph.graph.message import add_messages
 from pydantic import ValidationError
 
 from reflexo.agent import grounding, output_gate
-from reflexo.agent.context import PreparedContext
+from reflexo.agent.context import PreparedContext, without_customer_words
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.model_gateway.langchain import GatewayChatModel
 from reflexo.agent.schemas import AgentOutput, GateResult
@@ -166,6 +166,20 @@ def route_after_step(state: CustomerState) -> str:
     return END if state.get("result") == "fallback" else "model"
 
 
+def _tool_facts(state: CustomerState) -> list[str]:
+    """This turn's tool results as the gate may trust them: our tools' data minus the customer's echoed words.
+    Repair/nudge feedback (name "reply") is not a fact — it quotes the very amounts that were refused."""
+    facts = []
+    for m in state["messages"]:
+        if isinstance(m, ToolMessage) and m.name != "reply":
+            try:
+                payload = json.loads(str(m.content))
+            except ValueError:
+                continue
+            facts.append(json.dumps(without_customer_words(payload), ensure_ascii=False))
+    return facts
+
+
 async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, Any]:
     deps = _deps(config)
     ai = _last_ai(state)
@@ -201,6 +215,7 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         customer_id=customer.id if customer else None,
         customer_phone=customer.phone_e164 if customer else None,
         wa_display_number=deps.wa_display_number,
+        trusted_texts=[p.trusted_facts, *_tool_facts(state)],
     )
     result: GateResult = output_gate.check(output, records)
     await emit(
