@@ -193,7 +193,9 @@ async def test_failed_turn_while_owner_question_open_does_not_ask_again(
     first = await turn_for(registry, db, pnid, wa, "sugar free cake milta hai?")
     await desk(registry).run_turn(first)
     kind, body = notes.sent[0]
-    assert kind == "question" and "👤" in body and "💬 Recent:" in body and "sugar free cake milta hai?" in body
+    assert kind == "question" and "👤" in body and "Do we make sugar-free cakes?" in body
+    assert "Recent:" not in body  # a colleague's message, not a transcript dump (POC_10 §8)
+    assert ("chat:" + str(first.ref.conversation_id), "💬 Show chat") in notes.buttons[0]
 
     down = agent.FakeReply(error=agent.ModelError("PROVIDER_UNAVAILABLE", "503"))
     fake.script(PRIMARY, lambda a: down)

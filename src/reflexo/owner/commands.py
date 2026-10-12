@@ -24,6 +24,7 @@ from reflexo.common.db import get_db
 from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
+from reflexo.common.timeutil import to_business_tz
 from reflexo.common.xray import emit
 from reflexo.owner.notify import notification_for_reply
 
@@ -32,6 +33,7 @@ _ANSWER = re.compile(r"^\s*(\d{4})\s*[:.\-–]?\s+(\S.*)$", re.DOTALL)
 _OPTION = re.compile(r"^(oq|oqs):([0-9a-f-]{36}):(.+)$")
 _APPROVAL_BUTTON = re.compile(r"^apv:([0-9a-f-]{36}):([ar])$")
 _LEARN_BUTTON = re.compile(r"^lrn:([0-9a-f-]{36}):([gco])$")  # learn from a decision: global / customer / once
+_CHAT_BUTTON = re.compile(r"^chat:([0-9a-f-]{36})$")  # "💬 Show chat" under an owner message
 _YES = r"(?:yes|y|haan|han|ha|ok|okay|confirm|done|theek hai|kar do)"
 _NO = r"(?:no|n|nahi|nahin|cancel|mat karo|rehne do)"
 _DECIDE_CODE = re.compile(rf"^\s*({_YES}|{_NO})\s*[,:]?\s*(\d{{4}})\s*[.!]*\s*$", re.IGNORECASE)
@@ -121,6 +123,9 @@ class OwnerCommands:
             )
             await say(learned)
             return "learning"
+        if option_id and (m := _CHAT_BUTTON.match(option_id)):
+            await say(await recent_chat(business_id, UUID(m.group(1))))
+            return "chat"
         if (m := _DECIDE_CODE.match(body)) is not None:
             approve = re.fullmatch(_YES, m.group(1), re.IGNORECASE) is not None
             if await self._decide(say, business_id, member_id, approve, code=m.group(2)):
@@ -342,3 +347,17 @@ async def _question(
         "options": row.options,
         "customer_name": row.display_name,
     }
+
+
+async def recent_chat(business_id: UUID, conversation_id: UUID, limit: int = 8) -> str:
+    """The last messages of a customer conversation, on demand (the owner tapped 💬 Show chat)."""
+    settings = await knowledge.business_settings(business_id)
+    tz = str(settings.get("timezone") or "Asia/Kolkata")
+    async with get_db().tenant_session(business_id) as s:
+        messages = await gateway.recent_messages(s, conversation_id, limit=limit)
+    who = {"customer": "👤", "ai": "🤖", "system": "🤖", "owner": "🧑‍🍳", "team": "🧑‍🍳"}
+    lines = [
+        f"{to_business_tz(m.created_at, tz).strftime('%H:%M')} {who.get(m.author, '•')} {(m.text or '[media]')[:300]}"
+        for m in messages
+    ]
+    return "💬 Last messages:\n" + "\n".join(lines) if lines else "No messages yet."

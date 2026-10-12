@@ -201,7 +201,12 @@ async def test_owner_answer_on_telegram_is_relayed_saved_and_reused(
     [note] = await owner_messages(db, shop)
     assert f"Question {code}" in note["text"] and "Eggless option hai?" in note["text"]
     keyboard = [b[0]["callback_data"] for b in note["reply_markup"]["inline_keyboard"]]
-    assert keyboard == [f"o:oq:{question.id}:0", f"o:oq:{question.id}:1", f"o:oq:{question.id}:later"]
+    assert keyboard == [
+        f"o:oq:{question.id}:0",
+        f"o:oq:{question.id}:1",
+        f"o:oq:{question.id}:later",
+        f"o:chat:{conv}",  # the conversation is one tap away, never pasted in
+    ]
     [sla] = await q(
         db,
         "SELECT run_after > now() + interval '10 minutes' AS later FROM jobs WHERE dedupe_key = :k",
@@ -339,3 +344,13 @@ async def test_undo_pause_resume_help(registry: Registry, db: Database, fake: ag
         tg=shop.tg,
     )
     assert turns == []
+
+
+async def test_show_chat_button_brings_the_conversation_on_demand(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    shop = await bakery(db)
+    handle, _ = await asked(registry, db, fake, shop, wa_number())
+    await owner_says(registry, db, shop, callback=f"chat:{handle.ref.conversation_id}")
+    last = (await owner_messages(db, shop))[-1]["text"]
+    assert last.startswith("💬 Last messages") and "Eggless option hai?" in last

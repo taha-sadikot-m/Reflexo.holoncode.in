@@ -328,7 +328,17 @@ class CustomerDesk:
             model_calls=ctx.stats.model_calls,
             hedged=ctx.stats.hedged,
         )
-        await self._notify(ref.business_id, action, conv, customer, prepared.inbound_text, draft, question, prepared)
+        await self._notify(
+            ref.business_id,
+            action,
+            conv,
+            customer,
+            prepared.inbound_text,
+            draft,
+            question,
+            prepared,
+            brief=output.owner_brief if output else None,
+        )
 
     async def _notify(
         self,
@@ -340,18 +350,28 @@ class CustomerDesk:
         draft: OwnerQuestionDraft | None,
         question: tuple[UUID, str] | None,
         prepared: PreparedContext | None,
+        *,
+        brief: str | None = None,
     ) -> None:
+        """Owner messages read like a colleague (POC_10 §8): what is needed, the agent's brief, one compact facts
+        line — no transcript; [💬 Show chat] fetches the last messages only if the owner wants them."""
         notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
         if notifier is None or action not in ("handoff", "ask_owner", "fallback"):
             return
-        context = owner_context(conv, customer, prepared)
+        facts = owner_context(conv, customer, prepared)
+        name = customer.display_name or "A customer"
+        note = f"\n{brief.strip()}" if brief and brief.strip() else ""
+        show_chat = (f"chat:{conv.id}", "💬 Show chat")
         if question and draft:
             qid, code = question
             guess = f"\nMy guess: {draft.ai_guess}" if draft.ai_guess else ""
-            why = "I couldn't handle this message myself." if action == "fallback" else "I don't have this answer."
-            body = f'❓ *Question {code}* — {why}\n"{draft.question}"{guess}\n\n{context}\n\nReply: `{code} <answer>`'
+            if action == "fallback":
+                head = f'❓ *Question {code}* — {name} wrote: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
+            else:
+                head = f"❓ *Question {code}* — {draft.question}{note}{guess}"
+            body = f"{head}\n\n{facts}\n\nReply: `{code} <answer>`"
             buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate(draft.options[:2])]
-            buttons.append((f"oq:{qid}:later", "I'll reply"))
+            buttons += [(f"oq:{qid}:later", "I'll reply"), show_chat]
             await notifier.notify(
                 business_id,
                 "question",
@@ -363,22 +383,26 @@ class CustomerDesk:
             )
         elif action == "fallback" and prepared and prepared.open_question:
             code = prepared.open_question["code"]
-            body = f'🔁 *Follow-up on question {code}*: "{inbound_text[:300]}"\n\n{context}'
+            body = f'🔁 *{name} is asking again* about question {code}: "{inbound_text[:300]}"\n\n{facts}'
             await notifier.notify(
                 business_id,
                 "question_followup",
                 body,
                 dedupe_key=f"oqf:{conv.id}:{int(time.time() // 600)}",
                 priority=PriorityClass.P1,
+                buttons=[show_chat],
             )
         else:
-            body = f"🙋 *Customer needs you* — please reply to them on {conv.channel.replace('_', ' ')}.\n\n{context}"
+            channel = conv.channel.replace("_", " ")
+            what = note.strip() or f'They wrote: "{inbound_text[:300]}"'
+            body = f"🙋 *{name} needs you* (please reply on {channel})\n{what}\n\n{facts}"
             await notifier.notify(
                 business_id,
                 "handoff",
                 body,
                 dedupe_key=f"handoff:{conv.id}:{int(time.time() // 600)}",
                 priority=PriorityClass.P1,
+                buttons=[show_chat],
             )
 
     async def _schedule_sla(self, s: AsyncSession, business_id: UUID, question_id: UUID, sla_min: int) -> None:
@@ -448,15 +472,13 @@ class CustomerDesk:
 def owner_context(
     conv: gateway.ConversationView, customer: gateway.CustomerView, prepared: PreparedContext | None
 ) -> str:
-    """What the owner needs to act without opening the panel: who, where, the open order and the last messages."""
+    """One compact facts line for the owner: who, where, the open order. The conversation itself is one tap away
+    ([💬 Show chat]), never pasted in (live: owners read the transcript dump as a log, not a message)."""
     who = customer.display_name or "Customer"
     phone = f" ({customer.phone_e164})" if customer.phone_e164 else ""
-    lines = [f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"]
+    line = f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"
     order = prepared.open_order if prepared else None
     if order:
         items = ", ".join(f"{ln['qty']} × {ln['item']}" for ln in order.get("lines", []))
-        lines.append(f"🧾 Order {order['order_number']} ({order['status']}): {items} — total {order['total']}")
-    if prepared and prepared.recent_lines:
-        lines.append("💬 Recent:")
-        lines += [f"  {line[:200]}" for line in prepared.recent_lines[-4:]]
-    return "\n".join(lines)
+        line += f"\n🧾 {order['order_number']} ({str(order['status']).replace('_', ' ')}): {items} · {order['total']}"
+    return line
