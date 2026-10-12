@@ -41,4 +41,29 @@ async def order_cancel(ctx: ToolContext, args: OrderCancelArgs, s: AsyncSession)
     )
 
 
-ACTION_TOOLS = ["order_cancel"]
+class OrderChangeArgs(BaseModel):
+    order_id: str = Field(description="The placed order to change (from OPEN ORDER, order_status or an earlier tool)")
+    changes: dict[str, str] = Field(
+        min_length=1,
+        description="Detail keys → new values, e.g. {'delivery_date': 'YYYY-MM-DD' (use the Dates line), "
+        "'delivery_slot': '4pm-8pm', 'address': '...', 'message_on_cake': '...'}",
+    )
+    reason: str = Field(description=REASON_DESC, max_length=500)
+    note_for_owner: str = Field(description=NOTE_DESC, max_length=600)
+
+
+@tool("order_change", OrderChangeArgs, desks=ACTION_DESKS, side_effect=True)
+async def order_change(ctx: ToolContext, args: OrderChangeArgs, s: AsyncSession) -> dict[str, Any]:
+    """The customer wants to change a placed order (date, time slot, address, message on cake…). For a draft use
+    order_update instead. Returns outcome: done | declined | asked_owner | not_possible (with the reason)."""
+    return await capabilities.request(
+        ctx,
+        s,
+        "order.change",
+        {"order_id": args.order_id, "changes": args.changes},
+        reason=args.reason,
+        note_for_owner=args.note_for_owner,
+    )
+
+
+ACTION_TOOLS = ["order_cancel", "order_change"]

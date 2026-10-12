@@ -408,3 +408,89 @@ async def test_the_owner_acts_on_an_order_and_the_customer_is_told(
     fake.script(PRIMARY, relay_reply)
     await registry.require(TurnRunnerPort).run_turn(relay)  # type: ignore[type-abstract]
     assert "The shop itself did this" in seen[0] and "oven toot gaya" in seen[0]
+
+
+# ---------------------------------------------------------------- order.change: the same loop, no new flow
+
+
+def asks_to_change(order_id: UUID, changes: dict[str, str], say: dict[str, str]) -> Any:
+    def script(a: agent.Attempt) -> agent.FakeReply:
+        results = tool_results(a)
+        if not results:
+            return call(
+                "order_change",
+                order_id=str(order_id),
+                changes=changes,
+                reason="I'll be out of town",
+                note_for_owner="Taha wants to move the delivery by a day. I suggest yes.",
+            )
+        data = results[-1].get("data", {})
+        outcome = data.get("outcome", f"error:{results[-1].get('error')}")
+        text_ = say.get(outcome, f"[{outcome}: {data.get('reason', '')}]")
+        return reply("send", text_, topic="other")
+
+    return script
+
+
+async def test_a_date_change_follows_the_same_learning_loop(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    shop = await bakery(db)
+    wa = wa_number()
+    order, conv = await placed_order(registry, db, fake, shop, wa)
+    [d] = await q(db, "SELECT delivery_date + 1 AS d FROM orders WHERE id = :o", o=order.order_id)
+    new_day = d.d.isoformat()
+    say = {"done": "Done — moved.", "asked_owner": "I've asked the shop.", "not_possible": "That's not possible."}
+    fake.script(PRIMARY, learning(asks_to_change(order.order_id, {"delivery_date": new_day}, say), []))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "ek din aage kar do"))
+    assert (await outbound_texts(db, conv))[-1] == say["asked_owner"]
+    [proposal] = await q(
+        db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid
+    )
+    brief = next(str(m) for m in await owner_messages(db, shop) if "wants" in str(m))
+    assert "changing a placed order" in brief.lower() and new_day in brief
+
+    await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
+    [row] = await q(db, "SELECT delivery_date FROM orders WHERE id = :o", o=order.order_id)
+    assert row.delivery_date.isoformat() == new_day
+    assert any("Next time" in str(m) for m in await owner_messages(db, shop))  # it offers to learn here too
+
+
+async def test_a_full_day_or_a_paid_total_cannot_change(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    import reflexo.automations.api as automations
+
+    automations.register(registry)
+    shop = await bakery(db)
+    wa = wa_number()
+    order, conv = await placed_order(registry, db, fake, shop, wa)
+    await knowledge.playbook.add_rule(
+        shop.bid, capability="order.change", effect="allow", conditions=[], says="date change theek hai",
+        source="owner_instruction",
+    )  # fmt: skip
+    installed = await automations.install(shop.bid, automations.demo.DAILY_CAKE_LIMIT, description_nl="8 cake roz")
+    [d] = await q(db, "SELECT delivery_date + 1 AS d FROM orders WHERE id = :o", o=order.order_id)
+    full_day = d.d.isoformat()
+    async with db.service_session(ServiceReason.ADMIN) as s:  # that day already has 8 cakes
+        await s.execute(
+            text("""INSERT INTO automation_counters (automation_id, business_id, counter_key, value, limit_value)
+                    VALUES (:a, :b, :k, 8, 8)"""),
+            {"a": installed.automation_id, "b": shop.bid, "k": f"cakes:{full_day}"},
+        )
+    say = {"done": "Done — moved.", "not_possible": "That day is full, sorry."}
+    fake.script(PRIMARY, asks_to_change(order.order_id, {"delivery_date": full_day}, say))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "ek din aage"))
+    assert (await outbound_texts(db, conv))[-1] == say["not_possible"]
+    [row] = await q(db, "SELECT delivery_date FROM orders WHERE id = :o", o=order.order_id)
+    assert row.delivery_date.isoformat() != full_day  # unchanged
+
+    async with db.service_session(ServiceReason.ADMIN) as s:  # paid: a change that moves the total is refused
+        await s.execute(text("UPDATE orders SET payment_status = 'paid' WHERE id = :o"), {"o": order.order_id})
+    [before] = await q(db, "SELECT total_paise, address FROM orders WHERE id = :o", o=order.order_id)
+    assert before.address is None  # no address yet → no delivery fee; Kothrud adds ₹50 (under ₹1,500)
+    with pytest.raises(commerce.CommerceError) as err:
+        await commerce.change_order(shop.bid, order.order_id, {"address": "Kothrud 411038"}, by="customer")
+    assert err.value.code == "NOT_CHANGEABLE" and "total would become" in str(err.value)
+    [after] = await q(db, "SELECT total_paise, address FROM orders WHERE id = :o", o=order.order_id)
+    assert (after.total_paise, after.address) == (before.total_paise, None)  # rolled back, nothing half-changed

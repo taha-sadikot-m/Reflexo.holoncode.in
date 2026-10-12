@@ -65,6 +65,23 @@ async def _cancel(business_id: UUID, args: dict[str, Any], by: str) -> dict[str,
     return out
 
 
+async def _change(business_id: UUID, args: dict[str, Any], by: str) -> dict[str, Any]:
+    v = await commerce.change_order(
+        business_id, UUID(args["order_id"]), dict(args["changes"]), by=by, notify_owner=False
+    )
+    return {
+        "status": v.status,
+        "order_number": v.order_number,
+        "delivery": " ".join(x for x in (v.delivery_date or "", v.delivery_slot or "") if x),
+        "total": format_inr(v.total_paise),
+    }
+
+
+def _not_changeable(sit: dict[str, Any]) -> str | None:
+    status = str(sit.get("order.status"))
+    return "it was cancelled" if status == "cancelled" else commerce.NOT_CANCELLABLE.get(status)
+
+
 CAPABILITIES: dict[str, Capability] = {
     "order.cancel": Capability(
         name="order.cancel",
@@ -75,6 +92,15 @@ CAPABILITIES: dict[str, Capability] = {
         default=lambda sit: "allow" if sit.get("order.status") == "draft" else _by_risk("commitment"),
         invariant=lambda sit: commerce.NOT_CANCELLABLE.get(str(sit.get("order.status"))),
         execute=_cancel,
+    ),
+    "order.change": Capability(
+        name="order.change",
+        risk="commitment",
+        label="Changing a placed order",
+        verb="change",
+        default=lambda sit: "allow" if sit.get("order.status") == "draft" else _by_risk("commitment"),
+        invariant=_not_changeable,
+        execute=_change,
     ),
 }
 
@@ -109,6 +135,8 @@ async def request(
         raise ToolError("NOT_FOUND", "no such order for this customer", guidance="Use order_status to find it.")
     situation = await commerce.situation(ctx.business_id, order.order_id)
     summary = describe_order(order)
+    if changes := args.get("changes"):
+        summary += " → " + ", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in changes.items())
 
     if why_not := cap.invariant(situation):
         await _trace(ctx, name, "not_possible", None)
@@ -119,7 +147,11 @@ async def request(
     basis = {"rule": rule.rule.says} if rule else {"rule": None, "default": f"{cap.risk} actions: {effect}"}
 
     if effect == "allow":
-        result = await cap.execute(ctx.business_id, {**args, "reason": reason}, "customer")
+        try:
+            result = await cap.execute(ctx.business_id, {**args, "reason": reason}, "customer")
+        except commerce.CommerceError as exc:  # e.g. the new day is full, the date is too close
+            return {"outcome": "not_possible", "reason": str(exc), "guidance": exc.guidance,
+                    "next": "Explain kindly and offer what is possible."}  # fmt: skip
         await _fyi(ctx, cap, summary, reason, rule.rule.says if rule else None)
         await _trace(ctx, name, "done", rule)
         return {"outcome": "done", **result, **basis, "next": "Tell the customer it is done, briefly and warmly."}

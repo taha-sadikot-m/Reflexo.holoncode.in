@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 from uuid import UUID
@@ -475,6 +476,62 @@ async def cancel_order(
     return CancelResult(
         status="cancelled", order=v, payment_link_cancelled=bool(link_to_cancel), refund_due_paise=int(paid)
     )
+
+
+async def change_order(
+    business_id: UUID, order_id: UUID, details: dict[str, Any], *, by: str, notify_owner: bool = True
+) -> OrderView:
+    """The `order.change` capability's effect (POC_10 §3): change details (date, slot, address, …) of a placed
+    order. Only invariants here — whether the business allows it is the playbook's decision. A changed date moves
+    the order's capacity reservation (guards re-checked; the old one is restored if the new day is full); a change
+    that alters the total of an order already paid or awaiting payment is refused (the payment would not match)."""
+    guard = _port(OrderGuardPort)
+    async with get_db().tenant_session(business_id) as s:
+        before = await orders.view(s, order_id)
+        if before.status == "cancelled" or before.status in NOT_CANCELLABLE:
+            reason = NOT_CANCELLABLE.get(before.status, "it was cancelled")
+            raise CommerceError("NOT_CHANGEABLE", f"cannot change: {reason}")
+        merged = await orders.validated_changes(s, business_id, order_id, details)
+    after_preview = before.model_copy(
+        update={k: merged.get(k) for k in ("delivery_date", "delivery_slot", "address") if k in merged}
+    )
+    moved = before.status != "draft" and str(after_preview.delivery_date) != str(before.delivery_date)
+    if moved and guard is not None:
+        await guard.release(business_id, order_id, "order_changed")
+        result = await guard.check(business_id, after_preview.model_dump(mode="json"))
+        if not result.allowed:
+            await guard.check(business_id, before.model_dump(mode="json"))  # keep the old day's reservation
+            raise CommerceError(
+                result.code or "GUARD_DENIED",
+                result.reason or "that day is full",
+                guidance="Offer another day" + (f": {', '.join(result.alternatives)}" if result.alternatives else "."),
+            )
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("UPDATE orders SET details = CAST(:d AS jsonb), updated_at = now() WHERE id = :id"),
+            {"d": json.dumps(merged, ensure_ascii=False, default=str), "id": order_id},
+        )
+        await orders.recompute(s, business_id, order_id)
+        after = await orders.view(s, order_id)
+        if after.total_paise != before.total_paise and before.payment_status in ("paid", "pending"):
+            raise CommerceError(  # rolls the transaction back
+                "NOT_CHANGEABLE",
+                f"the total would become {format_inr(after.total_paise)} (paid: {format_inr(before.total_paise)})",
+                guidance="The payment would not match; the owner has to handle this.",
+            )
+        old = {f.key: f.value for f in before.fields}
+        changed = {k: v for k, v in merged.items() if old.get(k) != v}
+        await _event(s, business_id, "order.changed", after, by=by, changes=changed)
+    if notify_owner and by != "owner":
+        await _notify_owner(
+            business_id,
+            "order_changed",
+            f"✏️ Order {after.order_number} changed by the customer: "
+            + ", ".join(f"{k.replace('_', ' ')} → {v}" for k, v in changed.items()),
+            f"order_changed:{order_id}:{new_id().hex[:8]}",  # every change is news
+        )
+    await emit("order_change", PipelineEventStatus.OK, business_id=business_id, by=by, moved=moved)
+    return after
 
 
 async def handle_payment_event(log_id: UUID) -> None:

@@ -514,6 +514,33 @@ async def update_order(
         return result
 
 
+async def validated_changes(
+    s: AsyncSession, business_id: UUID, order_id: UUID, details: dict[str, Any]
+) -> dict[str, Any]:
+    """The order's details with `details` applied, each value validated like at order time (date notice, slot by
+    time, address zone). All or nothing: a placed order is not left half-changed."""
+    current = await view(s, order_id)
+    stored = (await s.execute(text("SELECT details FROM orders WHERE id = :id"), {"id": order_id})).scalar_one()
+    merged: dict[str, Any] = dict(stored or {})  # every stored detail survives, schema field or not
+    fields = {f.key: f for f in current.fields}
+    _, _, notice = await _item_scope(s, business_id, current.lines)
+    for key, raw in details.items():
+        field = fields.get(key)
+        if field is not None:
+            merged[key], _fee = await _validate_value(business_id, field, raw, notice, current.subtotal_paise)
+        elif key == "delivery_date":  # no schema field (some businesses): still a real, future date
+            try:
+                day = date.fromisoformat(str(raw)[:10])
+            except ValueError as exc:
+                raise CommerceError("VALIDATION_FAILED", f"'{raw}' is not a date", guidance="Use YYYY-MM-DD.") from exc
+            if day < utcnow().date():
+                raise CommerceError("VALIDATION_FAILED", f"{day.isoformat()} is in the past")
+            merged[key] = day.isoformat()
+        else:  # like update_order: details without a schema field are stored as given
+            merged[key] = raw if isinstance(raw, str | int | float | bool) else json.dumps(raw)
+    return merged
+
+
 async def order_status(business_id: UUID, customer_id: UUID, order_number: str | None) -> OrderView | None:
     async with get_db().tenant_session(business_id) as s:
         oid = (
