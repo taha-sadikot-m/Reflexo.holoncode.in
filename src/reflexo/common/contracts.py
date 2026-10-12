@@ -278,6 +278,10 @@ class ProposalPort(Protocol):
 
     async def decided(self, business_id: UUID, approval_id: UUID, approve: bool, member_id: UUID | None) -> str: ...
 
+    async def learn(self, business_id: UUID, approval_id: UUID, scope: str, member_id: UUID | None) -> str:
+        """The owner's answer to "do this myself next time?": g = for everyone, c = this customer, o = just once."""
+        ...
+
 
 class QuestionAnswerPort(Protocol):
     """Provided by agent: the ask-the-owner loop's answer side (POC_04 §7 steps 4-7)."""

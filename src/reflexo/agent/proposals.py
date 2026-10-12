@@ -3,25 +3,39 @@
 Yes → the stored action runs exactly as proposed (same capability, same arguments; no LLM re-decides). Either way
 the outcome is recorded on the request, a relay turn tells the customer in their language, and the owner gets a
 short confirmation.
+
+Then the agent offers to learn (POC_10 §6): it proposes the general rule behind the decision — typed conditions
+from the playbook's field catalogue, each one checked to hold for the case it came from — and shows it to the
+owner word for word: [Always] [Only for <customer>] [Just this once]. A tap makes it a playbook rule (undoable).
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field
+
 import reflexo.approvals.api as approvals
 import reflexo.commerce.api as commerce
-from reflexo.agent.capabilities import CAPABILITIES, PROPOSAL_KIND
+import reflexo.knowledge.api as knowledge
+from reflexo.agent.capabilities import CAPABILITIES, PROPOSAL_KIND, Capability
 from reflexo.agent.questions import relay_message
-from reflexo.common.contracts import TurnScheduler
+from reflexo.common.contracts import ModelGatewayPort, OwnerNotifyPort, TurnScheduler
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass
+from reflexo.common.llm import CallCtx, ChatMessage, ModelError
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
 
 log = get_logger(__name__)
+Condition = knowledge.playbook.Condition
+
+
+class Generalisation(BaseModel):
+    conditions: list[Condition] = Field(default_factory=list, max_length=3)
 
 
 class ProposalService:
@@ -50,8 +64,12 @@ class ProposalService:
                 outcome = {"approved": True, "done": False, "reason": str(exc)}
         else:
             outcome = {"approved": False}
+        if outcome.get("done") or not approve:
+            outcome["learn"] = await self._generalise(business_id, cap, sub, approve)
         await approvals.record_outcome(business_id, approval_id, outcome)
         await self._relay(business_id, a)
+        if "learn" in outcome:
+            await self._offer_to_learn(business_id, a, cap, outcome["learn"], name)
         await emit(
             "proposal_decided",
             PipelineEventStatus.OK,
@@ -85,6 +103,109 @@ class ProposalService:
                 ends_thought=True,
                 hints={"proposal_id": str(a.id)},
             )
+
+    # ------------------------------------------------------------ learning from the decision
+
+    async def _generalise(
+        self, business_id: UUID, cap: Capability, sub: dict[str, Any], approve: bool
+    ) -> dict[str, Any]:
+        """The rule the owner most likely follows. The model proposes typed conditions; every condition must hold
+        for this very case (a rule that would not have covered its own example is wrong) — others are dropped."""
+        situation: dict[str, Any] = dict(sub.get("situation") or {})
+        catalogue = "\n".join(
+            f"- {name} ({f.kind}{': ' + ', '.join(f.values) if f.values else ''}): {f.en}"
+            for name, f in knowledge.playbook.FIELDS.items()
+        )
+        decided = "YES" if approve else "NO"
+        prompt = (
+            f"A shop's assistant asked the owner whether to do this for a customer: {cap.label.lower()}. "
+            f"The owner said {decided}.\nFacts of this case: {json.dumps(situation, default=str)}\n"
+            f"Customer's reason: {sub.get('reason', '')!r}\n\n"
+            "Propose the general rule the owner most likely follows, so the assistant can decide alone next time. "
+            "At most 3 conditions, only from these fields:\n"
+            f"{catalogue}\n"
+            "Ops: is, is_not, in, not_in, lt, lte, gt, gte, includes. Prefer facts that explain the decision (how "
+            "close delivery is, whether it is being prepared, the payment state) over incidental ones (the exact "
+            "total, this customer); use round thresholds an owner would say (24, 48 hours). Every condition must be "
+            "true for this case. No conditions = always.\n"
+            'Reply as JSON: {"conditions": [{"field": "...", "op": "...", "value": ...}]}'
+        )
+        try:
+            proposal = await self.registry.require(ModelGatewayPort).structured(  # type: ignore[type-abstract]
+                "builder",
+                [ChatMessage(role="user", content=prompt)],
+                Generalisation,
+                ctx=CallCtx(business_id=business_id, purpose="learn_rule"),
+            )
+            conditions = [c for c in proposal.conditions if c.holds(situation)]
+        except ModelError as exc:
+            log.info("learn_generalise_failed", code=exc.code)
+            status = situation.get("order.status")  # the one fact every order capability depends on
+            conditions = [Condition(field="order.status", op="is", value=str(status))] if status else []
+        return {"effect": "allow" if approve else "deny", "conditions": [c.model_dump() for c in conditions]}
+
+    async def _offer_to_learn(
+        self, business_id: UUID, a: approvals.Approval, cap: Capability, learn: dict[str, Any], name: str
+    ) -> None:
+        notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
+        if notifier is None:
+            return
+        rule = _draft_rule(cap, learn, "")
+        mine = "do this myself" if learn["effect"] == "allow" else "say no myself"
+        await notifier.notify(
+            business_id,
+            "learn",
+            f"💡 Next time, should I {mine}?\n“{rule.readback(cap.label)}”",
+            dedupe_key=f"learn:{a.id}",
+            priority=PriorityClass.P2,
+            buttons=[
+                (f"lrn:{a.id}:g", "✅ Always"),
+                (f"lrn:{a.id}:c", f"Only for {name}"[:20]),
+                (f"lrn:{a.id}:o", "Just this once"),
+            ],
+            ref={"approval_id": str(a.id)},
+        )
+
+    async def learn(self, business_id: UUID, approval_id: UUID, scope: str, member_id: UUID | None) -> str:
+        a = await approvals.get(business_id, approval_id)
+        decision = (await approvals.outcome(business_id, approval_id) or {}).get("outcome") or {}
+        if a is None or a.kind != PROPOSAL_KIND or "learn" not in decision:
+            return "Nothing to learn from that one."
+        if decision.get("learned"):
+            return "Already saved ✅"
+        if scope == "o":
+            await approvals.record_outcome(business_id, approval_id, {**decision, "learned": "once"})
+            return "Okay — I'll ask you again next time. 👍"
+        cap = CAPABILITIES[str(a.subject["capability"])]
+        customer_id = UUID(a.subject["customer_id"]) if scope == "c" else None
+        who = f" (only for {a.subject.get('customer_name', 'this customer')})" if customer_id else ""
+        says = f"Learned from your decision on {a.preview.get('summary', '')}{who}"
+        rule = _draft_rule(cap, decision["learn"], says)
+        await knowledge.playbook.add_rule(
+            business_id,
+            capability=cap.name,
+            effect=rule.effect,
+            conditions=rule.conditions,
+            says=says,
+            source="owner_decision",
+            customer_id=customer_id,
+            source_ref=approval_id,
+            summary=f"Playbook: {cap.label}",
+            member_id=member_id,
+        )
+        await approvals.record_outcome(business_id, approval_id, {**decision, "learned": scope})
+        return f"Got it ✅ From now on{who}: {rule.readback(cap.label)}. (/undo to remove)"
+
+
+def _draft_rule(cap: Capability, learn: dict[str, Any], says: str) -> knowledge.playbook.PlaybookRule:
+    return knowledge.playbook.PlaybookRule(
+        id=UUID(int=0),
+        capability=cap.name,
+        effect=learn["effect"],
+        conditions=[Condition.model_validate(c) for c in learn.get("conditions") or []],
+        says=says or "draft",
+        source="owner_decision",
+    )
 
 
 def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str:

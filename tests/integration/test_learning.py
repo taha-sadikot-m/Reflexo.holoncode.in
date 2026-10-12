@@ -4,6 +4,7 @@ just the first capability."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from typing import Any
 from uuid import UUID
@@ -253,3 +254,81 @@ async def test_the_owners_rules_decide_without_asking(
     assert (await outbound_texts(db, conv))[-1] == SAY["done"]
     assert any("your rule" in str(m) and "24 ghante" in str(m) for m in await owner_messages(db, shop))
     assert not await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid)
+
+
+def learning(script_for_desk: Any, conditions: list[dict[str, Any]]) -> Any:
+    """One fake model: the builder's generalisation prompt gets the conditions, everything else the desk script."""
+
+    def script(a: agent.Attempt) -> agent.FakeReply:
+        if any("Propose the general rule" in (m.content or "") for m in a.messages):
+            return agent.FakeReply(text=json.dumps({"conditions": conditions}))
+        return script_for_desk(a)
+
+    return script
+
+
+async def test_one_decision_teaches_the_rule_and_undo_forgets_it(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    shop = await bakery(db)
+    wa1, wa2, wa3 = wa_number(), wa_number(), wa_number()
+    order1, _ = await placed_order(registry, db, fake, shop, wa1)
+    order2, conv2 = await placed_order(registry, db, fake, shop, wa2)
+    order3, _ = await placed_order(registry, db, fake, shop, wa3)
+    learned = [
+        {"field": "order.hours_until_delivery", "op": "gte", "value": 24},
+        {"field": "order.status", "op": "is", "value": "delivered"},  # false for this case → dropped
+    ]
+    fake.script(PRIMARY, learning(asks_to_cancel(order1.order_id, SAY), learned))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa1, "cancel karo"))
+    [proposal] = await q(
+        db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid
+    )
+    await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
+
+    offer = next(m for m in await owner_messages(db, shop) if "Next time" in str(m))
+    assert "I do it myself when hours left until delivery is at least 24" in str(offer)
+    assert "delivered" not in str(offer).split("Next time")[1]  # the condition that did not hold was dropped
+    await owner_says(registry, db, shop, callback=f"lrn:{proposal.id}:g")
+    assert any("Got it ✅ From now on" in str(m) for m in await owner_messages(db, shop))
+    [rule] = await q(
+        db, "SELECT effect, conditions, source, source_ref FROM playbook_rules WHERE business_id = :b", b=shop.bid
+    )
+    assert (rule.effect, rule.source, rule.source_ref) == ("allow", "owner_decision", proposal.id)
+    assert rule.conditions == [{"field": "order.hours_until_delivery", "op": "gte", "value": 24.0}]
+
+    fake.script(PRIMARY, asks_to_cancel(order2.order_id, SAY))  # another customer: no question this time
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa2, "please cancel"))
+    assert await status_of(db, order2.order_id) == "cancelled"
+    assert (await outbound_texts(db, conv2))[-1] == SAY["done"]
+    assert (
+        len(await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid))
+        == 1
+    )
+    assert any("your rule" in str(m) and "Learned from your decision" in str(m) for m in await owner_messages(db, shop))
+
+    await owner_says(registry, db, shop, "/undo")  # the owner takes the rule back → asking again
+    fake.script(PRIMARY, asks_to_cancel(order3.order_id, SAY))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa3, "cancel"))
+    assert await status_of(db, order3.order_id) == "confirmed"
+    assert (
+        len(await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid))
+        == 2
+    )
+
+
+async def test_just_this_once_learns_nothing(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:
+    shop = await bakery(db)
+    wa = wa_number()
+    order, _ = await placed_order(registry, db, fake, shop, wa)
+    fake.script(PRIMARY, learning(asks_to_cancel(order.order_id, SAY), []))
+    await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "cancel karo"))
+    [proposal] = await q(
+        db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid
+    )
+    await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
+    await owner_says(registry, db, shop, callback=f"lrn:{proposal.id}:o")
+    await owner_says(registry, db, shop, callback=f"lrn:{proposal.id}:g")  # a late second tap changes nothing
+    assert not await q(db, "SELECT id FROM playbook_rules WHERE business_id = :b", b=shop.bid)
+    texts = [str(m) for m in await owner_messages(db, shop)]
+    assert any("ask you again next time" in t for t in texts) and any("Already saved" in t for t in texts)

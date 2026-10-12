@@ -31,6 +31,7 @@ log = get_logger(__name__)
 _ANSWER = re.compile(r"^\s*(\d{4})\s*[:.\-–]?\s+(\S.*)$", re.DOTALL)
 _OPTION = re.compile(r"^(oq|oqs):([0-9a-f-]{36}):(.+)$")
 _APPROVAL_BUTTON = re.compile(r"^apv:([0-9a-f-]{36}):([ar])$")
+_LEARN_BUTTON = re.compile(r"^lrn:([0-9a-f-]{36}):([gco])$")  # learn from a decision: global / customer / once
 _YES = r"(?:yes|y|haan|han|ha|ok|okay|confirm|done|theek hai|kar do)"
 _NO = r"(?:no|n|nahi|nahin|cancel|mat karo|rehne do)"
 _DECIDE_CODE = re.compile(rf"^\s*({_YES}|{_NO})\s*[,:]?\s*(\d{{4}})\s*[.!]*\s*$", re.IGNORECASE)
@@ -114,6 +115,12 @@ class OwnerCommands:
         if option_id and (m := _APPROVAL_BUTTON.match(option_id)):
             await self._decide(say, business_id, member_id, m.group(2) == "a", approval_id=UUID(m.group(1)))
             return "approval"
+        if option_id and (m := _LEARN_BUTTON.match(option_id)):
+            learned = await self.registry.require(ProposalPort).learn(  # type: ignore[type-abstract]
+                business_id, UUID(m.group(1)), m.group(2), member_id
+            )
+            await say(learned)
+            return "learning"
         if (m := _DECIDE_CODE.match(body)) is not None:
             approve = re.fullmatch(_YES, m.group(1), re.IGNORECASE) is not None
             if await self._decide(say, business_id, member_id, approve, code=m.group(2)):
