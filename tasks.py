@@ -6,6 +6,7 @@ Tasks:
   migrate       alembic upgrade head
   seed          load seeds (default mode: onboarding); `seed --full`
   demo-reset    wipe + reseed the demo businesses; `demo-reset --full`
+  eval          eval suites with real Gemini (POC_08 §4); `eval tool_selection grounding`
   api           run the HTTP API with reload
   worker        run the pipeline worker (all pools)
   voice-bridge  run the voice-bridge (WhatsApp WebRTC <-> LiveKit)
@@ -65,6 +66,8 @@ def main(argv: list[str]) -> None:
         run(py, "scripts/seed.py", "load", *args)
     elif task == "demo-reset":
         run(py, "scripts/seed.py", "reset", *args)
+    elif task == "eval":
+        run(py, "scripts/eval.py", *args)
     elif task == "api":
         run(py, "-m", "uvicorn", "reflexo.api.main:app", "--reload", "--port", "8080")
     elif task == "worker":

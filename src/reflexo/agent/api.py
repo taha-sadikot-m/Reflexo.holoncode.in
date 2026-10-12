@@ -5,9 +5,10 @@ LangGraph desks (customer, owner, builder), tools, output gate, ask-owner, model
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
-from reflexo.agent import media_describe, sandbox
+from reflexo.agent import grounding, media_describe, output_gate, sandbox
 from reflexo.agent.capabilities import CAPABILITIES
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
@@ -18,7 +19,9 @@ from reflexo.agent.output_gate import extract_amounts
 from reflexo.agent.proposals import ProposalService
 from reflexo.agent.questions import SLA_QUEUE, QuestionService
 from reflexo.agent.runs import record_run
+from reflexo.agent.schemas import AgentOutput
 from reflexo.agent.tools.base import ToolContext, run_tool
+from reflexo.common import ports
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import (
     EmbedderPort,
@@ -151,3 +154,36 @@ __all__ += ["describe_media"]
 
 
 __all__ += ["CAPABILITIES"]  # risk-classed actions (ADR-015): name → label, verb, default authority
+
+
+async def decide_answer_scope(business_id: UUID, question: str, answer: str) -> str:
+    """Who an owner's answer applies to — global | customer | temporary (the ask-owner loop's own decider)."""
+    scope, _ = await QuestionService(ports.registry, gateway()).decide_scope(business_id, question, answer, None)
+    return scope
+
+
+async def generalise_decision(
+    business_id: UUID, capability: str, situation: dict[str, Any], reason: str, approve: bool
+) -> dict[str, Any]:
+    """The rule the learning loop would offer after the owner decided (effect + conditions that hold)."""
+    sub = {"situation": situation, "reason": reason}
+    return await ProposalService(ports.registry).generalise(business_id, CAPABILITIES[capability], sub, approve)
+
+
+__all__ += ["decide_answer_scope", "generalise_decision"]  # used by the eval suites (POC_08 §4)
+
+
+async def gate_check(
+    business_id: UUID, output: dict[str, Any], *, trusted_texts: tuple[str, ...] = ()
+) -> tuple[bool, list[str]]:
+    """Run the real output gate on a given reply (hydrated against the business's data, as in a turn):
+    (passed, names of the failed checks). For the adversarial eval suite."""
+    parsed = AgentOutput.model_validate(output)
+    records = await grounding.hydrate(
+        parsed, business_id, customer_id=None, customer_phone=None, trusted_texts=trusted_texts
+    )
+    result = output_gate.check(parsed, records)
+    return result.passed, [c.name for c in result.failures]
+
+
+__all__ += ["gate_check"]

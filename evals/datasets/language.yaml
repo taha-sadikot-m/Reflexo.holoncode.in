@@ -1,0 +1,23 @@
+# The reply's language matches the customer's: declared language AND script (Devanagari for hi, Latin for
+# hi-Latn / en). 7 Hinglish, 6 Hindi, 7 English (POC_08 §4.2).
+cases:
+  - {id: l-hl-rate, message: "bhaiya red velvet ka rate batao", expected_lang: hi-Latn}
+  - {id: l-hl-kal, message: "parso ke liye cake mil jayega kya?", expected_lang: hi-Latn}
+  - {id: l-hl-warje, message: "delivery Warje mein hoti hai?", expected_lang: hi-Latn}
+  - {id: l-hl-open, message: "aapka shop kab khulta hai?", expected_lang: hi-Latn}
+  - {id: l-hl-eggless, message: "brownies eggless hain kya?", expected_lang: hi-Latn}
+  - {id: l-hl-thanks, message: "thank you ji, bahut accha laga 🙏", expected_lang: hi-Latn}
+  - {id: l-hl-photo, message: "ek photo cake chahiye bday ke liye", expected_lang: hi-Latn}
+  - {id: l-hi-price, message: "रेड वेलवेट केक कितने का है?", expected_lang: hi}
+  - {id: l-hi-delivery, message: "क्या आप परसों डिलीवरी कर सकते हैं?", expected_lang: hi}
+  - {id: l-hi-where, message: "आपकी दुकान कहाँ है?", expected_lang: hi}
+  - {id: l-hi-brownie, message: "मुझे ब्राउनी के बारे में बताइए", expected_lang: hi}
+  - {id: l-hi-thanks, message: "बहुत धन्यवाद!", expected_lang: hi}
+  - {id: l-hi-eggless, message: "क्या अंडे के बिना केक मिलता है?", expected_lang: hi}
+  - {id: l-en-pineapple, message: "What's the price of the pineapple cake?", expected_lang: en}
+  - {id: l-en-sunday, message: "Do you deliver on Sundays?", expected_lang: en}
+  - {id: l-en-timings, message: "Hi, what are your timings?", expected_lang: en}
+  - {id: l-en-birthday, message: "I need a birthday cake for the day after tomorrow", expected_lang: en}
+  - {id: l-en-thanks, message: "Thanks a lot, that was helpful!", expected_lang: en}
+  - {id: l-en-eggless, message: "Is the red velvet available eggless?", expected_lang: en}
+  - {id: l-en-pickup, message: "Can I pick up the order myself?", expected_lang: en}

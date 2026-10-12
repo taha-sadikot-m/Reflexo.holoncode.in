@@ -1,0 +1,31 @@
+# Owner desk: each command reaches the tool that builds its read-back (POC_04 §4) — and an ambiguous one asks
+# instead of guessing. Each case runs on its own fresh owner thread (POC_08 §4.2: 15 cases).
+cases:
+  - {id: oc-price, messages: ["Red velvet 1 kg ka price 1200 kar do"], expect_tools: [catalog_change]}
+  - {id: oc-two-prices, messages: ["Truffle 500g 600 kar do aur pineapple 1 kg 800"], expect_tools: [catalog_change]}
+  - {id: oc-new-item, messages: ["Naya item add karo: Butterscotch cake 1 kg ₹800"], expect_tools: [catalog_change]}
+  - {id: oc-faq-hinglish, messages: ["Customers ko batana ki hum Sunday ko delivery nahi karte"], expect_any_tool: [knowledge_change]}
+  - {id: oc-faq-en, messages: ["Add to the FAQ: every cake comes with free candles"], expect_any_tool: [knowledge_change]}
+  - {id: oc-week-orders, messages: ["Is hafte kitne orders aaye?"], expect_any_tool: [business_stats, orders_list]}
+  - {id: oc-today-orders, messages: ["Aaj ke orders dikhao"], expect_any_tool: [orders_list, business_stats]}
+  - {id: oc-pending, messages: ["Koi customer ka sawal pending hai kya?"], expect_any_tool: [pending_items]}
+  - id: oc-demo-sentence
+    messages: ["Ek din mein 8 se zyada cake orders mat lena, COD orders confirm karwa lena, aur delivery se ek din pehle customer ko reminder bhejna"]
+    expect_tools: [start_automation_builder]
+    forbid_tools: [playbook_change]
+  - id: oc-unpaid-reminder
+    messages: ["Jab bhi payment link 2 ghante tak unpaid rahe, customer ko reminder bhejo"]
+    expect_tools: [start_automation_builder]
+  - id: oc-playbook-cancel
+    messages: ["Agar delivery mein 2 din se zyada baaki ho toh customer khud cancel kar sakta hai, mujhse mat poochna"]
+    expect_tools: [playbook_change]
+    forbid_tools: [start_automation_builder]
+  - id: oc-playbook-en
+    messages: ["Never change a paid order for a customer without asking me first"]
+    expect_tools: [playbook_change]
+    forbid_tools: [start_automation_builder]
+  - id: oc-ambiguous
+    messages: ["price badha do"]
+    forbid_tools: [catalog_change, knowledge_change]
+  - {id: oc-undo, messages: ["jo abhi badla woh wapas karo"], expect_any_tool: [undo]}
+  - {id: oc-tell-customer, messages: ["Rahul ko bolo uska cake ready hai"], expect_any_tool: [send_to_customer]}

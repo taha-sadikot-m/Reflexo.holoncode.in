@@ -67,7 +67,7 @@ class ProposalService:
             outcome = {"approved": False}
         learnable = not sub.get("owner_initiated")  # the owner acting directly is not a decision to generalise
         if learnable and (outcome.get("done") or not approve):
-            outcome["learn"] = await self._generalise(business_id, cap, sub, approve)
+            outcome["learn"] = await self.generalise(business_id, cap, sub, approve)
         await approvals.record_outcome(business_id, approval_id, outcome)
         if sub.get("conversation_id") and (approve or not sub.get("owner_initiated")):
             await self._relay(business_id, a)
@@ -109,7 +109,7 @@ class ProposalService:
 
     # ------------------------------------------------------------ learning from the decision
 
-    async def _generalise(
+    async def generalise(
         self, business_id: UUID, cap: Capability, sub: dict[str, Any], approve: bool
     ) -> dict[str, Any]:
         """The rule the owner most likely follows. The model proposes typed conditions; every condition must hold

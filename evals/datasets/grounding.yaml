@@ -1,0 +1,24 @@
+# Business-fact questions: the reply is sent, cites the records it rests on, and states the true fact
+# (POC_08 §4.2). Facts are eval-bakes' seed (a copy of Meera's full seed).
+# must_reference_any: at least one of these record types · reply_contains_any: the fact, as any of these spellings.
+cases:
+  - {id: g-red-velvet, messages: ["Red velvet cake ka price?"], must_reference_any: [offering, variant], reply_contains_any: ["1,100", "1100"]}
+  - {id: g-truffle-small, messages: ["Truffle 500g kitne ka hai?"], must_reference_any: [offering, variant], reply_contains_any: ["550"]}
+  - {id: g-brownies, messages: ["Brownies ka box kitne ka hai?"], must_reference_any: [offering, variant], reply_contains_any: ["420"]}
+  - {id: g-cookies, messages: ["Cookies jar ka price batao"], must_reference_any: [offering, variant], reply_contains_any: ["350"]}
+  - {id: g-pineapple, messages: ["Pineapple cake 1 kg?"], must_reference_any: [offering, variant], reply_contains_any: ["750"]}
+  - {id: g-eggless-price, messages: ["Eggless chocolate truffle 1 kg kitne ka padega?"], must_reference_any: [offering, variant], reply_contains_any: ["1,000", "1000", "₹50"]}
+  - {id: g-sizes, messages: ["What sizes does the chocolate truffle come in?"], must_reference_any: [offering, variant], reply_contains_any: ["500"]}
+  - {id: g-hi-price, messages: ["रेड वेलवेट केक की कीमत क्या है?"], must_reference_any: [offering, variant], reply_contains_any: ["1,100", "1100", "११००"]}
+  - {id: g-delivery-fee, messages: ["Kothrud mein delivery charge kitna hai?"], must_reference_any: [delivery_zone, qa, profile], reply_contains_any: ["50"]}
+  - {id: g-free-delivery, messages: ["Kitne ke order pe free delivery milti hai?"], must_reference_any: [delivery_zone, qa, profile], reply_contains_any: ["1,500", "1500"]}
+  - {id: g-areas, messages: ["Which areas do you deliver to?"], must_reference_any: [delivery_zone, qa, profile], reply_contains_any: ["Kothrud"]}
+  - {id: g-payment, messages: ["Payment kaise kar sakte hain?"], must_reference_any: [profile, qa], reply_contains_any: ["UPI"]}
+  - {id: g-sunday, messages: ["Sunday ko kitne baje tak khula hai?"], must_reference_any: [profile], reply_contains_any: ["6", "18:00"]}
+  - {id: g-notice, messages: ["Order kitna pehle dena padta hai?"], must_reference_any: [profile, qa], reply_contains_any: ["24"]}
+  - {id: g-photo-notice, messages: ["Photo cake ke liye kitne pehle batana hoga?"], must_reference_any: [profile, qa, offering], reply_contains_any: ["48"]}
+  - {id: g-cancel-policy, messages: ["Cancellation policy kya hai aapki?"], must_reference_any: [profile], reply_contains_any: ["24"]}
+  - {id: g-returns, messages: ["Cake mein kuch problem ho toh kya karein? Return hota hai?"], must_reference_any: [profile], reply_contains_any: ["2 ghante", "2 hours", "2 hrs", "2 घंटे", "2 hour"]}
+  - {id: g-pickup, messages: ["Kya main khud pickup kar sakti hoon?"], must_reference_any: [profile], reply_contains_any: ["Kothrud"]}
+  - {id: g-location, messages: ["Where are you located?"], must_reference_any: [profile], reply_contains_any: ["Kothrud"]}
+  - {id: g-brownies-eggless, messages: ["Kya brownies eggless milti hain?"], must_reference_any: [offering, variant]}

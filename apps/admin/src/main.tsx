@@ -12,6 +12,7 @@ import { Conversations } from "./pages/Conversations";
 import { Automations } from "./pages/Automations";
 import { Calls } from "./pages/Calls";
 import { Customers } from "./pages/Customers";
+import { Evals } from "./pages/Evals";
 import { History } from "./pages/History";
 import { Imports } from "./pages/Imports";
 import { Lab } from "./pages/Lab";
@@ -52,6 +53,7 @@ function App() {
         <Route path="history" element={<History />} />
         <Route path="imports" element={<Imports />} />
         <Route path="calls" element={<Calls />} />
+        <Route path="evals" element={<Evals />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

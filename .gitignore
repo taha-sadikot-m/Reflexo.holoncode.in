@@ -18,3 +18,6 @@ data/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# eval reports are per-run outputs (eval_runs + the admin Evals page hold the evidence)
+evals/reports/

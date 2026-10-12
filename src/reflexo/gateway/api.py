@@ -27,6 +27,7 @@ from reflexo.common.enums import PipelineEventStatus
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
 from reflexo.gateway import identity
+from reflexo.gateway.adapters import simulator as simulator_adapter
 from reflexo.gateway.adapters.base import ChannelAdapter
 from reflexo.gateway.adapters.meta_messaging import InstagramAdapter, MessengerAdapter
 from reflexo.gateway.adapters.meta_whatsapp import WhatsAppAdapter
@@ -308,3 +309,11 @@ def sign_meta(raw_body: bytes) -> str:
 __all__ += ["sign_meta"]
 
 __all__ += ["clear_connection_cache"]  # after a demo reset: route to the new connection rows at once
+
+
+def sign_simulator(raw_body: bytes) -> str:
+    """Sign a simulator-channel envelope (eval runner, Lab): it then enters through the real ingress."""
+    return simulator_adapter.sign(raw_body)
+
+
+__all__ += ["sign_simulator"]

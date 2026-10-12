@@ -1,4 +1,4 @@
-import { Activity, Bomb, BookOpenCheck, FileUp, FlaskConical, History, LayoutDashboard, LogOut, MessagesSquare, Moon, Phone, Receipt, Settings, Sun, UserRound, Users, Workflow } from "lucide-react";
+import { Activity, Bomb, BookOpenCheck, FileUp, Gauge, FlaskConical, History, LayoutDashboard, LogOut, MessagesSquare, Moon, Phone, Receipt, Settings, Sun, UserRound, Users, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -19,6 +19,7 @@ const NAV = [
   { to: "/imports", label: "Imports", icon: FileUp },
   { to: "/calls", label: "Calls", icon: Phone },
   { to: "/chaos", label: "Chaos", icon: Bomb },
+  { to: "/evals", label: "Evals", icon: Gauge },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

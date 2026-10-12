@@ -440,3 +440,22 @@ async def customer(customer_id: UUID, _: Authed, business_id: Business) -> dict[
     if found is None:
         raise problem(404, "NOT_FOUND", "customer not found")
     return found
+
+
+# ---------------------------------------------------------------- evals (POC_08 §4)
+
+
+@router.get("/evals")
+async def evals_overview(_: Authed) -> dict[str, Any]:
+    return {"runs": await admin.evals.recent(), **admin.evals.status()}
+
+
+@router.post("/evals/run", status_code=202)
+async def evals_run(_: Mutating, suite: str | None = None) -> dict[str, Any]:
+    """Start a run in the API process (one at a time); progress via GET /evals."""
+    suites = None if suite in (None, "", "all") else [s.strip() for s in suite.split(",")]
+    if suites and (unknown := set(suites) - set(admin.evals.ORDER)):
+        raise problem(422, "INVALID", f"unknown suite(s): {sorted(unknown)}")
+    if not admin.evals.start(suites):
+        raise problem(409, "BUSY", "an eval run is already in progress")
+    return {"started": True, "suites": suites or admin.evals.ORDER}

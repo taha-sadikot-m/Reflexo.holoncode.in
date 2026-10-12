@@ -1,0 +1,19 @@
+# Who an owner's answer applies to (POC_04 §7): global (a fact about the shop, saved for everyone),
+# customer (only this customer), temporary (today / a limited time). Some answers carry an explicit marker the
+# decider reads deterministically; most need the classifier. 15 cases (POC_08 §4.2).
+cases:
+  - {id: s-vegan, question: "Do you make vegan cakes?", answer: "No, we don't make vegan cakes.", expected_scope: global}
+  - {id: s-hinjewadi, question: "Kya aap Hinjewadi deliver karte ho?", answer: "Haan Hinjewadi bhi karte hain, ₹100 charge lagega.", expected_scope: global}
+  - {id: s-parking, question: "Is there parking near the shop?", answer: "Yes, there is street parking right outside.", expected_scope: global}
+  - {id: s-fondant, question: "Fondant wale cake bante hain?", answer: "Haan, fondant cakes bana sakte hain, price design ke hisaab se.", expected_scope: global}
+  - {id: s-candles, question: "क्या आप जन्मदिन के लिए मोमबत्ती देते हैं?", answer: "हाँ, हर केक के साथ मोमबत्ती फ्री देते हैं।", expected_scope: global}
+  - {id: s-gift-wrap, question: "Gift wrapping hoti hai?", answer: "Haan, ₹30 mein gift wrapping karte hain.", expected_scope: global}
+  - {id: s-half-half, question: "Can I pay half now and half on delivery?", answer: "Theek hai, inke liye half-half chalega, purane customer hain.", expected_scope: customer}
+  - {id: s-discount-once, question: "Mujhe discount milega?", answer: "Is baar inko ₹100 kam kar do.", expected_scope: customer}
+  - {id: s-office-9am, question: "Can you deliver to my office at 9 am?", answer: "For her, yes — I'll drop it myself at 9.", expected_scope: customer}
+  - {id: s-logo, question: "Can my cake have my company logo?", answer: "Sure, for this order I'll print the logo free of cost.", expected_scope: customer}
+  - {id: s-late-pickup, question: "Can I collect at 10 pm?", answer: "Theek hai, aap 10 baje aa jaiye, main ruk jaungi.", expected_scope: customer}
+  - {id: s-oven, question: "Aaj delivery ho sakti hai?", answer: "Aaj nahi ho payegi, oven kharab hai.", expected_scope: temporary}
+  - {id: s-closed-today, question: "Is the shop open today?", answer: "Today we are closed for a family function.", expected_scope: temporary}
+  - {id: s-mango-week, question: "Mango cake milega?", answer: "Is hafte mango cake available hai, season ka special hai.", expected_scope: temporary}
+  - {id: s-diwali-free, question: "Delivery charge kitna hai?", answer: "Aaj Diwali ki wajah se delivery free hai.", expected_scope: temporary}

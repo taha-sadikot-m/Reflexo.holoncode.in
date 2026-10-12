@@ -70,7 +70,8 @@ def eval_seed(meera: dict[str, Any]) -> dict[str, Any]:
     seed["slug"] = "eval-bakes"
     seed["name"] = "Eval Bakes"
     seed["order_number_prefix"] = "EB"
-    seed["owner"] = {"display_name": "Eval Owner", "simulated_whatsapp": "+919999900003"}
+    # the eval owner talks through the simulator channel (owner_commands suite); simulated_only like the Lab's
+    seed["owner"] = {"display_name": "Eval Owner", "simulated_whatsapp": "+919999900003", "simulator_id": "eval-owner"}
     seed["connections"] = [
         {
             "channel": "web_widget",
@@ -139,6 +140,8 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
         bindings.append(("telegram", getattr(settings, owner["telegram_setting"]), False))
     if owner.get("simulated_whatsapp"):
         bindings.append(("whatsapp", owner["simulated_whatsapp"], True))
+    if owner.get("simulator_id"):
+        bindings.append(("web_widget", owner["simulator_id"], True))
     for i, (channel, external_id, simulated) in enumerate(bindings):
         await _exec(
             s,
@@ -239,15 +242,20 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
     return bid
 
 
-async def load(db: Database, mode: Mode = "onboarding", settings: Settings | None = None) -> SeedReport:
+async def load(
+    db: Database,
+    mode: Mode = "onboarding",
+    settings: Settings | None = None,
+    slugs: tuple[str, ...] = DEMO_SLUGS,
+) -> SeedReport:
     settings = settings or get_settings()
     started = time.perf_counter()
     report = SeedReport()
     meera = read_seed("meeras_bakes")
     seeds: list[tuple[dict[str, Any], bool]] = [
-        (meera, mode == "full"),
-        (read_seed("kurti_kraft"), True),
-        (eval_seed(meera), True),
+        (seed, full)
+        for seed, full in ((meera, mode == "full"), (read_seed("kurti_kraft"), True), (eval_seed(meera), True))
+        if seed["slug"] in slugs
     ]
     async with db.service_session(ServiceReason.SEED) as s:
         for seed, full in seeds:
@@ -259,14 +267,14 @@ async def load(db: Database, mode: Mode = "onboarding", settings: Settings | Non
     return report
 
 
-async def wipe(db: Database) -> int:
+async def wipe(db: Database, slugs: tuple[str, ...] = DEMO_SLUGS) -> int:
     """Delete the demo businesses; FK cascades remove every dependent row."""
     async with db.service_session(ServiceReason.SEED) as s:
-        result = await s.execute(text("DELETE FROM businesses WHERE slug = ANY(:slugs)"), {"slugs": list(DEMO_SLUGS)})
+        result = await s.execute(text("DELETE FROM businesses WHERE slug = ANY(:slugs)"), {"slugs": list(slugs)})
         return int(result.rowcount or 0) if isinstance(result, CursorResult) else 0
 
 
-async def live_workflows(db: Database) -> list[str]:
+async def live_workflows(db: Database, slugs: tuple[str, ...] = DEMO_SLUGS) -> list[str]:
     """Workflows still running for the demo businesses: automation runs, imports, approvals that wait on a timer."""
     async with db.service_session(ServiceReason.SEED) as s:
         rows = (
@@ -282,7 +290,7 @@ async def live_workflows(db: Database) -> list[str]:
             UNION
             SELECT workflow_id FROM approval_requests
              WHERE business_id IN (SELECT id FROM demo) AND status = 'pending' AND workflow_id IS NOT NULL"""),
-                {"slugs": list(DEMO_SLUGS)},
+                {"slugs": list(slugs)},
             )
         ).all()
     return [r.workflow_id for r in rows]
@@ -305,12 +313,13 @@ async def reset(
     mode: Mode = "onboarding",
     settings: Settings | None = None,
     workflows: WorkflowPort | None = None,
+    slugs: tuple[str, ...] = DEMO_SLUGS,
 ) -> SeedReport:
     """`demo-reset`: terminate the demo businesses' live workflows (their rows are about to go: a timer firing
     later would act on nothing, or retry forever), then wipe + reseed. Temporal being down does not block the
     reset — it is reported, and those workflows fail harmlessly when they wake."""
     started = time.perf_counter()
-    ids = await live_workflows(db) if workflows else []
+    ids = await live_workflows(db, slugs) if workflows else []
     terminated, unreachable = 0, False
     if ids and workflows:
         try:
@@ -319,8 +328,8 @@ async def reset(
         except TimeoutError:
             unreachable = True
             log.warning("demo_reset_terminate_timeout", workflows=len(ids))
-    deleted = await wipe(db)
-    report = await load(db, mode, settings)
+    deleted = await wipe(db, slugs)
+    report = await load(db, mode, settings, slugs)
     report.workflows_terminated, report.workflows_unreachable = terminated, unreachable
     report.seconds = time.perf_counter() - started
     log.info(

@@ -1,0 +1,60 @@
+# The learning loop (ADR-015, POC_10 §6): from one owner decision, the rule the owner most likely follows —
+# built from the facts that explain the decision, not incidental ones (the exact total, this customer's count),
+# every condition true for the case. The effect follows the decision (yes → allow, no → deny).
+cases:
+  - id: l-cancel-far-yes
+    capability: order.cancel
+    approve: true
+    reason: "plans changed"
+    situation: {order.status: confirmed, order.payment_method: cod, order.payment_status: cod_pending, order.total_rupees: 950, order.hours_until_delivery: 72, order.hours_since_placed: 2, order.categories: [cakes], customer.orders_count: 1}
+    expect_any_field: [order.hours_until_delivery, order.status, order.hours_since_placed]
+    forbid_fields: [order.total_rupees, customer.orders_count]
+  - id: l-cancel-near-no
+    capability: order.cancel
+    approve: false
+    reason: "not needed any more"
+    situation: {order.status: preparing, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 1100, order.hours_until_delivery: 6, order.hours_since_placed: 40, order.categories: [cakes], customer.orders_count: 2}
+    expect_any_field: [order.hours_until_delivery, order.status]
+    forbid_fields: [order.total_rupees]
+  - id: l-change-date-yes
+    capability: order.change
+    approve: true
+    reason: "party moved to next day"
+    situation: {order.status: confirmed, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 750, order.hours_until_delivery: 96, order.hours_since_placed: 5, order.categories: [cakes], customer.orders_count: 1}
+    expect_any_field: [order.hours_until_delivery, order.status]
+    forbid_fields: [order.total_rupees, customer.orders_count]
+  - id: l-change-preparing-no
+    capability: order.change
+    approve: false
+    reason: "want a different flavour"
+    situation: {order.status: preparing, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 950, order.hours_until_delivery: 20, order.hours_since_placed: 30, order.categories: [cakes], customer.orders_count: 1}
+    expect_any_field: [order.status, order.hours_until_delivery]
+    forbid_fields: [order.total_rupees, customer.orders_count]
+  - id: l-refund-cancelled-yes
+    capability: refund.request
+    approve: true
+    reason: "order was cancelled after I paid"
+    situation: {order.status: cancelled, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 1100, order.hours_until_delivery: 50, order.hours_since_placed: 3, order.categories: [cakes], customer.orders_count: 1}
+    expect_any_field: [order.status, order.payment_status]
+    forbid_fields: [order.total_rupees, customer.orders_count]
+  - id: l-refund-delivered-no
+    capability: refund.request
+    approve: false
+    reason: "didn't like the taste"
+    situation: {order.status: delivered, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 420, order.hours_until_delivery: -48, order.hours_since_placed: 75, order.categories: [brownies], customer.orders_count: 1}
+    expect_any_field: [order.status, order.hours_since_placed, order.hours_until_delivery]
+    forbid_fields: [order.total_rupees]
+  - id: l-cancel-paid-yes
+    capability: order.cancel
+    approve: true
+    reason: "ordered by mistake"
+    situation: {order.status: confirmed, order.payment_method: razorpay_link, order.payment_status: paid, order.total_rupees: 550, order.hours_until_delivery: 48, order.hours_since_placed: 1, order.categories: [cakes], customer.orders_count: 1}
+    expect_any_field: [order.hours_until_delivery, order.status, order.hours_since_placed]
+    forbid_fields: [order.total_rupees, customer.orders_count]
+  - id: l-cancel-draft-yes
+    capability: order.cancel
+    approve: true
+    reason: "changed my mind"
+    situation: {order.status: awaiting_payment, order.payment_method: razorpay_link, order.payment_status: unpaid, order.total_rupees: 350, order.hours_until_delivery: 30, order.hours_since_placed: 0.5, order.categories: [cookies], customer.orders_count: 1}
+    expect_any_field: [order.status, order.payment_status, order.hours_until_delivery, order.hours_since_placed]
+    forbid_fields: [order.total_rupees, customer.orders_count]

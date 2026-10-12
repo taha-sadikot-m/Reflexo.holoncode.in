@@ -96,7 +96,7 @@ class QuestionService:
                     relayed=str(q.status) == "relayed",
                     already_answered=True,
                 )
-        decided, uncertain = await self._decide_scope(business_id, q.question, answer, scope)
+        decided, uncertain = await self.decide_scope(business_id, q.question, answer, scope)
         valid_until = await self._end_of_today(business_id) if decided == "temporary" else None
         saved_scope: Scope = "customer" if uncertain else decided
         cs = await knowledge.apply_now(
@@ -218,7 +218,7 @@ class QuestionService:
         await emit("owner_question_sla", PipelineEventStatus.OK, business_id=business_id, question=str(question_id))
 
     # ---------------------------------------------------------------- helpers
-    async def _decide_scope(
+    async def decide_scope(
         self, business_id: UUID, question: str, answer: str, given: str | None
     ) -> tuple[Scope, bool]:
         """(scope, uncertain). Explicit scope or a deterministic marker → certain; else the classifier role."""

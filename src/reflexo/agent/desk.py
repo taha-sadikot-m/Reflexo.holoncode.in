@@ -325,6 +325,8 @@ class CustomerDesk:
             duration_ms=int((time.perf_counter() - started) * 1000),
             action=action,
             topic=output.topic if output else None,
+            language=output.language if output else None,
+            refs=sorted({r.type for r in output.referenced_records}) if output else [],
             model_calls=ctx.stats.model_calls,
             hedged=ctx.stats.hedged,
         )

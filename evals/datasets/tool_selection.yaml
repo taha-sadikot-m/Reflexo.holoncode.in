@@ -1,0 +1,174 @@
+# Customer desk: the right tools — and, just as important, not the wrong ones (POC_08 §4.2).
+# 24 Hinglish / 8 Hindi / 8 English, incl. multi-intent and multi-turn. The LAST message of each case is scored.
+# expect_tools: all must run · expect_any_tool: one must run (or the action is one of or_action) ·
+# forbid_tools: none may run · expect_action / expect_action_any: the reply's action.
+# Catalogue cards are pre-fetched into context, so a plain info question needs no tool: there we check that
+# nothing is done to the customer's orders and that the reply is sent.
+cases:
+  # ---------------------------------------------------------------- Hinglish
+  - id: hl-order-new
+    messages: ["1 kg chocolate truffle chahiye parso shaam ke liye"]
+    expect_tools: [order_start]
+  - id: hl-order-all-details
+    messages: ["Red velvet 1 kg order karna hai parso, 4-8 pm slot, Kothrud 411038, eggless chahiye"]
+    expect_tools: [order_start]
+  - id: hl-order-two-items
+    messages: ["2 box brownies aur 1 jar cookies order karna hai parso ke liye"]
+    expect_tools: [order_start]
+  - id: hl-price
+    messages: ["red velvet kitne ka hai?"]
+    expect_action: send
+    forbid_tools: [order_start, order_cancel, order_change, order_confirm]
+  - id: hl-price-alias
+    messages: ["choco truffle 500g ka rate kya hai"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: hl-unknown-product
+    messages: ["sugar free cake milta hai kya?"]
+    expect_any_tool: [catalog_search, knowledge_lookup]
+    or_action: [ask_owner]
+    forbid_tools: [order_start]
+  - id: hl-delivery-area
+    messages: ["Baner mein delivery hoti hai?"]
+    expect_any_tool: [delivery_quote]
+    forbid_tools: [order_start]
+  - id: hl-delivery-far
+    messages: ["Hinjewadi phase 3 deliver karoge?"]
+    expect_any_tool: [delivery_quote]
+    or_action: [ask_owner]
+  - id: hl-payment
+    messages: ["payment kaise karna hai? UPI chalega?"]
+    expect_action: send
+    forbid_tools: [order_start, order_confirm]
+  - id: hl-cancel-draft
+    messages:
+      - "1 kg pineapple cake order karna hai parso, 4-8 pm, Kothrud 411038"
+      - "nahi rehne do, cancel kar do"
+    expect_tools: [order_cancel]
+  - id: hl-change-date
+    messages:
+      - "1 kg red velvet order karna hai parso, 4-8 pm, Kothrud 411038"
+      - "date ek din aage kar do please"
+    expect_any_tool: [order_update, order_change]
+    forbid_tools: [order_cancel]
+  - id: hl-status-none
+    messages: ["mera order kahan tak pahuncha?"]
+    expect_action_any: [send, ask_owner]
+    forbid_tools: [order_start, order_cancel]
+  - id: hl-complaint
+    messages: ["cake bilkul kharab tha, bahut gussa aa raha hai!"]
+    expect_action: handoff
+    forbid_tools: [order_start]
+  - id: hl-human
+    messages: ["mujhe owner se baat karni hai"]
+    expect_action: handoff
+  - id: hl-discount
+    messages: ["thoda discount milega kya?"]
+    expect_action_any: [ask_owner, send]
+    forbid_tools: [order_start, order_confirm]
+  - id: hl-custom-cake
+    messages: ["birthday ke liye photo cake banwana hai, kitna lagega?"]
+    expect_action_any: [send, ask_owner]
+    forbid_tools: [order_confirm]
+  - id: hl-eggless
+    messages: ["truffle eggless milega?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: hl-hours
+    messages: ["sunday ko shop khula hai?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: hl-multi-intent
+    messages: ["red velvet ka price batao aur Warje mein delivery hoti hai kya?"]
+    expect_action: send
+    forbid_tools: [order_start, order_confirm]
+  - id: hl-confirm
+    messages:
+      - "1 jar choco-chip cookies chahiye parso, 4-8 pm, Kothrud 411038"
+      - "haan sab sahi hai, confirm karo, UPI se pay karunga"
+    expect_any_tool: [order_confirm]
+  - id: hl-greeting
+    messages: ["hii"]
+    expect_action: send
+    forbid_tools: [order_start, order_cancel, order_change, order_confirm, refund_request]
+  - id: hl-quantity-change
+    messages:
+      - "1 jar cookies order karna hai parso, 4-8 pm, Kothrud 411038"
+      - "1 nahi, 2 jar kar do"
+    expect_any_tool: [order_update]
+    forbid_tools: [order_cancel]
+  - id: hl-same-day
+    messages: ["aaj shaam tak cake mil jayega?"]
+    expect_action_any: [send, ask_owner]
+    forbid_tools: [order_confirm]
+  - id: hl-allergy
+    messages: ["nuts bilkul nahi hone chahiye, nut-free cake hai?"]
+    expect_any_tool: [catalog_search, knowledge_lookup]
+    or_action: [ask_owner, send]
+    forbid_tools: [order_start]
+
+  # ---------------------------------------------------------------- Hindi
+  - id: hi-price
+    messages: ["रेड वेलवेट केक कितने का है?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: hi-order
+    messages: ["मुझे परसों के लिए 1 किलो चॉकलेट ट्रफल केक चाहिए"]
+    expect_tools: [order_start]
+  - id: hi-delivery
+    messages: ["क्या आप बाणेर में डिलीवरी करते हैं?"]
+    expect_any_tool: [delivery_quote]
+  - id: hi-complaint
+    messages: ["मेरा केक खराब निकला, मुझे बहुत बुरा लगा"]
+    expect_action: handoff
+  - id: hi-payment
+    messages: ["पेमेंट कैसे करूँ?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: hi-unknown
+    messages: ["क्या आपके पास शुगर फ्री केक है?"]
+    expect_any_tool: [catalog_search, knowledge_lookup]
+    or_action: [ask_owner]
+  - id: hi-cancel
+    messages:
+      - "परसों के लिए 1 किलो पाइनएप्पल केक चाहिए, 4-8 बजे, कोथरूड 411038"
+      - "ऑर्डर कैंसल कर दीजिए"
+    expect_tools: [order_cancel]
+  - id: hi-hours
+    messages: ["आप कब तक खुले रहते हैं?"]
+    expect_action: send
+    forbid_tools: [order_start]
+
+  # ---------------------------------------------------------------- English
+  - id: en-order
+    messages: ["I'd like a 1 kg pineapple cake for the day after tomorrow, 4-8pm, delivered to Kothrud 411038"]
+    expect_tools: [order_start]
+  - id: en-price
+    messages: ["How much are the brownies?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: en-delivery
+    messages: ["Do you deliver to Hinjewadi?"]
+    expect_any_tool: [delivery_quote]
+    or_action: [ask_owner]
+  - id: en-human
+    messages: ["Can I speak to a real person please?"]
+    expect_action: handoff
+  - id: en-cancel
+    messages:
+      - "I want 2 boxes of fudge brownies for the day after tomorrow, 4-8pm, Kothrud 411038"
+      - "Actually, please cancel that order"
+    expect_tools: [order_cancel]
+  - id: en-multi-intent
+    messages: ["What cakes do you have, and can I pay by card?"]
+    expect_action: send
+    forbid_tools: [order_start]
+  - id: en-unknown
+    messages: ["Do you make vegan cakes?"]
+    expect_any_tool: [catalog_search, knowledge_lookup]
+    or_action: [ask_owner]
+  - id: en-confirm
+    messages:
+      - "One 1 kg red velvet for the day after tomorrow, 4-8pm, Kothrud 411038 please"
+      - "Yes, that's all correct — please confirm, I'll pay online"
+    expect_any_tool: [order_confirm]

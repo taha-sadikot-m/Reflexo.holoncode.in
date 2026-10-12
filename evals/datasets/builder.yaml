@@ -1,0 +1,27 @@
+# Automation builder: the owner's words → valid definitions (after the same validate-and-repair loop as the
+# build workflow) that say what the owner said (POC_08 §4.2: 8 cases incl. the demo sentence; pass ≥ 7/8).
+cases:
+  - id: b-demo-sentence
+    description: "Ek din mein 8 se zyada cake orders mat lena, COD orders confirm karwa lena, aur delivery se ek din pehle customer ko reminder bhejna"
+    expect: {count: 3, counter_limit: 8, step_types: [counter_limit, send]}
+  - id: b-daily-limit
+    description: "Ek din mein 5 se zyada brownie orders nahi lene"
+    expect: {count: 1, counter_limit: 5, step_types: [counter_limit]}
+  - id: b-thank-you
+    description: "Har order confirm hone par customer ko thank you message bhejo"
+    expect: {count: 1, triggers: [order_confirmed], step_types: [send]}
+  - id: b-unpaid-link
+    description: "Agar payment link 2 ghante tak pay na ho toh customer ko yaad dilana"
+    expect: {count: 1, triggers: [payment_link_created], step_types: [send]}
+  - id: b-big-order
+    description: "Jab bhi 3000 rupaye se upar ka order confirm ho, mujhe turant batana"
+    expect: {count: 1, triggers: [order_confirmed], step_types: [notify_owner], mentions: ["300000"]}
+  - id: b-welcome
+    description: "Naye customer ka pehla message aaye toh welcome bolo aur menu ke baare mein batao"
+    expect: {count: 1, triggers: [message_received], step_types: [send]}
+  - id: b-day-before
+    description: "Remind customers one day before their delivery"
+    expect: {count: 1, step_types: [wait, send]}
+  - id: b-cod-confirm
+    description: "For cash on delivery orders, ask the customer to confirm with YES; if they don't reply within 2 hours, tell me"
+    expect: {count: 1, step_types: [wait_for_event, send]}
