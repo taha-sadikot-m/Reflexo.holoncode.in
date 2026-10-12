@@ -228,7 +228,7 @@ async def chaos_clear_flag(key: str, _: Mutating) -> dict[str, Any]:
 
 
 class SimSendBody(BaseModel):
-    actor: int = Field(ge=1, le=99)
+    actor: int = Field(ge=1, le=9999)
     text: str | None = Field(default=None, max_length=4000)
     option_id: str | None = Field(default=None, max_length=100)
     option_title: str | None = Field(default=None, max_length=100)
@@ -245,7 +245,7 @@ async def sim_send(body: SimSendBody, _: Mutating, business_id: Business) -> dic
 
 
 @router.get("/sim/thread")
-async def sim_thread(actor: Annotated[int, Query(ge=1, le=99)], _: Authed, business_id: Business) -> dict[str, Any]:
+async def sim_thread(actor: Annotated[int, Query(ge=1, le=9999)], _: Authed, business_id: Business) -> dict[str, Any]:
     return await admin.sim.thread(business_id, actor)
 
 

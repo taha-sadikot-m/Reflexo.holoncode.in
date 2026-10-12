@@ -1,4 +1,4 @@
-import { Activity, Bomb, LayoutDashboard, LogOut, MessagesSquare, Moon, Sun } from "lucide-react";
+import { Activity, Bomb, FlaskConical, LayoutDashboard, LogOut, MessagesSquare, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
@@ -7,6 +7,7 @@ import { cx } from "./ui";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/lab", label: "Simulation Lab", icon: FlaskConical },
   { to: "/xray", label: "Pipeline X-ray", icon: Activity },
   { to: "/conversations", label: "Conversations", icon: MessagesSquare },
   { to: "/chaos", label: "Chaos", icon: Bomb },

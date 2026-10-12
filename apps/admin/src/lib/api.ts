@@ -178,3 +178,40 @@ export interface ChaosOverview {
   flags: Record<string, { value: unknown; expires_at: string | null }>;
   recent: ChaosRun[];
 }
+export interface SimThreadItem {
+  at: string;
+  from: "customer" | "business";
+  text?: string | null;
+  option?: string | null;
+  payload?: Record<string, any>;
+  status?: string;
+}
+export interface SimThread {
+  conversation_id: string | null;
+  items: SimThreadItem[];
+  payment_links?: { id: string; amount_paise: number; status: string; url: string; order_number: string }[];
+}
+export interface ScenarioSummary {
+  id: string;
+  title: string;
+  covers: string;
+  steps: number;
+}
+export interface ScenarioStep {
+  index: number;
+  label: string;
+  status: "pending" | "running" | "ok" | "failed" | "skipped";
+  detail: string | null;
+  seconds: number | null;
+}
+export interface ScenarioRun {
+  id: string;
+  scenario_id: string;
+  title: string;
+  business_id: string;
+  status: "running" | "passed" | "failed" | "stopped";
+  steps: ScenarioStep[];
+  actors: Record<string, number>;
+  started_at: string;
+  finished_at: string | null;
+}
