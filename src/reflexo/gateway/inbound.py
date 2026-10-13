@@ -15,6 +15,7 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+from reflexo.common import ports
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import (
     CallRouterPort,
@@ -24,6 +25,7 @@ from reflexo.common.contracts import (
     JobEnqueuer,
     NewDomainEvent,
     OwnerCommandPort,
+    OwnerNotifyPort,
     RoutableEvent,
     TurnScheduler,
 )
@@ -31,7 +33,7 @@ from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass
 from reflexo.common.flags import business_killed
 from reflexo.common.ids import new_id
-from reflexo.common.logging import get_logger
+from reflexo.common.logging import get_logger, mask_phone_numbers
 from reflexo.common.ports import Registry
 from reflexo.common.redis import RedisUnavailable, get_redis
 from reflexo.common.xray import emit
@@ -323,14 +325,17 @@ class GatewayInbound:
                 )
                 if decision == "consumed":
                     return
-            if not await self._customer_turn_allowed(conn, sender.conversation_id):
+            blocked = await self._customer_turn_blocked(conn, sender.conversation_id)
+            if blocked is not None:
                 await emit(
                     "turn_scheduled",
                     PipelineEventStatus.SKIP,
                     business_id=conn.business_id,
                     conversation_id=sender.conversation_id,
-                    reason="mode",
+                    reason=blocked,
                 )
+                if blocked == "human":
+                    await self._while_human_handles(conn, sender.conversation_id, sender.customer_id, ev.text)
                 return
             await self._schedule(conn, sender.conversation_id, message_id, Desk.CUSTOMER, PriorityClass.P0, ev)
             return
@@ -451,11 +456,13 @@ class GatewayInbound:
             )
         return True
 
-    async def _customer_turn_allowed(self, conn: ConnectionInfo, conversation_id: UUID) -> bool:
+    async def _customer_turn_blocked(self, conn: ConnectionInfo, conversation_id: UUID) -> str | None:
+        """Why the AI must not answer: "mode" (AI off / business inactive / killed), "human" (a person is handling
+        this chat), or None."""
         if conn.business_status != "active" or conn.customer_mode == "off" or "customer" not in conn.roles:
-            return False
+            return "mode"
         if await business_killed(conn.business_id):
-            return False
+            return "mode"
         async with get_db().service_session(ServiceReason.INBOUND_RESOLVE) as s:
             human = (
                 await s.execute(
@@ -463,7 +470,39 @@ class GatewayInbound:
                     {"c": conversation_id},
                 )
             ).scalar_one()
-        return not human
+        return "human" if human else None
+
+    async def _while_human_handles(
+        self, conn: ConnectionInfo, conversation_id: UUID, customer_id: UUID | None, body: str | None
+    ) -> None:
+        """The customer wrote while a person holds the chat: the AI stays silent, so a person must know — the chat
+        is flagged and the owner is told once per takeover, with a way to hand it back (live 13 Oct: a "reply as
+        team" test silenced the AI for 30 min and the customer's cancellation reached nobody)."""
+        async with get_db().service_session(ServiceReason.INBOUND_RESOLVE) as s:
+            row = (
+                await s.execute(
+                    text("""UPDATE conversations c SET needs_attention = true WHERE c.id = :c
+                            RETURNING c.human_active_until,
+                                      (SELECT coalesce(cu.display_name, cu.phone_e164) FROM customers cu
+                                        WHERE cu.id = c.customer_id) AS who"""),
+                    {"c": conversation_id},
+                )
+            ).one()
+        notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
+        if notifier is None:
+            return
+        who = mask_phone_numbers(str(row.who)) if row.who else "A customer"
+        said = f"\n“{body.strip()[:300]}”" if body and body.strip() else ""
+        await notifier.notify(
+            conn.business_id,
+            "human_waiting",
+            f"✋ {who} wrote while a person is handling this chat — the AI is staying quiet.{said}",
+            dedupe_key=f"human_waiting:{conversation_id}:{row.human_active_until.isoformat()}",
+            priority=PriorityClass.P1,
+            buttons=[(f"ai:{conversation_id}", "🤖 Let AI handle"), (f"chat:{conversation_id}", "💬 Show chat")],
+            ref={"conversation_id": str(conversation_id)},
+            about_conversation=conversation_id,
+        )
 
     async def _schedule(
         self,
@@ -493,3 +532,42 @@ class GatewayInbound:
             turn_id=turn_id,
             desk=str(desk),
         )
+
+
+async def hand_back_to_ai(business_id: UUID, conversation_id: UUID) -> bool:
+    """End a human takeover and let the AI answer what is waiting: the customer's latest message that came after
+    the last reply and got no turn (it arrived while a person held the chat). True if a turn was scheduled."""
+    async with get_db().tenant_session(business_id) as s:
+        found = (
+            await s.execute(
+                text("""UPDATE conversations SET human_active_until = NULL, needs_attention = false
+                        WHERE id = :c RETURNING id"""),
+                {"c": conversation_id},
+            )
+        ).first()
+        if found is None:
+            raise LookupError("conversation not found")
+        waiting = (
+            await s.execute(
+                text("""SELECT m.id FROM messages m
+                        WHERE m.conversation_id = :c AND m.direction = 'inbound' AND m.turn_id IS NULL
+                          AND m.created_at > coalesce((SELECT max(o.created_at) FROM messages o
+                                                        WHERE o.conversation_id = :c AND o.direction = 'outbound'),
+                                                       '-infinity')
+                        ORDER BY m.created_at DESC LIMIT 1"""),
+                {"c": conversation_id},
+            )
+        ).scalar_one_or_none()
+        if waiting is None:
+            return False
+        await ports.registry.require(TurnScheduler).schedule(  # type: ignore[type-abstract]
+            s,
+            business_id=business_id,
+            conversation_id=conversation_id,
+            message_id=waiting,
+            desk=Desk.CUSTOMER,
+            priority=PriorityClass.P0,
+            ends_thought=True,
+        )
+    await emit("human_released", PipelineEventStatus.OK, business_id=business_id, conversation_id=conversation_id)
+    return True

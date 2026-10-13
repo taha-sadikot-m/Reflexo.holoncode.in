@@ -28,7 +28,7 @@ from reflexo.common.ports import Registry, reset_registry
 from reflexo.pipeline import api as pipeline_api
 from reflexo.pipeline.turns import _TURN_COLUMNS, PipelineTurnHandle, TurnService, _ref
 from tests.integration.test_customer_desk import PRIMARY, make_bakery, outbound_texts, reply, turn_for
-from tests.integration.test_gateway import deliver
+from tests.integration.test_gateway import deliver, wa_message
 
 pytestmark = pytest.mark.integration
 OWNER_CHAT = "555001"
@@ -371,3 +371,45 @@ async def test_simulated_conversations_never_reach_the_real_owner(
     assert await owner_messages(db, shop) == []  # nothing on the real Telegram
     [note] = await q(db, "SELECT kind FROM owner_notifications WHERE business_id = :b", b=shop.bid)
     assert note.kind == "question"  # still recorded (admin Owner page shows it)
+
+
+async def test_a_message_during_a_human_takeover_reaches_the_owner_and_can_be_handed_back(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live 13 Oct: a team reply put the chat in takeover; the customer's cancellation then reached nobody."""
+    shop = await bakery(db)
+    wa = wa_number()
+    fake.script(PRIMARY, lambda a: reply("send", "Namaste!", topic="greeting_smalltalk"))
+    first = await turn_for(registry, db, shop.pnid, wa, "hi")
+    await registry.require(TurnRunnerPort).run_turn(first)  # type: ignore[type-abstract]
+    conv = first.ref.conversation_id
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE conversations SET human_active_until = now() + interval '30 minutes' WHERE id = :c"),
+            {"c": conv},
+        )
+
+    for body in ("mera order cancel kar do", "hello??"):
+        await deliver(registry, db, "meta_whatsapp", wa_message(shop.pnid, wa, f"wamid.{new_id()}", body), shop.pnid)
+    pending = "SELECT message_ids FROM conversation_turns WHERE conversation_id = :c AND status = 'pending'"
+    assert not await q(db, pending, c=conv)
+    [row] = await q(db, "SELECT needs_attention FROM conversations WHERE id = :c", c=conv)
+    assert row.needs_attention
+    alerts = [m for m in await owner_messages(db, shop) if "handling this chat" in json.dumps(m, ensure_ascii=False)]
+    assert len(alerts) == 1  # once per takeover, not per message
+    alert = json.dumps(alerts[0], ensure_ascii=False)
+    assert "mera order cancel kar do" in alert and f"ai:{conv}" in alert and f"chat:{conv}" in alert
+
+    await owner_says(registry, db, shop, callback=f"ai:{conv}")  # 🤖 Let AI handle
+    [state] = await q(db, "SELECT human_active_until, needs_attention FROM conversations WHERE id = :c", c=conv)
+    assert state.human_active_until is None and not state.needs_attention
+    [turn] = await q(db, pending, c=conv)
+    [latest] = await q(
+        db,
+        "SELECT id FROM messages WHERE conversation_id = :c AND direction = 'inbound' ORDER BY created_at DESC LIMIT 1",
+        c=conv,
+    )
+    assert latest.id in turn.message_ids  # the AI answers what waited, nothing to resend
+    assert any(
+        "back on this chat and answering" in json.dumps(m, ensure_ascii=False) for m in await owner_messages(db, shop)
+    )

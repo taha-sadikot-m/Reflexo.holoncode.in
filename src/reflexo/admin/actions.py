@@ -49,6 +49,9 @@ async def reply_as_team(business_id: UUID, conversation_id: UUID, body: str) -> 
 
 
 async def set_takeover(business_id: UUID, conversation_id: UUID, active: bool) -> None:
+    if not active:  # release = hand back: the AI also answers what the customer wrote meanwhile
+        await gateway.hand_back_to_ai(business_id, conversation_id)
+        return
     async with get_db().tenant_session(business_id) as s:
         updated = await s.execute(
             text("""UPDATE conversations SET human_active_until =

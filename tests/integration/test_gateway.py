@@ -437,7 +437,7 @@ async def test_page_inbox_echo_starts_human_takeover(registry: Registry, db: Dat
                              AND status = 'skip'""",
         c=conv.id,
     )
-    assert skipped and skipped[-1].attrs["reason"] == "mode"
+    assert skipped and skipped[-1].attrs["reason"] == "human"  # a person holds the chat (not "AI off")
 
 
 # ---------------------------------------------------------------- opt-out / opt-in

@@ -35,7 +35,7 @@ from reflexo.gateway.adapters.simulator import SimulatorAdapter
 from reflexo.gateway.adapters.telegram import TelegramAdapter
 from reflexo.gateway.connections import ConnectionInfo, credentials, find_connection, get_connection
 from reflexo.gateway.connections import clear_cache as clear_connection_cache
-from reflexo.gateway.inbound import GatewayInbound
+from reflexo.gateway.inbound import GatewayInbound, hand_back_to_ai
 from reflexo.gateway.media import MediaSigner, file_kind, media_path, register_jobs, store_media
 from reflexo.gateway.outbound import EnqueueResult, Outbound
 from reflexo.gateway.views import (
@@ -317,3 +317,6 @@ def sign_simulator(raw_body: bytes) -> str:
 
 
 __all__ += ["sign_simulator"]
+
+
+__all__ += ["hand_back_to_ai"]  # end a human takeover; the AI answers what waited

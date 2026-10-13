@@ -34,6 +34,7 @@ _OPTION = re.compile(r"^(oq|oqs):([0-9a-f-]{36}):(.+)$")
 _APPROVAL_BUTTON = re.compile(r"^apv:([0-9a-f-]{36}):([ar])$")
 _LEARN_BUTTON = re.compile(r"^lrn:([0-9a-f-]{36}):([gco])$")  # learn from a decision: global / customer / once
 _CHAT_BUTTON = re.compile(r"^chat:([0-9a-f-]{36})$")  # "💬 Show chat" under an owner message
+_AI_BUTTON = re.compile(r"^ai:([0-9a-f-]{36})$")  # "🤖 Let AI handle": end a human takeover
 _YES = r"(?:yes|y|haan|han|ha|ok|okay|confirm|done|theek hai|kar do)"
 _NO = r"(?:no|n|nahi|nahin|cancel|mat karo|rehne do)"
 _DECIDE_CODE = re.compile(rf"^\s*({_YES}|{_NO})\s*[,:]?\s*(\d{{4}})\s*[.!]*\s*$", re.IGNORECASE)
@@ -126,6 +127,14 @@ class OwnerCommands:
         if option_id and (m := _CHAT_BUTTON.match(option_id)):
             await say(await recent_chat(business_id, UUID(m.group(1))))
             return "chat"
+        if option_id and (m := _AI_BUTTON.match(option_id)):
+            try:
+                answering = await gateway.hand_back_to_ai(business_id, UUID(m.group(1)))
+            except LookupError:
+                await say("I can't find that chat any more.")
+                return "hand_back"
+            await say("🤖 I'm back on this chat" + (" and answering their last message." if answering else "."))
+            return "hand_back"
         if (m := _DECIDE_CODE.match(body)) is not None:
             approve = re.fullmatch(_YES, m.group(1), re.IGNORECASE) is not None
             if await self._decide(say, business_id, member_id, approve, code=m.group(2)):
