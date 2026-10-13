@@ -82,7 +82,7 @@ export function Overview() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card title="Recent orders" actions={<ViewAll to="/orders" />} flush>
           {!orders.data ? (
             <div className="p-5">
@@ -164,7 +164,7 @@ export function Overview() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card title="Live activity" actions={<ViewAll to="/quality/xray" />} flush>
           {!traces.data ? (
             <div className="p-5">

@@ -19,6 +19,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { api, type ConversationItem, type OwnerWorkspace } from "../lib/api";
 import { useSession } from "../lib/session";
+import { Logo } from "./brand";
 import { Button, cx } from "./ui";
 
 type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: "inbox" | "brain"; hint: string };
@@ -68,20 +69,6 @@ class PageBoundary extends Component<{ children: ReactNode; resetKey: string }, 
   }
 }
 
-function Logo() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-signal to-[#8f6bff] text-[15px] font-bold text-white shadow-sm">
-        R
-      </div>
-      <div className="leading-tight">
-        <div className="text-[15px] font-semibold tracking-tight text-ink">Reflexo</div>
-        <div className="text-[11px] text-stone">Admin console</div>
-      </div>
-    </div>
-  );
-}
-
 export function Layout() {
   const { me, businesses, business, setBusinessId, logout } = useSession();
   const location = useLocation();
@@ -120,7 +107,7 @@ export function Layout() {
     <div className="flex h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-sand bg-white">
         <div className="px-5 pb-4 pt-5">
-          <Logo />
+          <Logo sub={window.location.pathname.startsWith("/app") ? "Your AI employee" : "Operations console"} />
         </div>
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
           {SECTIONS.map((section) => (

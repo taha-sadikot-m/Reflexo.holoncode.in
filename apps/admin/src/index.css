@@ -1,30 +1,33 @@
 @import "tailwindcss";
 
-/* Reflexo admin design system — light, Stripe-style: a soft gray canvas, white surfaces with quiet shadows, navy
-   text, one blue-violet accent, and status colours that carry meaning. The token names are the panel's own; their
+/* Reflexo brand system — Indigo + Marigold: deep indigo ink, a violet primary, warm marigold accents and a soft
+   warm-white canvas; Sora for headlines, Inter for text. The token names are shared by the site and the app; their
    values define the look, so every page follows from here. */
 @theme {
-  --font-display: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Sora", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
   /* text */
-  --color-ink: #0a2540; /* headings, primary text */
-  --color-soot: #1a1f36; /* body text */
-  --color-dusk: #4f566b; /* secondary text */
-  --color-stone: #8792a2; /* muted text, placeholders */
+  --color-ink: #1a1446; /* headings — deep indigo */
+  --color-soot: #26214a; /* body text */
+  --color-dusk: #585374; /* secondary text */
+  --color-stone: #948fab; /* muted text, placeholders */
 
   /* surfaces & lines */
-  --color-parchment: #f6f8fa; /* canvas */
-  --color-bone: #f1f4f8; /* subtle fill, hover */
-  --color-sand: #e3e8ee; /* borders, dividers */
+  --color-parchment: #f8f6f2; /* canvas — warm white */
+  --color-bone: #f1eee9; /* subtle fill, hover */
+  --color-sand: #e7e2da; /* borders, dividers */
   --color-indigo: #ffffff; /* (legacy dark surface) — white in the light theme */
-  --color-twilight: #e3e8ee; /* (legacy dark line) */
+  --color-twilight: #e7e2da; /* (legacy dark line) */
 
-  /* accent — blue-violet */
-  --color-signal: #635bff;
-  --color-signal-d: #4f46e5;
-  --color-signal-l: #efeeff;
+  /* primary — Reflexo violet */
+  --color-signal: #6c4ff5;
+  --color-signal-d: #5236e0;
+  --color-signal-l: #f0ecff;
+  /* deep brand indigo (hero, sidebar accents) */
+  --color-night: #15103a;
+  --color-night-2: #241a63;
 
   /* status */
   --color-verdant: #0e9f6e;
@@ -36,10 +39,11 @@
   --color-sky: #0570de;
   --color-sky-l: #e6f0fd;
 
-  /* warm brand accent (used sparingly: the logo mark, the demo-time pill) */
+  /* warm brand accent — marigold */
   --color-marigold: #ff9e1b;
+  --color-marigold-d: #f08300;
   --color-saffron: #b45309;
-  --color-blossom: #fff3e0;
+  --color-blossom: #fff4e2;
 
   /* stage families (X-ray) */
   --color-st-ingress: #8792a2;
@@ -53,8 +57,9 @@
   --color-st-workflow: #7c3aed;
   --color-st-error: #df1b41;
 
-  --shadow-card: 0 0 0 1px rgb(10 37 64 / 0.05), 0 1px 2px rgb(10 37 64 / 0.06), 0 2px 6px -1px rgb(10 37 64 / 0.05);
-  --shadow-pop: 0 0 0 1px rgb(10 37 64 / 0.06), 0 8px 24px -6px rgb(10 37 64 / 0.18);
+  --shadow-card: 0 0 0 1px rgb(26 20 70 / 0.05), 0 1px 2px rgb(26 20 70 / 0.05), 0 4px 12px -4px rgb(26 20 70 / 0.07);
+  --shadow-pop: 0 0 0 1px rgb(26 20 70 / 0.06), 0 12px 32px -8px rgb(26 20 70 / 0.22);
+  --shadow-glow: 0 10px 40px -10px rgb(108 79 245 / 0.45);
 }
 
 /* light only: `dark:` utilities never apply (the old toggle could leave every page black) */
@@ -79,10 +84,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 ::selection {
-  background: rgb(99 91 255 / 0.18);
+  background: rgb(108 79 245 / 0.18);
 }
 *:focus-visible {
-  outline: 2px solid rgb(99 91 255 / 0.55);
+  outline: 2px solid rgb(108 79 245 / 0.55);
   outline-offset: 2px;
 }
 /* quiet, thin scrollbars */
@@ -102,4 +107,41 @@ body {
   background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
   background-size: 800px 100%;
   animation: shimmer 1.4s ease infinite;
+}
+
+/* brand utilities */
+.text-gradient {
+  background: linear-gradient(100deg, #8b6cff 0%, #c084fc 40%, #ffb347 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bg-brand {
+  background: linear-gradient(135deg, #6c4ff5 0%, #8a5cf6 55%, #ff9e1b 140%);
+}
+.bg-hero {
+  background:
+    radial-gradient(60% 80% at 85% 10%, rgb(255 158 27 / 0.28) 0%, transparent 60%),
+    radial-gradient(50% 70% at 10% 0%, rgb(139 108 255 / 0.45) 0%, transparent 65%),
+    linear-gradient(180deg, #15103a 0%, #1d1550 60%, #241a63 100%);
+}
+.grid-fade {
+  background-image: linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.6s ease-out both;
 }

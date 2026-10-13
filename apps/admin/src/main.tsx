@@ -22,6 +22,8 @@ import { Overview } from "./pages/Overview";
 import { Playbook } from "./pages/Playbook";
 import { Settings } from "./pages/Settings";
 import { Xray } from "./pages/Xray";
+import { Landing } from "./site/Landing";
+import { SoonPage } from "./site/Soon";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,14 +92,37 @@ function App() {
   );
 }
 
+/** The public site: what a visitor sees before they have an account. */
+function Site() {
+  return (
+    <Routes>
+      <Route index element={<Landing />} />
+      <Route path="demo" element={<SoonPage what="demo" />} />
+      <Route path="signup" element={<SoonPage what="signup" />} />
+      <Route path="login" element={<SoonPage what="login" />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// One build, three modes by the first path segment: the ops console (/admin), the owner's app (/app) and the public site.
+const segment = window.location.pathname.split("/")[1];
+const mode = segment === "admin" || segment === "app" ? segment : "site";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename="/admin">
-        <SessionProvider>
-          <App />
-        </SessionProvider>
-      </BrowserRouter>
+      {mode === "site" ? (
+        <BrowserRouter>
+          <Site />
+        </BrowserRouter>
+      ) : (
+        <BrowserRouter basename={`/${mode}`}>
+          <SessionProvider>
+            <App />
+          </SessionProvider>
+        </BrowserRouter>
+      )}
     </QueryClientProvider>
   </StrictMode>,
 );
