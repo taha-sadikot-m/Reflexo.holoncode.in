@@ -40,7 +40,7 @@ function Call({ c }: { c: CallRow }) {
             )}
           </div>
           <div className="space-y-1">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-stone">In-call events</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-stone">In-call events</div>
             {c.events.length ? (
               c.events.map((e, i) => (
                 <div key={i} className="text-xs">

@@ -99,7 +99,9 @@ function Device({
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const count = thread?.items.length ?? 0;
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [count]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" }); // block body: never return the Promise (see Conversations)
+  }, [count]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!draft.trim()) return;
@@ -274,7 +276,7 @@ export function Lab() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-bold">Simulation Lab</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink">Simulation Lab</h1>
           <p className="max-w-3xl text-sm text-dusk dark:text-stone">
             Simulated customers and a simulated owner talk to the real pipeline through signed provider payloads — only the last hop to WhatsApp is
             swapped. Nothing here reaches a real phone.

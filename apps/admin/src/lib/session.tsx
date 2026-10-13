@@ -15,6 +15,7 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 const BUSINESS_KEY = "reflexo.admin.business";
+const DEFAULT_SLUG = "meeras-bakes";
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
@@ -31,7 +32,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
   const me = meQuery.data ?? null;
-  useEffect(() => setCsrf(me?.csrf ?? null), [me]);
+  useEffect(() => {
+    setCsrf(me?.csrf ?? null);
+  }, [me]);
 
   const bizQuery = useQuery({
     queryKey: ["businesses"],
@@ -40,7 +43,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   });
   const [businessId, setBusinessIdState] = useState<string | null>(() => localStorage.getItem(BUSINESS_KEY));
   const businesses = bizQuery.data ?? [];
-  const business = businesses.find((b) => b.id === businessId) ?? businesses[0] ?? null;
+  // the remembered business, else the demo business (Meera's Bakes), else the first one — never a test business
+  const business =
+    businesses.find((b) => b.id === businessId) ??
+    businesses.find((b) => b.slug === DEFAULT_SLUG) ??
+    businesses.find((b) => !b.slug.startsWith("eval")) ??
+    businesses[0] ??
+    null;
 
   const value = useMemo<SessionValue>(
     () => ({

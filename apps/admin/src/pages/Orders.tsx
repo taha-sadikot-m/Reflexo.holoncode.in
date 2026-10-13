@@ -52,7 +52,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-lg font-bold">{o.order_number}</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-ink">{o.order_number}</h2>
         <StatusBadge status={o.status} />
         <StatusBadge status={o.payment_status} />
         {o.conversation_id && (
@@ -118,7 +118,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
       {o.missing_details.length > 0 && <div className="text-xs text-sun">Still missing: {o.missing_details.join(", ")}</div>}
       {o.payment_links.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">Payment links</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Payment links</div>
           {o.payment_links.map((p) => (
             <div key={p.id} className="flex items-center gap-2 text-sm">
               <StatusBadge status={p.status} />
@@ -130,7 +130,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
       )}
       {o.proposals.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">Asked the owner</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Asked the owner</div>
           {o.proposals.map((p) => (
             <div key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
               <Mono>{p.capability}</Mono>
@@ -144,7 +144,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         </div>
       )}
       <div>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">Timeline</div>
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Timeline</div>
         {o.timeline.length ? (
           <ol className="space-y-1 border-l border-sand pl-3 dark:border-twilight">
             {o.timeline.map((e, n) => (

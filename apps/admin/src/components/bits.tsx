@@ -56,17 +56,22 @@ const STATUS_TONE: Record<string, Tone> = {
 
 export function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return null;
-  return <Badge tone={STATUS_TONE[status] ?? "neutral"}>{status.replace(/_/g, " ")}</Badge>;
+  const label = status.replace(/_/g, " ");
+  return (
+    <Badge tone={STATUS_TONE[status] ?? "neutral"} dot>
+      {label.charAt(0).toUpperCase() + label.slice(1)}
+    </Badge>
+  );
 }
 
 export function PageHeader({ title, children, actions }: { title: string; children?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="font-display text-xl font-bold">{title}</h1>
-        {children && <p className="max-w-3xl text-sm text-dusk dark:text-stone">{children}</p>}
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="text-[22px] font-semibold tracking-tight text-ink">{title}</h1>
+        {children && <p className="mt-1 max-w-3xl text-[13.5px] leading-relaxed text-dusk">{children}</p>}
       </div>
-      {actions}
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -92,7 +97,7 @@ export function fmtDate(iso: string | null | undefined): string {
 
 export function Json({ value, className }: { value: unknown; className?: string }) {
   return (
-    <pre className={`max-h-80 overflow-auto rounded-lg bg-bone p-2.5 font-mono text-[11px] leading-relaxed dark:bg-ink ${className ?? ""}`}>
+    <pre className={`max-h-80 overflow-auto rounded-lg border border-sand bg-parchment p-3 font-mono text-[11.5px] leading-relaxed text-soot ${className ?? ""}`}>
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -101,8 +106,8 @@ export function Json({ value, className }: { value: unknown; className?: string 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-stone">{label}</div>
-      <div className="break-words text-sm">{children ?? "—"}</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-stone">{label}</div>
+      <div className="mt-0.5 break-words text-[13.5px] text-ink">{children ?? "—"}</div>
     </div>
   );
 }

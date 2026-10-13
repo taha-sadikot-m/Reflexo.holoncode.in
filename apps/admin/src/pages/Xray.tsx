@@ -6,7 +6,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
 import { api, type TraceDetail, type TraceEvent, type TraceSummary, type XrayEvent } from "../lib/api";
 import { useSession } from "../lib/session";
-import { CHANNEL_ICON, OUTCOME_LABEL, familyOf, fmtMs, fmtTime, stageColor, type StageFamily } from "../lib/stages";
+import { ChannelIcon } from "../components/channel";
+import { OUTCOME_LABEL, familyOf, fmtMs, fmtTime, stageColor, type StageFamily } from "../lib/stages";
 import { useXrayStream, type StreamMode } from "../lib/stream";
 
 function ModeBadge({ mode }: { mode: StreamMode }) {
@@ -192,7 +193,7 @@ export function Xray() {
                 className={cx("w-full px-4 py-2.5 text-left hover:bg-parchment dark:hover:bg-ink", t.trace_id === traceId && "bg-blossom dark:bg-twilight")}
               >
                 <div className="flex items-center gap-2 text-sm">
-                  <span>{CHANNEL_ICON[t.provider ?? ""] ?? "•"}</span>
+                  <ChannelIcon channel={t.provider} size="sm" />
                   <span className="min-w-0 flex-1 truncate">{t.snippet ?? <Mono>{t.trace_id.slice(0, 12)}…</Mono>}</span>
                   <span className="font-mono text-xs text-dusk">{fmtMs(t.total_ms)}</span>
                 </div>

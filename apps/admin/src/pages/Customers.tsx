@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { UserRound, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { Field, PageHeader, StatusBadge, fmtWhen, inr } from "../components/bits";
-import { Badge, Card, Empty, ErrorNote, cx } from "../components/ui";
+import { Badge, Card, Empty, ErrorNote, Skeleton, cx } from "../components/ui";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
-import { CHANNEL_ICON } from "../lib/stages";
+import { ChannelIcon, channelLabel } from "../components/channel";
 
 interface CustomerRow {
   id: string;
@@ -41,7 +42,6 @@ const LINKED: Record<string, string> = {
   owner_confirmed: "owner confirmed",
 };
 
-const icon = (channel: string) => (CHANNEL_ICON as Record<string, string>)[channel] ?? "💬";
 
 function Detail({ id, bid }: { id: string; bid: string }) {
   const q = useQuery({
@@ -51,11 +51,11 @@ function Detail({ id, bid }: { id: string; bid: string }) {
   });
   const c = q.data;
   if (q.error) return <ErrorNote error={q.error} />;
-  if (!c) return <Empty>Loading…</Empty>;
+  if (!c) return <Skeleton lines={6} />;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-lg font-bold">{c.name ?? "Unknown customer"}</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-ink">{c.name ?? "Unknown customer"}</h2>
         {c.language && <Badge>{c.language}</Badge>}
         {c.tags.map((t) => (
           <Badge key={t} tone="accent">
@@ -69,12 +69,12 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         <Field label="Last seen">{fmtWhen(c.last_seen_at)}</Field>
       </div>
       <div>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">Identities</div>
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Identities</div>
         <ul className="space-y-1">
           {c.identities.map((i, n) => (
             <li key={n} className="flex flex-wrap items-center gap-2 text-sm">
-              <span>{icon(i.channel)}</span>
-              <span className="font-semibold">{i.channel.replace(/_/g, " ")}</span>
+              <ChannelIcon channel={i.channel} size="sm" />
+              <span className="font-medium text-ink">{channelLabel(i.channel)}</span>
               <span className="font-mono text-xs text-dusk dark:text-stone">{i.external_id}</span>
               <Badge tone={i.linked_via === "first_contact" ? "neutral" : "good"}>{LINKED[i.linked_via] ?? i.linked_via}</Badge>
               <span className="text-[11px] text-stone">{fmtWhen(i.created_at)}</span>
@@ -89,7 +89,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
       </div>
       {(c.summary || c.facts.length > 0) && (
         <div>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">What the AI remembers</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">What the AI remembers</div>
           {c.summary && <div className="text-sm">{c.summary}</div>}
           <ul className="list-inside list-disc text-sm text-dusk dark:text-stone">
             {c.facts.map((f, n) => (
@@ -100,7 +100,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
       )}
       {c.orders.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">Orders</div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Orders</div>
           {c.orders.map((o) => (
             <Link key={o.id} to={`/orders?o=${o.id}`} className="flex items-center gap-2 py-0.5 text-sm hover:underline">
               <span className="font-mono text-xs">{o.order_number}</span>
@@ -112,20 +112,20 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         </div>
       )}
       <div>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-stone">History · all channels</div>
-        <div className="max-h-[480px] space-y-1.5 overflow-y-auto rounded-lg bg-parchment p-3 dark:bg-ink">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">History · all channels</div>
+        <div className="max-h-[480px] space-y-1.5 overflow-y-auto rounded-lg border border-sand bg-parchment p-3">
           {c.history.length ? (
             c.history.map((h, n) => (
               <div key={n} className={cx("flex", h.direction === "inbound" ? "justify-start" : "justify-end")}>
                 <div
                   className={cx(
                     "max-w-[80%] rounded-2xl px-3 py-1.5 text-sm shadow-sm",
-                    h.direction === "inbound" ? "rounded-bl-sm bg-white dark:bg-twilight" : "rounded-br-sm bg-blossom dark:bg-[#3d2a10]",
+                    h.direction === "inbound" ? "rounded-bl-sm bg-white dark:bg-twilight" : "rounded-br-sm bg-signal-l",
                   )}
                 >
                   <div className="whitespace-pre-wrap break-words">{h.text}</div>
                   <div className="mt-0.5 flex justify-end gap-1.5 text-[10px] text-stone">
-                    <span title={h.channel}>{icon(h.channel)}</span>
+                    <ChannelIcon channel={h.channel} size="sm" className="!h-4 !w-4" />
                     {h.direction !== "inbound" && <span>{h.author}</span>}
                     <span>{fmtWhen(h.at)}</span>
                   </div>
@@ -171,7 +171,11 @@ export function Customers() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name ?? "Unknown"}</span>
-                      <span className="text-sm">{c.identities.map((i) => icon(i.channel)).join(" ")}</span>
+                      <span className="flex gap-1">
+                        {[...new Set(c.identities.map((i) => i.channel))].map((ch) => (
+                          <ChannelIcon key={ch} channel={ch} size="sm" />
+                        ))}
+                      </span>
                     </div>
                     <div className="mt-0.5 flex gap-3 text-[11px] text-stone">
                       <span>{c.orders} orders</span>
@@ -183,10 +187,10 @@ export function Customers() {
               ))}
             </ul>
           ) : (
-            <Empty>No customers yet.</Empty>
+            <Empty icon={Users} hint="Customers appear when they first message the shop on any channel.">No customers yet</Empty>
           )}
         </Card>
-        <Card>{selected ? <Detail id={selected} bid={bid} /> : <Empty>Pick a customer.</Empty>}</Card>
+        <Card>{selected ? <Detail id={selected} bid={bid} /> : <Empty icon={UserRound}>Select a customer to see their identities, orders and history</Empty>}</Card>
       </div>
     </div>
   );

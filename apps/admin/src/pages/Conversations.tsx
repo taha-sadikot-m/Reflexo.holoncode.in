@@ -6,7 +6,8 @@ import { useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
 import { api, type ConversationItem, type Thread, type ThreadMessage } from "../lib/api";
 import { useSession } from "../lib/session";
-import { CHANNEL_ICON, fmtTime } from "../lib/stages";
+import { ChannelIcon } from "../components/channel";
+import { fmtTime } from "../lib/stages";
 import { useXrayStream } from "../lib/stream";
 
 const TICKS: Record<string, { mark: string; tone: string; title: string }> = {
@@ -102,7 +103,11 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
     mutationFn: (on: boolean) => api.post(`/conversations/${id}/${on ? "takeover" : "release"}`, {}, { business_id: businessId }),
     onSuccess: refresh,
   });
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [thread.data?.messages.length]);
+  // a block body: scrollIntoView returns a Promise in current Chromium, and an effect must return nothing or a cleanup
+  // function — returning the Promise made React call it on unmount and blanked the panel ("c is not a function")
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [thread.data?.messages.length]);
 
   const t = thread.data;
   if (thread.error) return <ErrorNote error={thread.error} />;
@@ -116,7 +121,7 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-sand pb-3 dark:border-twilight">
-        <span className="text-xl">{CHANNEL_ICON[t.channel] ?? "•"}</span>
+        <ChannelIcon channel={t.channel} size="lg" />
         <div className="min-w-0 flex-1">
           <div className="font-display font-semibold">{t.customer?.name ?? t.customer?.phone ?? t.role}</div>
           <div className="flex flex-wrap gap-1 text-xs">
@@ -196,7 +201,7 @@ export function Conversations() {
                 className={cx("w-full px-4 py-3 text-left hover:bg-parchment dark:hover:bg-ink", c.id === selected && "bg-blossom dark:bg-twilight")}
               >
                 <div className="flex items-center gap-2">
-                  <span>{CHANNEL_ICON[c.channel] ?? "•"}</span>
+                  <ChannelIcon channel={c.channel} size="sm" />
                   <span className="flex-1 truncate text-sm font-semibold">{c.customer ?? c.role}</span>
                   <span className="text-[11px] text-stone">{fmtTime(c.last_at)}</span>
                 </div>

@@ -176,7 +176,7 @@ export function Chaos() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-bold">Chaos</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink">Chaos</h1>
           <p className="max-w-3xl text-sm text-dusk dark:text-stone">
             Each action breaks something on purpose, using a simulated customer through the real pipeline. The verdict is computed afterwards from
             the database, not assumed. One action runs at a time.

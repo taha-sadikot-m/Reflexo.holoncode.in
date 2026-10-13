@@ -159,7 +159,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-lg font-bold">{a.name}</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-ink">{a.name}</h2>
         <StatusBadge status={a.status} />
         <Badge>v{a.version}</Badge>
         <Badge tone="info">{a.executor}</Badge>
@@ -180,7 +180,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
       {a.readback && <div className="whitespace-pre-wrap rounded-lg bg-blossom px-3 py-2 text-sm dark:bg-[#3d2a10]">{a.readback}</div>}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-stone">Flow</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-stone">Flow</span>
           <button className="text-xs text-signal hover:underline" onClick={() => setShowJson(!showJson)}>
             {showJson ? "Diagram" : "Definition JSON"}
           </button>
@@ -188,7 +188,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         {showJson ? <Json value={a.definition} /> : <Diagram def={a.definition} active={active} />}
       </div>
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wide text-stone">Runs</div>
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-stone">Runs</div>
         {a.runs.length ? (
           <ul>
             {a.runs.map((r) => (

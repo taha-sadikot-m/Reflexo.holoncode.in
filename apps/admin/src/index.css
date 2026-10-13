@@ -1,55 +1,105 @@
 @import "tailwindcss";
 
-/* Visual tokens harvested from the old DesignSystem.jsx (H16); the panel itself is new. */
+/* Reflexo admin design system — light, Stripe-style: a soft gray canvas, white surfaces with quiet shadows, navy
+   text, one blue-violet accent, and status colours that carry meaning. The token names are the panel's own; their
+   values define the look, so every page follows from here. */
 @theme {
-  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --color-ink: #12111a;
-  --color-indigo: #1e1c30;
-  --color-twilight: #2d2a4a;
+  /* text */
+  --color-ink: #0a2540; /* headings, primary text */
+  --color-soot: #1a1f36; /* body text */
+  --color-dusk: #4f566b; /* secondary text */
+  --color-stone: #8792a2; /* muted text, placeholders */
+
+  /* surfaces & lines */
+  --color-parchment: #f6f8fa; /* canvas */
+  --color-bone: #f1f4f8; /* subtle fill, hover */
+  --color-sand: #e3e8ee; /* borders, dividers */
+  --color-indigo: #ffffff; /* (legacy dark surface) — white in the light theme */
+  --color-twilight: #e3e8ee; /* (legacy dark line) */
+
+  /* accent — blue-violet */
+  --color-signal: #635bff;
+  --color-signal-d: #4f46e5;
+  --color-signal-l: #efeeff;
+
+  /* status */
+  --color-verdant: #0e9f6e;
+  --color-verdant-l: #e5f6ef;
+  --color-ember: #df1b41;
+  --color-ember-l: #fdecef;
+  --color-sun: #c27803;
+  --color-sun-l: #fff6e0;
+  --color-sky: #0570de;
+  --color-sky-l: #e6f0fd;
+
+  /* warm brand accent (used sparingly: the logo mark, the demo-time pill) */
   --color-marigold: #ff9e1b;
-  --color-saffron: #e88a15;
-  --color-blossom: #fff4e0;
-  --color-signal: #6c5ce7;
-  --color-signal-l: #eceaff;
-  --color-verdant: #00c88c;
-  --color-verdant-l: #e0fff6;
-  --color-ember: #f45c4a;
-  --color-ember-l: #fff0ee;
-  --color-sun: #f0b429;
-  --color-sun-l: #fffae0;
-  --color-parchment: #fbf9f5;
-  --color-bone: #f2efe9;
-  --color-sand: #e0ddd6;
-  --color-stone: #9e9b94;
-  --color-dusk: #615e58;
-  --color-soot: #201f1c;
+  --color-saffron: #b45309;
+  --color-blossom: #fff3e0;
 
-  /* stage families (POC_07 §1) */
-  --color-st-ingress: #8a8780;
-  --color-st-identity: #3b82f6;
+  /* stage families (X-ray) */
+  --color-st-ingress: #8792a2;
+  --color-st-identity: #0570de;
   --color-st-automation: #8b5cf6;
-  --color-st-agent: #f59e0b;
-  --color-st-tool: #14b8a6;
-  --color-st-gate: #10b981;
-  --color-st-outbound: #6366f1;
-  --color-st-voice: #ec4899;
+  --color-st-agent: #d97706;
+  --color-st-tool: #0d9488;
+  --color-st-gate: #0e9f6e;
+  --color-st-outbound: #635bff;
+  --color-st-voice: #db2777;
   --color-st-workflow: #7c3aed;
-  --color-st-error: #f45c4a;
+  --color-st-error: #df1b41;
+
+  --shadow-card: 0 0 0 1px rgb(10 37 64 / 0.05), 0 1px 2px rgb(10 37 64 / 0.06), 0 2px 6px -1px rgb(10 37 64 / 0.05);
+  --shadow-pop: 0 0 0 1px rgb(10 37 64 / 0.06), 0 8px 24px -6px rgb(10 37 64 / 0.18);
 }
 
-@custom-variant dark (&:where(.dark, .dark *));
+/* light only: `dark:` utilities never apply (the old toggle could leave every page black) */
+@custom-variant dark (&:where(.never-dark, .never-dark *));
 
 html,
 body,
 #root {
   height: 100%;
 }
+html {
+  color-scheme: light;
+}
 body {
-  @apply bg-parchment font-sans text-soot antialiased dark:bg-ink dark:text-bone;
+  @apply bg-parchment font-sans text-[14px] leading-normal text-soot antialiased;
+  font-feature-settings: "cv11", "ss01", "tnum" 0;
 }
 .font-display {
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+::selection {
+  background: rgb(99 91 255 / 0.18);
+}
+*:focus-visible {
+  outline: 2px solid rgb(99 91 255 / 0.55);
+  outline-offset: 2px;
+}
+/* quiet, thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cdd5df transparent;
+}
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, #eef1f5 25%, #f6f8fa 37%, #eef1f5 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease infinite;
 }

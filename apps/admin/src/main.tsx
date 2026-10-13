@@ -28,7 +28,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (count, error) => !(error instanceof ApiError && [401, 403, 404].includes(error.status)) && count < 2,
-      refetchOnWindowFocus: false,
+      // data stays live without a page reload: refetch when the tab regains focus or the network returns
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 2_000,
     },
   },
 });
