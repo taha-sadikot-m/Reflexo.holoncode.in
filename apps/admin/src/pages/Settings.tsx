@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ToggleLeft } from "lucide-react";
 import { useState } from "react";
 
 import { Json, PageHeader, StatusBadge } from "../components/bits";
-import { Badge, Button, Card, Empty, ErrorNote, Mono } from "../components/ui";
+import { Badge, Button, Card, Empty, ErrorNote, Mono, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
+import { channelLabel } from "../components/channel";
 
 interface SettingsView {
   flags: Record<string, unknown>;
@@ -68,7 +69,7 @@ export function Settings() {
                 <Button variant={m === "onboarding" ? "danger" : "ghost"} className="shrink-0 text-xs" disabled={reset.isPending} onClick={() => run(m)}>
                   <RotateCcw size={12} /> {m === "onboarding" ? "Reset for the demo" : "Reset with full catalogue"}
                 </Button>
-                <div className="text-xs text-dusk dark:text-stone">
+                <div className="text-xs text-dusk">
                   {MODES[m]} <Mono>make demo-reset{m === "full" ? " FULL=1" : ""}</Mono>
                 </div>
               </div>
@@ -76,14 +77,16 @@ export function Settings() {
             {reset.isPending && <div className="text-sm text-signal">Resetting… stopping workflows, wiping, reseeding.</div>}
             <ErrorNote error={reset.error} />
             {last && (
-              <div className="rounded-lg bg-verdant-l px-3 py-2 text-sm dark:bg-[#0a3b2e]">
+              <div className="rounded-lg bg-verdant-l px-3 py-2 text-sm">
                 Done in {last.seconds}s · {last.workflows_terminated} workflow{last.workflows_terminated === 1 ? "" : "s"} stopped ·{" "}
                 {Object.keys(last.businesses).join(", ")}
                 {last.workflows_unreachable && <div className="text-ember">Some workflows could not be stopped — is the Temporal worker running?</div>}
-                <div className="text-xs text-dusk dark:text-stone">Workers pick up the new connections within 30 s.</div>
+                <div className="text-xs text-dusk">Workers pick up the new connections within 30 s.</div>
               </div>
             )}
-            <div className="text-[11px] text-stone">Demo time scale: {me?.demo_time_scale ?? 1}× (1 day ≈ {Math.round(86400 / (me?.demo_time_scale || 1))} s)</div>
+            <div className="text-xs text-stone">
+              Demo time: 1 day of waiting in automations takes {Math.round(86400 * (me?.demo_time_scale ?? 1))} s
+            </div>
           </div>
         </Card>
         <Card title="Channel connections">
@@ -91,19 +94,25 @@ export function Settings() {
           {q.data?.connections.length ? (
             <ul className="space-y-2">
               {q.data.connections.map((c) => (
-                <li key={c.id} className="border-t border-sand/60 pt-2 first:border-0 first:pt-0 dark:border-twilight">
+                <li key={c.id} className="border-t border-sand/60 pt-2 first:border-0 first:pt-0">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-semibold">{c.display_name}</span>
                     <StatusBadge status={c.status} />
-                    <Badge tone={c.customer_mode === "off" ? "bad" : "info"}>AI: {c.customer_mode}</Badge>
+                    <Badge tone={c.customer_mode === "off" ? "bad" : "good"} dot>{c.customer_mode === "off" ? "AI paused" : "AI answering"}</Badge>
                     {c.roles.map((r) => (
                       <Badge key={r}>{r}</Badge>
                     ))}
                   </div>
                   <div className="text-[11px] text-stone">
-                    {c.provider} · <Mono>{c.account}</Mono>
+                    {channelLabel(c.channel)}
+                    {c.account && (
+                      <>
+                        {" · "}
+                        <Mono>{c.account}</Mono>
+                      </>
+                    )}
                   </div>
-                  {c.job_description && <div className="mt-0.5 text-xs text-dusk dark:text-stone">Job: {c.job_description}</div>}
+                  {c.job_description && <div className="mt-0.5 text-xs text-dusk">Job: {c.job_description}</div>}
                 </li>
               ))}
             </ul>
@@ -111,7 +120,17 @@ export function Settings() {
             <Empty>No connections.</Empty>
           )}
         </Card>
-        <Card title="Runtime flags">{q.data ? <Json value={q.data.flags} /> : <Empty>Loading…</Empty>}</Card>
+        <Card title="Runtime flags">
+          {!q.data ? (
+            <Skeleton lines={2} />
+          ) : Object.keys(q.data.flags).length ? (
+            <Json value={q.data.flags} />
+          ) : (
+            <Empty icon={ToggleLeft} hint="Kill switches and demo toggles appear here when set.">
+              No runtime flags set
+            </Empty>
+          )}
+        </Card>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Undo2 } from "lucide-react";
+import { Brain, MessageSquareQuote, Undo2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PageHeader, StatusBadge, fmtWhen } from "../components/bits";
@@ -18,7 +18,7 @@ const LEARNED: Record<string, string> = { g: "learned: always", c: "learned: thi
 function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; busy: boolean }) {
   const effect = EFFECT[r.effect] ?? { tone: "warn" as const, label: r.effect };
   return (
-    <li className={cx("rounded-lg border px-3 py-2.5", r.status === "active" ? "border-sand dark:border-twilight" : "border-dashed border-sand opacity-60 dark:border-twilight")}>
+    <li className={cx("rounded-lg border px-3 py-2.5", r.status === "active" ? "border-sand" : "border-dashed border-sand opacity-60")}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={effect.tone}>{effect.label}</Badge>
         {r.customer ? <Badge tone="info">only {r.customer}</Badge> : <Badge>everyone</Badge>}
@@ -31,15 +31,19 @@ function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; bus
         )}
       </div>
       <div className="mt-1.5 text-sm font-semibold">“{r.readback}”</div>
-      <div className="mt-1 text-xs text-dusk dark:text-stone">
+      <div className="mt-1 text-xs text-dusk">
         {r.source === "owner_decision" ? (
           <>
-            🧠 Learned from the owner's decision
+            <Brain size={12} className="mr-1 inline text-signal" />
+            Learned from the owner's decision
             {r.source_decision?.summary && <> on <span className="font-semibold">{r.source_decision.summary}</span></>}
             {r.source_decision?.decided_at && <> · {fmtWhen(r.source_decision.decided_at)}</>}
           </>
         ) : (
-          <>🗣 The owner said: “{r.says}”</>
+          <>
+            <MessageSquareQuote size={12} className="mr-1 inline text-signal" />
+            The owner said: “{r.says}”
+          </>
         )}
       </div>
     </li>
@@ -48,10 +52,10 @@ function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; bus
 
 function ProposalRow({ p }: { p: PlaybookProposal }) {
   return (
-    <li className="border-t border-sand/60 py-2 text-sm dark:border-twilight">
+    <li className="border-t border-sand/60 py-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold">{p.label}</span>
-        <span className="text-dusk dark:text-stone">{p.summary}</span>
+        <span className="text-dusk">{p.summary}</span>
         <StatusBadge status={p.status} />
         {p.done === false && p.status === "approved" && <Badge tone="bad">could not be done</Badge>}
         {p.learned && <Badge tone={p.learned === "once" ? "neutral" : "accent"}>{LEARNED[p.learned] ?? p.learned}</Badge>}

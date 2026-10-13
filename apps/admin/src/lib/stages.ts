@@ -80,3 +80,12 @@ export const fmtMs = (ms: number | null | undefined) =>
   ms === null || ms === undefined ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
 
 export const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—");
+
+/** What a trace was about, in words: the customer's message if there is one, else what the system did. */
+export function traceLabel(t: { snippet?: string | null; outcome: string | null; last_stage: string }): string {
+  if (t.snippet) return t.snippet;
+  if (t.outcome) return `Message ${OUTCOME_LABEL[t.outcome] ?? t.outcome}`;
+  if (/^(sent|status|delivered|read)/.test(t.last_stage)) return "Delivery receipt from the channel";
+  const stage = t.last_stage.replace(/_/g, " ");
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
+}

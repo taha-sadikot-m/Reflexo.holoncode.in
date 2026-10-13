@@ -7,7 +7,7 @@ import { ChannelIcon } from "../components/channel";
 import { Badge, Card, Empty, ErrorNote, Skeleton, Stat, cx, td, th, tr } from "../components/ui";
 import { api, type AutomationRow, type ConversationItem, type Health, type OrderRow, type OwnerWorkspace, type TraceSummary } from "../lib/api";
 import { useSession } from "../lib/session";
-import { OUTCOME_LABEL, fmtMs } from "../lib/stages";
+import { OUTCOME_LABEL, fmtMs, traceLabel } from "../lib/stages";
 
 const LIVE_S = 300; // a worker silent for longer is a past process, not a live one
 
@@ -176,7 +176,7 @@ export function Overview() {
                 <li key={t.trace_id}>
                   <Link to={`/xray?trace=${t.trace_id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-bone/70">
                     <ChannelIcon channel={t.provider} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{t.snippet ?? t.trace_id.slice(0, 16)}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{traceLabel(t)}</span>
                     {t.outcome && (
                       <Badge tone={t.outcome === "error" ? "bad" : t.outcome === "send" ? "good" : "neutral"}>
                         {OUTCOME_LABEL[t.outcome] ?? t.outcome}

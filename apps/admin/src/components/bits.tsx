@@ -111,3 +111,17 @@ export function Field({ label, children }: { label: string; children: ReactNode 
     </div>
   );
 }
+
+const PAYMENT_METHOD: Record<string, string> = { razorpay_link: "Online", cod: "Cash on delivery" };
+export const paymentLabel = (m: string | null | undefined) => (m ? (PAYMENT_METHOD[m] ?? m.replace(/_/g, " ")) : "—");
+
+/** "order.cancelled" → "Order cancelled", "payment.link_created" → "Payment link created". */
+export function eventLabel(type: string): string {
+  const s = type.replace(/[._]/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** A small uppercase section heading inside cards and detail panes. */
+export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={`mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone ${className ?? ""}`}>{children}</div>;
+}

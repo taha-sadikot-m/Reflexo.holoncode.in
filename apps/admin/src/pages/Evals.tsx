@@ -35,44 +35,63 @@ const ABOUT: Record<string, string> = {
   learning: "One owner decision → the rule they follow (ADR-015)",
 };
 
+const SUITE_NAME: Record<string, string> = {
+  tool_selection: "Tool selection",
+  gate_adversarial: "Output gate (adversarial)",
+  grounding: "Grounding",
+  language: "Language",
+  ask_owner_scope: "Owner answer scope",
+  owner_commands: "Owner commands",
+  builder: "Automation builder",
+  learning: "Learning from decisions",
+};
+
 function SuiteRow({ r }: { r: EvalRun }) {
   const [open, setOpen] = useState(false);
-  const ok = r.metrics.score >= r.metrics.threshold;
   const m = r.metrics;
+  const ok = m.score >= m.threshold;
+  const pct = Math.round(m.score * 100);
   return (
-    <li className="border-t border-sand/60 py-2.5 first:border-0 dark:border-twilight">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-40 shrink-0">
-          <div className="font-mono text-sm font-semibold">{r.suite}</div>
-          <div className="text-[11px] text-stone">{ABOUT[r.suite]}</div>
+    <li className="px-5 py-3.5">
+      <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_88px_110px_minmax(0,0.9fr)] items-center gap-5">
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-medium text-ink">{SUITE_NAME[r.suite] ?? r.suite}</div>
+          <div className="truncate text-xs text-stone">{ABOUT[r.suite]}</div>
         </div>
-        <div className="flex min-w-[180px] flex-1 items-center gap-2">
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-bone dark:bg-twilight">
-            <div className={cx("h-full rounded-full", ok ? "bg-verdant" : "bg-ember")} style={{ width: `${Math.round(m.score * 100)}%` }} />
+        <div className="h-2 overflow-hidden rounded-full bg-bone">
+          <div className={cx("h-full rounded-full", ok ? "bg-verdant" : "bg-ember")} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="tabular text-right">
+          <div className="text-[13.5px] font-semibold text-ink">{pct}%</div>
+          <div className="text-[11px] text-stone">
+            {r.passed}/{r.cases} cases
           </div>
-          <span className="w-24 text-right font-mono text-sm">
-            {r.passed}/{r.cases} · {Math.round(m.score * 100)}%
-          </span>
         </div>
-        <Badge tone={ok ? "good" : "bad"}>
-          {ok ? "pass" : "fail"} · ≥{Math.round(m.threshold * 100)}%
-        </Badge>
-        {m.p50_s != null && (
-          <span className="text-[11px] text-stone">
-            p50 {m.p50_s}s · p95 {m.p95_s}s{m.one_call_turns != null && ` · ${Math.round(Number(m.one_call_turns) * 100)}% one-call`}
-          </span>
-        )}
-        {r.failed.length > 0 && (
-          <button className="text-xs text-signal hover:underline" onClick={() => setOpen(!open)}>
-            {open ? "hide" : `${r.failed.length} failed`}
-          </button>
-        )}
+        <div>
+          <Badge tone={ok ? "good" : "bad"} dot>
+            {ok ? "Pass" : "Fail"} · ≥{Math.round(m.threshold * 100)}%
+          </Badge>
+        </div>
+        <div className="text-right text-xs text-stone">
+          {m.p50_s != null ? (
+            <>
+              p50 {m.p50_s}s · p95 {m.p95_s}s
+            </>
+          ) : (
+            "in-process"
+          )}
+          {r.failed.length > 0 && (
+            <button className="ml-2 font-medium text-signal hover:text-signal-d" onClick={() => setOpen(!open)}>
+              {open ? "Hide" : `${r.failed.length} failed`}
+            </button>
+          )}
+        </div>
       </div>
       {open && (
-        <ul className="mt-2 space-y-1 pl-4">
+        <ul className="mt-3 space-y-1 rounded-lg bg-parchment p-3">
           {r.failed.map((f) => (
             <li key={f.id} className="text-xs">
-              <Mono>{f.id}</Mono> <span className="text-dusk dark:text-stone">{f.detail}</span>
+              <Mono>{f.id}</Mono> <span className="text-dusk">{f.detail}</span>
             </li>
           ))}
         </ul>
@@ -125,7 +144,7 @@ export function Evals() {
         }
       >
         {rows.length ? (
-          <ul>
+          <ul className="-m-5 divide-y divide-sand">
             {rows.map((r) => (
               <SuiteRow key={r.id} r={r} />
             ))}

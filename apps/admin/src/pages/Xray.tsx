@@ -7,7 +7,7 @@ import { Badge, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
 import { api, type TraceDetail, type TraceEvent, type TraceSummary, type XrayEvent } from "../lib/api";
 import { useSession } from "../lib/session";
 import { ChannelIcon } from "../components/channel";
-import { OUTCOME_LABEL, familyOf, fmtMs, fmtTime, stageColor, type StageFamily } from "../lib/stages";
+import { OUTCOME_LABEL, familyOf, fmtMs, fmtTime, stageColor, type StageFamily, traceLabel } from "../lib/stages";
 import { useXrayStream, type StreamMode } from "../lib/stream";
 
 function ModeBadge({ mode }: { mode: StreamMode }) {
@@ -62,16 +62,16 @@ function Waterfall({ rows, selected, onSelect }: { rows: TraceEvent[]; selected:
           <button
             key={r.id}
             onClick={() => onSelect(r.id)}
-            className={cx("grid w-full grid-cols-[150px_1fr_70px] items-center gap-3 rounded px-1 py-0.5 text-left text-xs hover:bg-bone dark:hover:bg-twilight", selected === r.id && "bg-bone dark:bg-twilight")}
+            className={cx("grid w-full grid-cols-[150px_1fr_70px] items-center gap-3 rounded px-1 py-0.5 text-left text-xs hover:bg-bone", selected === r.id && "bg-bone")}
           >
             <span className="truncate font-mono">
               {r.stage}
               {typeof r.attrs.tool === "string" ? `:${r.attrs.tool}` : ""}
             </span>
-            <span className="relative h-4 rounded bg-parchment dark:bg-ink">
+            <span className="relative h-4 rounded bg-parchment">
               <span className="absolute top-0 h-4 rounded" style={{ left: `${left}%`, width: `${width}%`, background: stageColor(r.stage, r.status) }} />
             </span>
-            <span className="text-right font-mono text-dusk dark:text-stone">{fmtMs(r.duration_ms)}</span>
+            <span className="text-right font-mono text-dusk">{fmtMs(r.duration_ms)}</span>
           </button>
         );
       })}
@@ -96,7 +96,7 @@ function ArchStrip({ rows }: { rows: TraceEvent[] }) {
       {ARCH.map((n, i) => (
         <div key={n.family} className="flex items-center gap-1.5">
           <span
-            className={cx("rounded-md border px-2 py-1 text-[11px] font-semibold transition", hit.has(n.family) ? "text-white shadow" : "border-sand text-stone dark:border-twilight")}
+            className={cx("rounded-md border px-2 py-1 text-[11px] font-semibold transition", hit.has(n.family) ? "text-white shadow" : "border-sand text-stone")}
             style={hit.has(n.family) ? { background: `var(--color-st-${n.family})`, borderColor: "transparent" } : undefined}
           >
             {n.label}
@@ -110,7 +110,7 @@ function ArchStrip({ rows }: { rows: TraceEvent[] }) {
 
 function StageCard({ row }: { row: TraceEvent }) {
   return (
-    <div className="rounded-lg border border-sand p-3 dark:border-twilight">
+    <div className="rounded-lg border border-sand p-3">
       <div className="mb-2 flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: stageColor(row.stage, row.status) }} />
         <span className="font-mono text-sm font-semibold">{row.stage}</span>
@@ -121,7 +121,7 @@ function StageCard({ row }: { row: TraceEvent }) {
         <tbody>
           {Object.entries(row.attrs).map(([k, v]) => (
             <tr key={k} className="align-top">
-              <td className="w-40 py-0.5 pr-3 font-mono text-dusk dark:text-stone">{k}</td>
+              <td className="w-40 py-0.5 pr-3 font-mono text-dusk">{k}</td>
               <td className="break-all py-0.5 font-mono">{typeof v === "object" ? JSON.stringify(v) : String(v)}</td>
             </tr>
           ))}
@@ -182,7 +182,7 @@ export function Xray() {
       <Card title="Traces" actions={<ModeBadge mode={mode} />} className="flex min-h-0 flex-col overflow-hidden">
         <ErrorNote error={list.error} />
         {!traces.length && <Empty>No traces yet — send a message on any channel.</Empty>}
-        <ul className="-mx-4 -my-4 max-h-[calc(100vh-180px)] divide-y divide-sand overflow-auto dark:divide-twilight">
+        <ul className="-mx-4 -my-4 max-h-[calc(100vh-180px)] divide-y divide-sand overflow-auto">
           {traces.map((t) => (
             <li key={t.trace_id}>
               <button
@@ -190,18 +190,18 @@ export function Xray() {
                   setParams({ trace: t.trace_id });
                   setSelectedEvent(null);
                 }}
-                className={cx("w-full px-4 py-2.5 text-left hover:bg-parchment dark:hover:bg-ink", t.trace_id === traceId && "bg-blossom dark:bg-twilight")}
+                className={cx("w-full px-4 py-2.5 text-left hover:bg-parchment", t.trace_id === traceId && "bg-blossom")}
               >
                 <div className="flex items-center gap-2 text-sm">
                   <ChannelIcon channel={t.provider} size="sm" />
-                  <span className="min-w-0 flex-1 truncate">{t.snippet ?? <Mono>{t.trace_id.slice(0, 12)}…</Mono>}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{traceLabel(t)}</span>
                   <span className="font-mono text-xs text-dusk">{fmtMs(t.total_ms)}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1">
                   {t.outcome && <Badge tone={outcomeTone(t.outcome)}>{OUTCOME_LABEL[t.outcome] ?? t.outcome}</Badge>}
                   {t.model && <Badge tone="accent">{t.model.replace("gemini-", "")}</Badge>}
                   {t.hedged && <Badge tone="warn">hedged</Badge>}
-                  {t.gate === false && <Badge tone="bad">gate ✗</Badge>}
+                  {t.gate === false && <Badge tone="bad">Gate blocked</Badge>}
                   {!!t.gate_repairs && t.gate !== false && <Badge tone="warn" title="the output gate caught a problem and the model fixed it">gate repaired</Badge>}
                   {t.simulated && <Badge tone="info">simulated</Badge>}
                   {t.errors > 0 && <Badge tone="bad">{t.errors} err</Badge>}
@@ -244,9 +244,9 @@ export function Xray() {
               </div>
               {rows.length ? <Waterfall rows={rows} selected={selectedRow?.id ?? null} onSelect={setSelectedEvent} /> : <Empty>Loading…</Empty>}
               {summary && (
-                <div className="mt-3 flex flex-wrap gap-4 border-t border-sand pt-3 text-xs text-dusk dark:border-twilight dark:text-stone">
+                <div className="mt-3 flex flex-wrap gap-4 border-t border-sand pt-3 text-xs text-dusk">
                   <span>
-                    total <b className="font-mono text-soot dark:text-bone">{fmtMs(summary.total_ms)}</b>
+                    total <b className="font-mono text-soot">{fmtMs(summary.total_ms)}</b>
                   </span>
                   <span>stages {summary.stages}</span>
                   {summary.model && <span>model {summary.model}</span>}
@@ -273,7 +273,7 @@ export function Xray() {
                     </thead>
                     <tbody>
                       {detail.data.outbound.map((p) => (
-                        <tr key={p.id} className="border-t border-sand dark:border-twilight">
+                        <tr key={p.id} className="border-t border-sand">
                           <td className="py-1 font-mono">{p.part}</td>
                           <td>
                             <Badge tone={p.status === "sent" ? "good" : p.status === "failed" ? "bad" : "neutral"}>{p.status}</Badge>

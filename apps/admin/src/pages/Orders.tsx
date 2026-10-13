@@ -1,37 +1,38 @@
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, FlaskConical, Receipt, Sparkles } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { Field, PageHeader, StatusBadge, fmtDate, fmtWhen, inr } from "../components/bits";
-import { Badge, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
+import { Field, PageHeader, SectionLabel, StatusBadge, eventLabel, fmtDate, fmtWhen, inr, paymentLabel } from "../components/bits";
+import { Badge, Card, Empty, ErrorNote, Segmented, Skeleton, cx, td, th, tr } from "../components/ui";
 import { api, type CapacityRow, type OrderDetail, type OrderRow } from "../lib/api";
 import { useSession } from "../lib/session";
 
 const FILTERS = ["", "awaiting_payment", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled", "draft"];
+const filterLabel = (f: string) => (f ? f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ") : "All");
 
 function Capacity({ rows }: { rows: CapacityRow[] }) {
   if (!rows.length) return null;
   return (
-    <Card title="Daily capacity">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+    <Card title="Daily capacity" actions={<span className="text-xs text-stone">Limits set by the owner's automations</span>}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 xl:grid-cols-7">
         {rows.map((r) => {
           const [name, day] = r.key.includes(":") ? r.key.split(":", 2) : [r.key, ""];
           const pct = r.limit ? Math.min(100, (r.used / r.limit) * 100) : 0;
           return (
             <div key={r.key} title={r.automation} className="min-w-0">
-              <div className="flex items-baseline justify-between text-xs">
-                <span className="font-semibold">{day ? fmtDate(day) : name}</span>
-                <Mono>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-medium text-ink">{day ? fmtDate(day) : name}</span>
+                <span className="tabular text-xs text-dusk">
                   {r.used}/{r.limit}
-                </Mono>
+                </span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-bone dark:bg-twilight">
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bone">
                 <div
-                  className={cx("h-full rounded-full", pct >= 100 ? "bg-ember" : pct >= 75 ? "bg-sun" : "bg-verdant")}
-                  style={{ width: `${pct}%` }}
+                  className={cx("h-full rounded-full transition-all", pct >= 100 ? "bg-ember" : pct >= 75 ? "bg-sun" : "bg-signal")}
+                  style={{ width: `${Math.max(pct, pct ? 6 : 0)}%` }}
                 />
               </div>
-              <div className="mt-0.5 truncate text-[10px] text-stone">{name}</div>
+              <div className="mt-1 truncate text-[11px] capitalize text-stone">{name}</div>
             </div>
           );
         })}
@@ -48,108 +49,147 @@ function Detail({ id, bid }: { id: string; bid: string }) {
   });
   const o = q.data;
   if (q.error) return <ErrorNote error={q.error} />;
-  if (!o) return <Empty>Loading…</Empty>;
+  if (!o) return <Skeleton lines={8} />;
+  const details = Object.entries(o.details).filter(([k]) => !["address", "delivery_date", "delivery_slot"].includes(k));
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-[17px] font-semibold tracking-tight text-ink">{o.order_number}</h2>
-        <StatusBadge status={o.status} />
-        <StatusBadge status={o.payment_status} />
-        {o.conversation_id && (
-          <Link to={`/conversations?c=${o.conversation_id}`} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-signal hover:underline">
-            Conversation <ExternalLink size={12} />
-          </Link>
-        )}
+    <div className="space-y-5">
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="text-[18px] font-semibold tracking-tight text-ink">{o.order_number}</h2>
+          {o.conversation_id && (
+            <Link
+              to={`/conversations?c=${o.conversation_id}`}
+              className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-medium text-signal hover:text-signal-d"
+            >
+              Open chat <ExternalLink size={12} />
+            </Link>
+          )}
+        </div>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <StatusBadge status={o.status} />
+          <StatusBadge status={o.payment_status} />
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+
+      {o.cancelled && (
+        <div className="rounded-lg border border-[#f8cdd6] bg-ember-l px-3 py-2.5 text-[13px] text-[#a41034]">
+          Cancelled {fmtWhen(o.cancelled.at)} by {o.cancelled.by ?? "—"}
+          {o.cancelled.reason && <span className="text-[#a41034]/80"> — “{o.cancelled.reason}”</span>}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
         <Field label="Customer">{o.customer}</Field>
+        <Field label="Payment">{paymentLabel(o.payment_method)}</Field>
         <Field label="Delivery">
-          {fmtDate(o.delivery_date)} {o.delivery_slot && `· ${o.delivery_slot}`}
+          {fmtDate(o.delivery_date)}
+          {o.delivery_slot && <span className="text-dusk"> · {o.delivery_slot}</span>}
         </Field>
-        <Field label="Payment">{o.payment_method?.toUpperCase()}</Field>
         <Field label="Address">{o.address}</Field>
         <Field label="Placed">{fmtWhen(o.created_at)}</Field>
         <Field label="Confirmed">{fmtWhen(o.confirmed_at)}</Field>
       </div>
-      {o.cancelled && (
-        <div className="rounded-lg bg-ember-l px-3 py-2 text-sm text-ember dark:bg-[#40201c]">
-          Cancelled {fmtWhen(o.cancelled.at)} by {o.cancelled.by ?? "—"}
-          {o.cancelled.reason && ` — “${o.cancelled.reason}”`}
+
+      <div className="rounded-lg border border-sand">
+        {o.items.map((i, n) => (
+          <div key={n} className="flex items-start justify-between gap-3 border-b border-sand px-3 py-2.5 last:border-0">
+            <div className="min-w-0">
+              <div className="text-[13px] text-ink">
+                <span className="tabular text-dusk">{i.quantity}×</span> {i.name}
+              </div>
+              {Object.keys(i.details).length > 0 && (
+                <div className="mt-0.5 text-xs text-stone">
+                  {Object.entries(i.details)
+                    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${String(v)}`)
+                    .join(" · ")}
+                </div>
+              )}
+            </div>
+            <span className="tabular text-[13px] text-ink">{inr(i.line_rupees)}</span>
+          </div>
+        ))}
+        {!!o.delivery_fee_rupees && (
+          <div className="flex justify-between border-t border-sand px-3 py-2 text-[13px] text-dusk">
+            <span>Delivery</span>
+            <span className="tabular">{inr(o.delivery_fee_rupees)}</span>
+          </div>
+        )}
+        <div className="flex justify-between rounded-b-lg border-t border-sand bg-parchment px-3 py-2.5 text-[13.5px] font-semibold text-ink">
+          <span>Total</span>
+          <span className="tabular">{inr(o.total_rupees)}</span>
+        </div>
+      </div>
+
+      {details.length > 0 && (
+        <div>
+          <SectionLabel>Order details</SectionLabel>
+          <div className="grid grid-cols-2 gap-4">
+            {details.map(([k, v]) => (
+              <Field key={k} label={k.replace(/_/g, " ")}>
+                {typeof v === "object" ? JSON.stringify(v) : String(v)}
+              </Field>
+            ))}
+          </div>
         </div>
       )}
-      <table className="w-full text-sm">
-        <tbody>
-          {o.items.map((i, n) => (
-            <tr key={n} className="border-b border-sand/60 dark:border-twilight">
-              <td className="py-1.5">
-                {i.quantity}× {i.name}
-                {Object.keys(i.details).length > 0 && (
-                  <div className="text-xs text-dusk dark:text-stone">
-                    {Object.entries(i.details)
-                      .map(([k, v]) => `${k}: ${String(v)}`)
-                      .join(" · ")}
-                  </div>
-                )}
-              </td>
-              <td className="py-1.5 text-right font-mono">{inr(i.line_rupees)}</td>
-            </tr>
-          ))}
-          {!!o.delivery_fee_rupees && (
-            <tr>
-              <td className="py-1 text-dusk">Delivery</td>
-              <td className="py-1 text-right font-mono">{inr(o.delivery_fee_rupees)}</td>
-            </tr>
-          )}
-          <tr className="font-semibold">
-            <td className="py-1.5">Total</td>
-            <td className="py-1.5 text-right font-mono">{inr(o.total_rupees)}</td>
-          </tr>
-        </tbody>
-      </table>
-      {Object.keys(o.details).length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {Object.entries(o.details).map(([k, v]) => (
-            <Field key={k} label={k.replace(/_/g, " ")}>
-              {typeof v === "object" ? JSON.stringify(v) : String(v)}
-            </Field>
-          ))}
-        </div>
+      {o.missing_details.length > 0 && (
+        <div className="rounded-lg bg-sun-l px-3 py-2 text-xs text-[#8a4b00]">Still missing: {o.missing_details.join(", ")}</div>
       )}
-      {o.missing_details.length > 0 && <div className="text-xs text-sun">Still missing: {o.missing_details.join(", ")}</div>}
+
       {o.payment_links.length > 0 && (
         <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Payment links</div>
-          {o.payment_links.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 text-sm">
-              <StatusBadge status={p.status} />
-              <span className="font-mono">{inr(p.amount_rupees)}</span>
-              <span className="text-xs text-stone">{p.paid_at ? `paid ${fmtWhen(p.paid_at)}` : `created ${fmtWhen(p.created_at)}`}</span>
-            </div>
-          ))}
+          <SectionLabel>Payment links</SectionLabel>
+          <div className="space-y-1.5">
+            {o.payment_links.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 text-[13px]">
+                <StatusBadge status={p.status} />
+                <span className="tabular text-ink">{inr(p.amount_rupees)}</span>
+                <span className="ml-auto text-xs text-stone">{p.paid_at ? `paid ${fmtWhen(p.paid_at)}` : `sent ${fmtWhen(p.created_at)}`}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
       {o.proposals.length > 0 && (
         <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Asked the owner</div>
-          {o.proposals.map((p) => (
-            <div key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
-              <Mono>{p.capability}</Mono>
-              <StatusBadge status={p.status} />
-              {p.outcome?.learned && p.outcome.learned !== "once" && <Badge tone="accent">learned a rule</Badge>}
-              <Link to="/playbook" className="text-xs text-signal hover:underline">
-                Playbook →
-              </Link>
-            </div>
-          ))}
+          <SectionLabel>Asked the owner</SectionLabel>
+          <div className="space-y-1.5">
+            {o.proposals.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                <span className="text-ink">{eventLabel(p.capability)}</span>
+                <StatusBadge status={p.status} />
+                {p.outcome?.learned && p.outcome.learned !== "once" && (
+                  <Badge tone="accent">
+                    <Sparkles size={11} /> Learned a rule
+                  </Badge>
+                )}
+                <Link to="/playbook" className="ml-auto text-xs font-medium text-signal hover:text-signal-d">
+                  Playbook
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
       <div>
-        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">Timeline</div>
+        <SectionLabel>Timeline</SectionLabel>
         {o.timeline.length ? (
-          <ol className="space-y-1 border-l border-sand pl-3 dark:border-twilight">
+          <ol className="relative space-y-3 pl-5">
+            <span className="absolute bottom-1 left-[5px] top-1 w-px bg-sand" />
             {o.timeline.map((e, n) => (
-              <li key={n} className="text-sm">
-                <Mono>{e.type}</Mono> <span className="text-xs text-stone">· {fmtWhen(e.at)} · {e.source}</span>
+              <li key={n} className="relative">
+                <span
+                  className={cx(
+                    "absolute -left-5 top-1 h-[11px] w-[11px] rounded-full border-2 border-white ring-1",
+                    e.type.includes("cancel") ? "bg-ember ring-[#f8cdd6]" : e.type.includes("paid") || e.type.includes("captured") || e.type.includes("confirmed") ? "bg-verdant ring-[#c6ecdb]" : "bg-signal ring-[#d9d6ff]",
+                  )}
+                />
+                <div className="text-[13px] text-ink">{eventLabel(e.type)}</div>
+                <div className="text-xs text-stone">
+                  {fmtWhen(e.at)} · {e.source}
+                </div>
               </li>
             ))}
           </ol>
@@ -186,77 +226,94 @@ export function Orders() {
     setParams(next, { replace: true });
   };
   const counts = list.data?.counts ?? {};
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Orders">Every order the AI took, its payment and delivery, and what happened to it — including what the owner decided.</PageHeader>
+    <div className="space-y-6">
+      <PageHeader title="Orders">Every order the AI took — its payment, delivery and what happened to it, including what the owner decided.</PageHeader>
       <Capacity rows={cap.data ?? []} />
-      <div className="flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => (
-          <button
-            key={f || "all"}
-            onClick={() => set("status", f || null)}
-            className={cx(
-              "rounded-full px-3 py-1 text-xs font-semibold",
-              status === f ? "bg-ink text-bone dark:bg-bone dark:text-ink" : "bg-bone text-dusk hover:bg-sand dark:bg-twilight dark:text-sand",
-            )}
-          >
-            {f ? f.replace(/_/g, " ") : "all"} {f && counts[f] ? `· ${counts[f]}` : ""}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        value={status}
+        onChange={(v) => set("status", v || null)}
+        options={FILTERS.map((f) => ({
+          value: f,
+          label: (
+            <span>
+              {filterLabel(f)}
+              <span className="tabular ml-1.5 text-stone">{f ? (counts[f] ?? 0) : total}</span>
+            </span>
+          ),
+        }))}
+      />
       <ErrorNote error={list.error} />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_440px]">
-        <Card className="overflow-x-auto">
-          {list.data?.items.length ? (
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="text-left text-[10px] uppercase tracking-wide text-stone">
-                <tr>
-                  <th className="pb-2">Order</th>
-                  <th className="pb-2">Customer</th>
-                  <th className="pb-2">Items</th>
-                  <th className="pb-2 text-right">Total</th>
-                  <th className="pb-2">Payment</th>
-                  <th className="pb-2">Delivery</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.data.items.map((o) => (
-                  <tr
-                    key={o.id}
-                    onClick={() => set("o", o.id)}
-                    className={cx(
-                      "cursor-pointer border-t border-sand/60 hover:bg-bone dark:border-twilight dark:hover:bg-twilight",
-                      selected === o.id && "bg-signal-l dark:bg-[#26214d]",
-                    )}
-                  >
-                    <td className="py-2 font-mono text-xs">
-                      {o.order_number}
-                      {o.simulated && <span title="Simulated (Lab)"> 🧪</span>}
-                    </td>
-                    <td className="py-2">{o.customer ?? "—"}</td>
-                    <td className="max-w-[220px] truncate py-2 text-dusk dark:text-stone">{o.items}</td>
-                    <td className="py-2 text-right font-mono">{inr(o.total_rupees)}</td>
-                    <td className="py-2">
-                      <span className="text-xs uppercase text-dusk">{o.payment_method ?? ""}</span> <StatusBadge status={o.payment_status} />
-                    </td>
-                    <td className="py-2 text-xs">
-                      {fmtDate(o.delivery_date)}
-                      <div className="text-stone">{o.delivery_slot}</div>
-                    </td>
-                    <td className="py-2">
-                      <StatusBadge status={o.status} />
-                    </td>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <Card flush className="overflow-hidden">
+          {!list.data ? (
+            <div className="p-5">
+              <Skeleton lines={8} />
+            </div>
+          ) : list.data.items.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-[13px]">
+                <thead className="bg-parchment/60">
+                  <tr>
+                    <th className={th}>Order</th>
+                    <th className={th}>Customer</th>
+                    <th className={cx(th, "text-right")}>Total</th>
+                    <th className={th}>Payment</th>
+                    <th className={th}>Delivery</th>
+                    <th className={th}>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {list.data.items.map((o) => (
+                    <tr key={o.id} onClick={() => set("o", o.id)} className={cx(tr, "cursor-pointer", selected === o.id && "bg-signal-l/60 hover:bg-signal-l/60")}>
+                      <td className={td}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-ink">{o.order_number}</span>
+                          {o.simulated && (
+                            <span title="Created in the Simulation Lab" className="text-stone">
+                              <FlaskConical size={12} />
+                            </span>
+                          )}
+                        </div>
+                        <div className="max-w-[260px] truncate text-xs text-stone">{o.items}</div>
+                      </td>
+                      <td className={cx(td, "text-dusk")}>{o.customer ?? "—"}</td>
+                      <td className={cx(td, "tabular text-right font-medium text-ink")}>{inr(o.total_rupees)}</td>
+                      <td className={td}>
+                        <div className="text-[12.5px] text-dusk">{paymentLabel(o.payment_method)}</div>
+                        <div className="mt-0.5">
+                          <StatusBadge status={o.payment_status} />
+                        </div>
+                      </td>
+                      <td className={td}>
+                        <div className="text-[12.5px] text-ink">{fmtDate(o.delivery_date)}</div>
+                        <div className="text-xs text-stone">{o.delivery_slot}</div>
+                      </td>
+                      <td className={td}>
+                        <StatusBadge status={o.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
-            <Empty>No orders{status ? ` with status ${status.replace(/_/g, " ")}` : ""}.</Empty>
+            <Empty icon={Receipt} hint="Orders appear as soon as a customer orders on any channel.">
+              No {status ? filterLabel(status).toLowerCase() : ""} orders
+            </Empty>
           )}
         </Card>
-        <Card>{selected ? <Detail id={selected} bid={bid} /> : <Empty>Pick an order to see its details and timeline.</Empty>}</Card>
+        <Card className="xl:sticky xl:top-0">
+          {selected ? (
+            <Detail id={selected} bid={bid} />
+          ) : (
+            <Empty icon={Receipt} hint="Items, payment, delivery and the full timeline.">
+              Select an order to see its details
+            </Empty>
+          )}
+        </Card>
       </div>
     </div>
   );

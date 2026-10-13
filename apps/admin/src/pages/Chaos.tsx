@@ -61,7 +61,7 @@ function Checks({ checks }: { checks: Record<string, unknown> }) {
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-xs text-dusk dark:text-stone">{k.replaceAll("_", " ")}</dt>
+            <dt className="text-xs text-dusk">{k.replaceAll("_", " ")}</dt>
             <dd className="min-w-0 break-words">
               <CheckValue value={v} />
             </dd>
@@ -69,7 +69,7 @@ function Checks({ checks }: { checks: Record<string, unknown> }) {
         ))}
       </dl>
       {reply && (
-        <blockquote className="whitespace-pre-line rounded-lg border-l-4 border-verdant bg-parchment px-3 py-2 text-xs dark:bg-ink">{reply}</blockquote>
+        <blockquote className="whitespace-pre-line rounded-lg border-l-4 border-verdant bg-parchment px-3 py-2 text-xs">{reply}</blockquote>
       )}
     </div>
   );
@@ -99,7 +99,7 @@ function ActionCard({
     <Card
       title={
         <span className="flex items-center gap-2">
-          <Icon size={15} className="text-saffron dark:text-marigold" />
+          <Icon size={15} className="text-saffron" />
           {meta.label}
         </span>
       }
@@ -116,15 +116,15 @@ function ActionCard({
         )
       }
     >
-      <p className="mb-3 text-sm text-dusk dark:text-sand">
-        <span className="font-semibold text-ink dark:text-bone">Expected: </span>
+      <p className="mb-3 text-sm text-dusk">
+        <span className="font-semibold text-ink">Expected: </span>
         {expected}
       </p>
       {outcome ? (
-        <div className="border-t border-sand pt-3 dark:border-twilight">
+        <div className="border-t border-sand pt-3">
           <div className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Badge tone={outcome.ok ? "good" : "bad"}>{outcome.ok ? "✅ verified" : "❌ not as expected"}</Badge>
+              <Badge tone={outcome.ok ? "good" : "bad"}>{outcome.ok ? "Verified" : "Not as expected"}</Badge>
               <Mono>
                 {outcome.seconds} s · {fmtTime(last!.at)}
               </Mono>
@@ -138,9 +138,9 @@ function ActionCard({
           <Checks checks={outcome.checks} />
         </div>
       ) : last?.state === "abandoned" ? (
-        <div className="border-t border-sand pt-3 text-xs text-stone dark:border-twilight">Last run was interrupted (API restarted).</div>
+        <div className="border-t border-sand pt-3 text-xs text-stone">Last run was interrupted (API restarted).</div>
       ) : (
-        !running && <div className="border-t border-sand pt-3 text-xs text-stone dark:border-twilight">Not run yet.</div>
+        !running && <div className="border-t border-sand pt-3 text-xs text-stone">Not run yet.</div>
       )}
     </Card>
   );
@@ -177,7 +177,7 @@ export function Chaos() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">Chaos</h1>
-          <p className="max-w-3xl text-sm text-dusk dark:text-stone">
+          <p className="max-w-3xl text-sm text-dusk">
             Each action breaks something on purpose, using a simulated customer through the real pipeline. The verdict is computed afterwards from
             the database, not assumed. One action runs at a time.
           </p>
@@ -187,7 +187,7 @@ export function Chaos() {
             {flags.map(([k, f]) => {
               const left = f.expires_at ? Math.max(0, Math.round((Date.parse(f.expires_at) - now) / 1000)) : null;
               return (
-                <span key={k} className="flex items-center gap-2 rounded-lg border border-sun bg-sun-l px-3 py-1.5 text-xs font-semibold text-[#8a6100] dark:bg-[#3d3210] dark:text-sun">
+                <span key={k} className="flex items-center gap-2 rounded-lg border border-sun bg-sun-l px-3 py-1.5 text-xs font-semibold text-[#8a6100]">
                   {FLAG_LABEL[k]}
                   {left !== null && <span className="font-mono">{left} s</span>}
                   <button className="underline hover:no-underline" onClick={() => disarm.mutate(k)} disabled={disarm.isPending}>
@@ -222,7 +222,7 @@ export function Chaos() {
           <table className="w-full text-sm">
             <tbody>
               {data.recent.map((r) => (
-                <tr key={r.id} className="border-t border-sand first:border-0 dark:border-twilight">
+                <tr key={r.id} className="border-t border-sand first:border-0">
                   <td className="py-1.5 text-xs text-stone">{fmtTime(r.at)}</td>
                   <td className="py-1.5">{ACTIONS[r.kind]?.label ?? r.kind}</td>
                   <td className="py-1.5">

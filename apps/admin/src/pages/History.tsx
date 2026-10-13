@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Undo2 } from "lucide-react";
+import { Minus, Pencil, Plus, type LucideIcon, Undo2 } from "lucide-react";
 import { useState } from "react";
 
 import { Json, PageHeader, StatusBadge, fmtWhen } from "../components/bits";
-import { Badge, Button, Card, Empty, ErrorNote, Mono } from "../components/ui";
+import { Badge, Button, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
 import { api, type ChangeSetRow } from "../lib/api";
 import { useSession } from "../lib/session";
 
-const OP_ICON: Record<string, string> = { create: "＋", update: "✎", delete: "－", archive: "－" };
+const OP_ICON: Record<string, LucideIcon> = { create: Plus, update: Pencil, delete: Minus, archive: Minus };
 
 // the fields of an item that changed, before → after (a create shows its new values)
 function diff(before: Record<string, unknown> | null, after: Record<string, unknown> | null): [string, unknown, unknown][] {
@@ -19,13 +19,23 @@ function diff(before: Record<string, unknown> | null, after: Record<string, unkn
 
 const show = (v: unknown) => (v === undefined ? "∅" : typeof v === "string" ? v : JSON.stringify(v));
 
+function OpIcon({ op }: { op: string }) {
+  const Icon = OP_ICON[op] ?? Pencil;
+  const tone = op === "create" ? "bg-verdant-l text-verdant" : op === "delete" || op === "archive" ? "bg-ember-l text-ember" : "bg-sky-l text-sky";
+  return (
+    <span className={cx("flex h-5 w-5 items-center justify-center rounded", tone)}>
+      <Icon size={12} />
+    </span>
+  );
+}
+
 function Item({ it }: { it: ChangeSetRow["items"][number] }) {
   const [raw, setRaw] = useState(false);
   const changes = diff(it.before, it.after);
   return (
-    <li className="rounded-lg bg-bone px-2.5 py-1.5 dark:bg-ink">
+    <li className="rounded-lg bg-bone px-2.5 py-1.5">
       <div className="flex items-center gap-2 text-xs">
-        <span className="font-bold">{OP_ICON[it.op] ?? it.op}</span>
+        <OpIcon op={it.op} />
         <Mono>{it.entity}</Mono>
         <span className="text-stone">{it.op}</span>
         <button className="ml-auto text-[11px] text-signal hover:underline" onClick={() => setRaw(!raw)}>
@@ -39,7 +49,7 @@ function Item({ it }: { it: ChangeSetRow["items"][number] }) {
           {changes.slice(0, 8).map(([k, b, a]) => (
             <li key={k} className="break-words text-[11px]">
               <span className="font-semibold">{k}</span>:{" "}
-              {it.op !== "create" && <span className="text-ember line-through">{show(b).slice(0, 120)}</span>} <span className="text-[#00785a] dark:text-verdant">{show(a).slice(0, 160)}</span>
+              {it.op !== "create" && <span className="text-ember line-through">{show(b).slice(0, 120)}</span>} <span className="text-[#00785a]">{show(a).slice(0, 160)}</span>
             </li>
           ))}
           {changes.length > 8 && <li className="text-[11px] text-stone">…and {changes.length - 8} more fields</li>}
@@ -74,7 +84,7 @@ export function History() {
         {q.data?.length ? (
           <ul className="space-y-4">
             {q.data.map((cs) => (
-              <li key={cs.id} className="border-t border-sand/60 pt-3 first:border-0 first:pt-0 dark:border-twilight">
+              <li key={cs.id} className="border-t border-sand/60 pt-3 first:border-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold">{cs.summary}</span>
                   <StatusBadge status={cs.status} />

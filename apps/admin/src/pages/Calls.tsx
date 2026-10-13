@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight, Image as ImageIcon, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,10 +14,12 @@ function Call({ c }: { c: CallRow }) {
   const live = c.status === "active" || c.status === "ringing" || c.status === "connecting";
   const [open, setOpen] = useState(live);
   return (
-    <li className="border-t border-sand/60 py-3 first:border-0 dark:border-twilight">
+    <li className="border-t border-sand/60 py-3 first:border-0">
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => setOpen(!open)} className="text-sm font-semibold hover:underline">
-          {open ? "▾" : "▸"} {c.direction === "inbound" ? "📞" : "📲"} {c.caller ?? "unknown caller"}
+          <ChevronRight size={13} className={cx("inline transition-transform", open && "rotate-90")} />{" "}
+          {c.direction === "inbound" ? <PhoneIncoming size={14} className="inline text-signal" /> : <PhoneOutgoing size={14} className="inline text-signal" />}{" "}
+          {c.caller ?? "Unknown caller"}
         </button>
         <StatusBadge status={c.status} />
         {live && <Badge tone="bad">● live</Badge>}
@@ -24,10 +27,10 @@ function Call({ c }: { c: CallRow }) {
         <Mono>{dur(c.seconds)}</Mono>
         <span className="ml-auto text-[11px] text-stone">{fmtWhen(c.started_at)}</span>
       </div>
-      {c.summary && <div className="mt-1 text-sm text-dusk dark:text-stone">{c.summary}</div>}
+      {c.summary && <div className="mt-1 text-sm text-dusk">{c.summary}</div>}
       {open && (
         <div className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
-          <div className="max-h-96 space-y-1 overflow-y-auto rounded-lg bg-bone p-2.5 dark:bg-ink">
+          <div className="max-h-96 space-y-1 overflow-y-auto rounded-lg bg-bone p-2.5">
             {c.transcript.length ? (
               c.transcript.map((t, i) => (
                 <div key={i} className={cx("text-sm", t.role === "agent" || t.role === "assistant" ? "text-signal" : "")}>
@@ -46,8 +49,8 @@ function Call({ c }: { c: CallRow }) {
                 <div key={i} className="text-xs">
                   <Mono>{e.kind}</Mono> <StatusBadge status={e.status} />{" "}
                   <span className="text-stone">{fmtWhen(e.at)}</span>
-                  {typeof e.payload?.text === "string" && <div className="text-dusk dark:text-stone">{e.payload.text}</div>}
-                  {typeof e.payload?.description === "string" && <div className="text-dusk dark:text-stone">🖼 {e.payload.description}</div>}
+                  {typeof e.payload?.text === "string" && <div className="text-dusk">{e.payload.text}</div>}
+                  {typeof e.payload?.description === "string" && <div className="flex items-start gap-1 text-dusk"><ImageIcon size={12} className="mt-0.5 shrink-0" /> {e.payload.description}</div>}
                 </div>
               ))
             ) : (

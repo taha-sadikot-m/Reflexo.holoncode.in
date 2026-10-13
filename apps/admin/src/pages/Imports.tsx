@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,10 +16,10 @@ function ImportCard({ r }: { r: ImportRow }) {
   const [open, setOpen] = useState(false);
   const flagged = r.items.filter((i) => (i.issues?.length ?? 0) > 0 || (i.confidence ?? 1) < 0.7).length;
   return (
-    <li className="border-t border-sand/60 py-3 first:border-0 dark:border-twilight">
+    <li className="border-t border-sand/60 py-3 first:border-0">
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => setOpen(!open)} className="text-sm font-semibold hover:underline">
-          {open ? "▾" : "▸"} {r.filename ?? r.source_kind}
+          <ChevronRight size={13} className={cx("inline transition-transform", open && "rotate-90")} /> {r.filename ?? r.source_kind}
         </button>
         <StatusBadge status={r.status} />
         <Badge>{r.items.length} items</Badge>
@@ -49,7 +50,7 @@ function ImportCard({ r }: { r: ImportRow }) {
             </thead>
             <tbody>
               {r.items.map((i, n) => (
-                <tr key={n} className="border-t border-sand/40 align-top dark:border-twilight">
+                <tr key={n} className="border-t border-sand/40 align-top">
                   <td className="py-1 pr-2" title={JSON.stringify(i.extracted)}>
                     {name(i.extracted)}
                   </td>

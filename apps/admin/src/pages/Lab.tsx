@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleCheck, CircleX, CreditCard, Loader2, Play, Send, SkipForward, Square } from "lucide-react";
+import { AlertTriangle, Check, CircleCheck, CircleX, CornerDownLeft, CreditCard, Loader2, Play, Send, SkipForward, Square, Store } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -15,9 +15,9 @@ type Option = { id: string; title: string };
 function payloadText(p: Record<string, any>): string {
   if (p.type === "text") return p.text?.body ?? "";
   if (p.type === "interactive") return p.interactive?.body?.text ?? "";
-  if (p.type === "image") return p.image?.caption ? `🖼 ${p.image.caption}` : "🖼 image";
-  if (p.type === "document") return `📄 ${p.document?.filename ?? "file"}`;
-  if (p.type === "template") return `📨 template ${p.template?.name}`;
+  if (p.type === "image") return p.image?.caption ? `[Photo] ${p.image.caption}` : "[Photo]";
+  if (p.type === "document") return `[File] ${p.document?.filename ?? "file"}`;
+  if (p.type === "template") return `[Template] ${p.template?.name}`;
   if (typeof p.text === "string") return p.text; // telegram-shaped
   return JSON.stringify(p).slice(0, 200);
 }
@@ -42,8 +42,14 @@ function Bubble({
   if (mine) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-[#d9fdd3] px-3 py-1.5 text-[13px] text-ink shadow-sm dark:bg-[#005c4b] dark:text-bone">
-          {item.option ? <span className="italic">↩ {item.option}</span> : <span className="whitespace-pre-wrap break-words">{item.text}</span>}
+        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-[#d9fdd3] px-3 py-1.5 text-[13px] text-ink shadow-sm">
+          {item.option ? (
+            <span className="inline-flex items-center gap-1 italic">
+              <CornerDownLeft size={12} /> {item.option}
+            </span>
+          ) : (
+            <span className="whitespace-pre-wrap break-words">{item.text}</span>
+          )}
           <div className="mt-0.5 text-right text-[10px] text-stone">{fmtTime(item.at)}</div>
         </div>
       </div>
@@ -53,24 +59,25 @@ function Bubble({
   const options = payloadOptions(p);
   return (
     <div className="flex justify-start">
-      <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white px-3 py-1.5 text-[13px] text-ink shadow-sm dark:bg-[#202c33] dark:text-bone">
+      <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white px-3 py-1.5 text-[13px] text-ink shadow-sm">
         <div className="whitespace-pre-wrap break-words">{payloadText(p)}</div>
         {options.length > 0 && (
-          <div className="mt-1.5 flex flex-col gap-1 border-t border-sand pt-1.5 dark:border-twilight">
+          <div className="mt-1.5 flex flex-col gap-1 border-t border-sand pt-1.5">
             {options.map((o) => (
               <button
                 key={o.id}
                 disabled={disabled}
                 onClick={() => onTap(o)}
-                className="rounded-lg py-1 text-center text-[13px] font-semibold text-[#027eb5] hover:bg-bone disabled:opacity-50 dark:text-[#53bdeb] dark:hover:bg-twilight"
+                className="rounded-lg py-1 text-center text-[13px] font-semibold text-[#027eb5] hover:bg-bone disabled:opacity-50"
               >
                 {o.title}
               </button>
             ))}
           </div>
         )}
-        <div className="mt-0.5 text-right text-[10px] text-stone">
-          {fmtTime(item.at)} {item.status === "failed" ? "✗" : item.status === "sent" ? "✓" : ""}
+        <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-stone">
+          {fmtTime(item.at)}
+          {item.status === "failed" ? <AlertTriangle size={11} className="text-ember" /> : item.status === "sent" ? <Check size={11} /> : null}
         </div>
       </div>
     </div>
@@ -97,10 +104,12 @@ function Device({
   busy: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  const end = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const count = thread?.items.length ?? 0;
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" }); // block body: never return the Promise (see Conversations)
+    // scroll the chat only (scrollIntoView also scrolled the whole page), and return nothing (see Conversations)
+    const el = scroller.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [count]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -110,25 +119,27 @@ function Device({
   };
   const unpaid = (thread?.payment_links ?? []).filter((l) => l.status === "created");
   return (
-    <div className="flex h-[640px] min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border-[6px] border-ink bg-[#efeae2] shadow-lg dark:border-twilight dark:bg-[#0b141a]">
-      <div className="flex items-center gap-2 bg-[#008069] px-4 py-2.5 text-white dark:bg-[#202c33]">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm">🧁</div>
+    <div className="min-w-0 flex-1 rounded-[34px] bg-white p-2 shadow-pop ring-1 ring-sand">
+    <div className="flex h-[640px] flex-col overflow-hidden rounded-[26px] bg-[#efeae2]">
+      <div className="flex items-center gap-2.5 bg-[#008069] px-4 py-2.5 text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+          <Store size={16} />
+        </div>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{title}</div>
           <div className="truncate text-[11px] opacity-80">{subtitle}</div>
         </div>
       </div>
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+      <div ref={scroller} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
         <ErrorNote error={error} />
         {thread?.items.length ? (
           thread.items.map((it, i) => <Bubble key={i} item={it} onTap={onTap} disabled={busy} />)
         ) : (
-          <div className="py-16 text-center text-xs text-stone">No messages yet — say hi 👋</div>
+          <div className="py-16 text-center text-xs text-stone">No messages yet — say hi</div>
         )}
-        <div ref={end} />
       </div>
       {onPay && unpaid.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-sand bg-white/70 px-3 py-1.5 dark:border-twilight dark:bg-black/30">
+        <div className="flex flex-wrap gap-1.5 border-t border-sand bg-white/70 px-3 py-1.5">
           {unpaid.map((l) => (
             <Button key={l.id} variant="ghost" className="text-xs" onClick={() => onPay(l.id)} disabled={busy}>
               <CreditCard size={13} /> Pay {l.order_number} · ₹{(l.amount_paise / 100).toLocaleString("en-IN")}
@@ -136,17 +147,18 @@ function Device({
           ))}
         </div>
       )}
-      <form onSubmit={submit} className="flex items-center gap-2 bg-[#f0f2f5] px-2 py-2 dark:bg-[#202c33]">
+      <form onSubmit={submit} className="flex items-center gap-2 bg-[#f0f2f5] px-2 py-2">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Message"
-          className="min-w-0 flex-1 rounded-full bg-white px-4 py-2 text-sm outline-none dark:bg-[#2a3942] dark:text-bone"
+          className="min-w-0 flex-1 rounded-full bg-white px-4 py-2 text-sm outline-none"
         />
         <button type="submit" disabled={busy || !draft.trim()} className="rounded-full bg-[#008069] p-2 text-white disabled:opacity-50">
           <Send size={16} />
         </button>
       </form>
+    </div>
     </div>
   );
 }
@@ -157,7 +169,7 @@ const STEP_ICON: Record<string, React.ReactNode> = {
   ok: <CircleCheck size={14} className="text-verdant" />,
   failed: <CircleX size={14} className="text-ember" />,
   running: <Loader2 size={14} className="animate-spin text-signal" />,
-  pending: <span className="inline-block h-3.5 w-3.5 rounded-full border border-sand dark:border-twilight" />,
+  pending: <span className="inline-block h-3.5 w-3.5 rounded-full border border-sand" />,
   skipped: <SkipForward size={14} className="text-stone" />,
 };
 
@@ -181,13 +193,13 @@ function RunView({ run, onStop }: { run: ScenarioRun; onStop: () => void }) {
       </div>
       <ol className="space-y-1">
         {run.steps.map((s) => (
-          <li key={s.index} className={cx("rounded-lg px-2 py-1 text-xs", s.status === "failed" && "bg-ember-l dark:bg-[#40201c]", s.status === "running" && "bg-signal-l dark:bg-[#26214d]")}>
+          <li key={s.index} className={cx("rounded-lg px-2 py-1 text-xs", s.status === "failed" && "bg-ember-l", s.status === "running" && "bg-signal-l")}>
             <div className="flex items-start gap-2">
               <span className="mt-0.5 shrink-0">{STEP_ICON[s.status]}</span>
               <span className="min-w-0 flex-1 break-words">{s.label}</span>
               {s.seconds != null && <Mono className="shrink-0">{s.seconds}s</Mono>}
             </div>
-            {s.detail && s.status !== "pending" && <div className="ml-6 mt-0.5 line-clamp-2 break-words text-[11px] text-dusk dark:text-stone">{s.detail}</div>}
+            {s.detail && s.status !== "pending" && <div className="ml-6 mt-0.5 line-clamp-2 break-words text-[11px] text-dusk">{s.detail}</div>}
           </li>
         ))}
       </ol>
@@ -277,7 +289,7 @@ export function Lab() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">Simulation Lab</h1>
-          <p className="max-w-3xl text-sm text-dusk dark:text-stone">
+          <p className="max-w-3xl text-sm text-dusk">
             Simulated customers and a simulated owner talk to the real pipeline through signed provider payloads — only the last hop to WhatsApp is
             swapped. Nothing here reaches a real phone.
           </p>
@@ -298,7 +310,7 @@ export function Lab() {
                   <li key={s.id} className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold">{s.title}</div>
-                      <div className="text-xs text-dusk dark:text-stone">{s.covers}</div>
+                      <div className="text-xs text-dusk">{s.covers}</div>
                     </div>
                     <Button className="shrink-0 text-xs" disabled={running || start.isPending} onClick={() => start.mutate(s.id)}>
                       <Play size={12} /> Run
@@ -341,7 +353,7 @@ export function Lab() {
                 setActor(n);
                 setActorName(actorChoices.find(([, a]) => a === n)?.[0] ?? `Customer ${n}`);
               }}
-              className="rounded-lg border border-sand bg-white px-3 py-1.5 text-sm dark:border-twilight dark:bg-indigo"
+              className="h-9 rounded-md bg-white px-3 text-[13px] font-medium text-ink shadow-sm ring-1 ring-inset ring-sand focus:outline-none focus:ring-2 focus:ring-signal/50"
             >
               {actorChoices.map(([name, n]) => (
                 <option key={`${name}-${n}`} value={n}>
@@ -361,7 +373,7 @@ export function Lab() {
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="py-1.5 text-sm font-semibold text-dusk dark:text-stone">Owner device (simulated)</div>
+            <div className="py-1.5 text-sm font-semibold text-dusk">Owner device (simulated)</div>
             <Device
               title="Meera (owner)"
               subtitle="WhatsApp · simulated owner binding"

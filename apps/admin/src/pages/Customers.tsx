@@ -75,14 +75,14 @@ function Detail({ id, bid }: { id: string; bid: string }) {
             <li key={n} className="flex flex-wrap items-center gap-2 text-sm">
               <ChannelIcon channel={i.channel} size="sm" />
               <span className="font-medium text-ink">{channelLabel(i.channel)}</span>
-              <span className="font-mono text-xs text-dusk dark:text-stone">{i.external_id}</span>
+              <span className="font-mono text-xs text-dusk">{i.external_id}</span>
               <Badge tone={i.linked_via === "first_contact" ? "neutral" : "good"}>{LINKED[i.linked_via] ?? i.linked_via}</Badge>
               <span className="text-[11px] text-stone">{fmtWhen(i.created_at)}</span>
             </li>
           ))}
         </ul>
         {c.merged_from.length > 0 && (
-          <div className="mt-1 text-xs text-dusk dark:text-stone">
+          <div className="mt-1 text-xs text-dusk">
             Merged {c.merged_from.length} profile{c.merged_from.length > 1 ? "s" : ""} into this one — one customer, one history.
           </div>
         )}
@@ -91,7 +91,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         <div>
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone">What the AI remembers</div>
           {c.summary && <div className="text-sm">{c.summary}</div>}
-          <ul className="list-inside list-disc text-sm text-dusk dark:text-stone">
+          <ul className="list-inside list-disc text-sm text-dusk">
             {c.facts.map((f, n) => (
               <li key={n}>{typeof f === "string" ? f : (f.text ?? f.fact ?? JSON.stringify(f))}</li>
             ))}
@@ -120,7 +120,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
                 <div
                   className={cx(
                     "max-w-[80%] rounded-2xl px-3 py-1.5 text-sm shadow-sm",
-                    h.direction === "inbound" ? "rounded-bl-sm bg-white dark:bg-twilight" : "rounded-br-sm bg-signal-l",
+                    h.direction === "inbound" ? "rounded-bl-sm bg-white" : "rounded-br-sm bg-signal-l",
                   )}
                 >
                   <div className="whitespace-pre-wrap break-words">{h.text}</div>
@@ -167,7 +167,7 @@ export function Customers() {
                 <li key={c.id}>
                   <button
                     onClick={() => setParams({ c: c.id }, { replace: true })}
-                    className={cx("w-full rounded-lg px-3 py-2 text-left hover:bg-bone dark:hover:bg-twilight", selected === c.id && "bg-signal-l dark:bg-[#26214d]")}
+                    className={cx("w-full rounded-lg px-3 py-2 text-left hover:bg-bone", selected === c.id && "bg-signal-l")}
                   >
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name ?? "Unknown"}</span>
@@ -179,7 +179,7 @@ export function Customers() {
                     </div>
                     <div className="mt-0.5 flex gap-3 text-[11px] text-stone">
                       <span>{c.orders} orders</span>
-                      {c.merged > 0 && <span className="text-[#00785a] dark:text-verdant">linked</span>}
+                      {c.merged > 0 && <span className="text-[#00785a]">linked</span>}
                       <span className="ml-auto">{fmtWhen(c.last_seen_at)}</span>
                     </div>
                   </button>

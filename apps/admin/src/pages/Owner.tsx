@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { FileSpreadsheet, FileText, Image as ImageIcon, Paperclip } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PageHeader, StatusBadge, fmtWhen } from "../components/bits";
@@ -13,6 +14,24 @@ function Sla({ due, done }: { due: string | null; done: boolean }) {
 }
 
 const size = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`);
+
+const KIND_LABEL: Record<string, string> = {
+  tool_call: "Customer request",
+  outbound_draft: "Message to send",
+  automation_activation: "New automation",
+  automation_step: "Automation step",
+  knowledge_conflict: "Knowledge conflict",
+  change_confirmation: "Catalogue change",
+};
+
+function FileTypeIcon({ mime }: { mime: string }) {
+  const Icon = mime.startsWith("image/") ? ImageIcon : mime.includes("pdf") ? FileText : mime.includes("sheet") || mime.includes("csv") ? FileSpreadsheet : Paperclip;
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bone text-dusk">
+      <Icon size={17} />
+    </span>
+  );
+}
 
 export function Owner() {
   const { business } = useSession();
@@ -33,7 +52,7 @@ export function Owner() {
           {d?.questions.length ? (
             <ul>
               {d.questions.map((x) => (
-                <li key={x.id} className="border-t border-sand/60 py-2 first:border-0 dark:border-twilight">
+                <li key={x.id} className="border-t border-sand/60 py-2 first:border-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={x.status} />
                     {x.code && <Mono>#{x.code}</Mono>}
@@ -43,9 +62,9 @@ export function Owner() {
                   <div className="mt-1 text-sm">{x.question}</div>
                   {x.ai_guess && <div className="text-xs text-stone">AI guessed: {x.ai_guess}</div>}
                   {x.answer && (
-                    <div className="mt-1 rounded-lg bg-verdant-l px-2.5 py-1.5 text-sm dark:bg-[#0a3b2e]">
+                    <div className="mt-1 rounded-lg bg-verdant-l px-2.5 py-1.5 text-sm">
                       {x.answer}
-                      <span className="ml-2 text-[11px] text-dusk dark:text-stone">
+                      <span className="ml-2 text-[11px] text-dusk">
                         {x.scope === "customer" ? "for this customer" : x.scope === "global" ? "saved for everyone" : x.scope}
                         {x.relayed_at && " · told the customer"}
                       </span>
@@ -73,11 +92,11 @@ export function Owner() {
           {d?.approvals.length ? (
             <ul>
               {d.approvals.map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center gap-2 border-t border-sand/60 py-2 text-sm first:border-0 dark:border-twilight">
-                  <Mono>{a.kind.replace(/_/g, " ")}</Mono>
+                <li key={a.id} className="flex flex-wrap items-center gap-2 border-t border-sand/60 py-2 text-sm first:border-0">
+                  <span className="w-36 shrink-0 text-[12.5px] font-medium text-dusk">{KIND_LABEL[a.kind] ?? a.kind.replace(/_/g, " ")}</span>
                   <StatusBadge status={a.status} />
                   {a.code && <Mono>#{a.code}</Mono>}
-                  <span className="min-w-0 flex-1 truncate text-dusk dark:text-stone">{a.summary}</span>
+                  <span className="min-w-0 flex-1 truncate text-dusk">{a.summary}</span>
                   <span className="text-[11px] text-stone">
                     {a.decided_at ? `decided ${fmtWhen(a.decided_at)}${a.decided_via ? ` via ${a.decided_via}` : ""}` : fmtWhen(a.created_at)}
                   </span>
@@ -92,7 +111,7 @@ export function Owner() {
           {d?.notifications.length ? (
             <ul>
               {d.notifications.map((n, i) => (
-                <li key={i} className="border-t border-sand/60 py-2 first:border-0 dark:border-twilight">
+                <li key={i} className="border-t border-sand/60 py-2 first:border-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Mono>{n.kind}</Mono>
                     <Badge tone={n.priority === "p0" ? "bad" : n.priority === "p1" ? "warn" : "neutral"}>{n.priority.toUpperCase()}</Badge>
@@ -102,7 +121,7 @@ export function Owner() {
                       {fmtWhen(n.delivered_at ?? n.created_at)}
                     </span>
                   </div>
-                  {n.text && <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-dusk dark:text-stone">{n.text}</div>}
+                  {n.text && <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-dusk">{n.text}</div>}
                 </li>
               ))}
             </ul>
@@ -114,11 +133,11 @@ export function Owner() {
           {d?.files.length ? (
             <ul>
               {d.files.map((f) => (
-                <li key={f.id} className={cx("flex items-start gap-3 border-t border-sand/60 py-2 first:border-0 dark:border-twilight")}>
-                  <span className="text-xl">{f.mime.startsWith("image/") ? "🖼" : f.mime.includes("pdf") ? "📄" : f.mime.includes("sheet") || f.mime.includes("csv") ? "📊" : "📎"}</span>
+                <li key={f.id} className={cx("flex items-start gap-3 border-t border-sand/60 py-2 first:border-0")}>
+                  <FileTypeIcon mime={f.mime} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{f.filename}</div>
-                    {f.description && <div className="line-clamp-2 text-xs text-dusk dark:text-stone">{f.description}</div>}
+                    {f.description && <div className="line-clamp-2 text-xs text-dusk">{f.description}</div>}
                     <div className="text-[11px] text-stone">
                       {f.kind} · {size(f.size_bytes)} · {f.received_via ?? "—"} · {fmtWhen(f.created_at)}
                       {f.imports > 0 && (

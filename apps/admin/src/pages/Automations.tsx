@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FastForward, Pause, Play } from "lucide-react";
+import { Ban, Bell, ChevronRight, Circle, CircleHelp, FastForward, Flag, GitBranch, Hash, Hourglass, Lock, MessageSquare, Pause, PenLine, Play, Receipt, Tag, Timer, type LucideIcon, Zap } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -10,21 +10,21 @@ import { useSession } from "../lib/session";
 
 type Step = { id: string; type?: string; [k: string]: unknown };
 
-const STEP_ICON: Record<string, string> = {
-  send: "💬",
-  wait: "⏱",
-  wait_for_event: "👂",
-  branch: "🔀",
-  counter_limit: "🔢",
-  claim_once: "☝️",
-  deny: "⛔",
-  llm_classify: "🏷",
-  llm_generate: "✍️",
-  notify_owner: "🔔",
-  ask_owner: "🙋",
-  update_order: "🧾",
-  set_tag: "🏷",
-  end: "🏁",
+const STEP_ICON: Record<string, LucideIcon> = {
+  send: MessageSquare,
+  wait: Timer,
+  wait_for_event: Hourglass,
+  branch: GitBranch,
+  counter_limit: Hash,
+  claim_once: Lock,
+  deny: Ban,
+  llm_classify: Tag,
+  llm_generate: PenLine,
+  notify_owner: Bell,
+  ask_owner: CircleHelp,
+  update_order: Receipt,
+  set_tag: Tag,
+  end: Flag,
 };
 
 // outgoing edges of a step: the keys of the definition language that name another step
@@ -44,35 +44,81 @@ function stepFacts(s: Step): string[] {
     .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
 }
 
+/** WhatsApp formatting (*bold*, _italic_) is for the phone; the panel shows plain text. */
+const plain = (text: string) => text.replace(/\*([^*\n]+)\*/g, "$1");
+
+const TRIGGER_LABEL: Record<string, string> = {
+  message_received: "A customer sends a message",
+  comment_received: "Someone comments on a post",
+  order_created: "An order is created",
+  order_confirmed: "An order is confirmed",
+  order_confirming: "An order is being confirmed",
+  order_cancelled: "An order is cancelled",
+  order_status_changed: "An order's status changes",
+  payment_link_created: "A payment link is sent",
+  payment_captured: "A payment is received",
+  payment_failed: "A payment fails",
+  schedule: "On a schedule",
+  manual: "Started manually",
+};
+
+function TriggerText({ trigger }: { trigger: unknown }) {
+  const t = (trigger ?? {}) as { type?: string; cel?: string | null; cron?: string | null };
+  return (
+    <span className="text-[13px] text-ink">
+      {TRIGGER_LABEL[t.type ?? ""] ?? t.type}
+      {t.cel && t.cel !== "true" && (
+        <span className="text-dusk">
+          {" "}
+          when <code className="break-all rounded bg-white/70 px-1 font-mono text-[11.5px]">{t.cel}</code>
+        </span>
+      )}
+      {t.cron && <span className="text-dusk"> · {t.cron}</span>}
+    </span>
+  );
+}
+
+function StepIcon({ type }: { type?: string }) {
+  const Icon = STEP_ICON[type ?? ""] ?? Circle;
+  return (
+    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-signal-l text-signal">
+      <Icon size={13} />
+    </span>
+  );
+}
+
 function Diagram({ def, active }: { def: AutomationDetail["definition"]; active: Set<string> }) {
   const steps = (def.steps ?? []) as Step[];
   return (
     <div className="space-y-1.5">
-      <div className="rounded-lg border border-dashed border-signal/50 bg-signal-l px-3 py-2 text-xs dark:bg-[#26214d]">
-        <span className="font-semibold">⚡ Trigger</span> <Mono>{JSON.stringify(def.trigger)}</Mono>
+      <div className="rounded-lg border border-dashed border-signal/50 bg-signal-l px-3 py-2 text-xs">
+        <span className="inline-flex items-center gap-1 font-semibold text-signal-d">
+          <Zap size={13} /> Trigger
+        </span>{" "}
+        <TriggerText trigger={def.trigger} />
       </div>
       {steps.map((s, i) => {
         const edges = EDGE_KEYS.filter(([k]) => typeof s[k] === "string").map(([k, label]) => [label, String(s[k])]);
         const falls = !edges.length && s.type !== "deny" && s.type !== "end" && i < steps.length - 1;
         return (
           <div key={s.id} id={`step-${s.id}`}>
-            <div className="ml-4 h-2 border-l border-sand dark:border-twilight" />
-            <div className={cx("rounded-lg border px-3 py-2", active.has(s.id) ? "border-sun bg-sun-l dark:bg-[#3d3210]" : "border-sand dark:border-twilight")}>
+            <div className="ml-4 h-2 border-l border-sand" />
+            <div className={cx("rounded-lg border px-3 py-2", active.has(s.id) ? "border-sun bg-sun-l" : "border-sand")}>
               <div className="flex items-center gap-2 text-sm">
-                <span>{STEP_ICON[s.type ?? ""] ?? "▫️"}</span>
+                <StepIcon type={s.type} />
                 <span className="font-semibold">{s.id}</span>
                 <Mono>{s.type}</Mono>
                 {active.has(s.id) && <Badge tone="warn">a run is here</Badge>}
               </div>
               {stepFacts(s).map((f) => (
-                <div key={f} className="ml-6 break-words text-xs text-dusk dark:text-stone">
+                <div key={f} className="ml-6 break-words text-xs text-dusk">
                   {f}
                 </div>
               ))}
               {(edges.length > 0 || falls) && (
                 <div className="ml-6 mt-1 flex flex-wrap gap-2 text-[11px]">
                   {edges.map(([label, to]) => (
-                    <a key={label} href={`#step-${to}`} className="rounded bg-bone px-1.5 py-0.5 hover:bg-sand dark:bg-twilight">
+                    <a key={label} href={`#step-${to}`} className="rounded bg-bone px-1.5 py-0.5 hover:bg-sand">
                       {label} → {to}
                     </a>
                   ))}
@@ -92,10 +138,10 @@ function RunRow({ r, onSkip, busy }: { r: AutomationRun; onSkip: () => void; bus
   const live = r.status === "running" || r.status === "waiting";
   const waiting = r.waits.filter((w) => w.status === "waiting" || w.status === "pending");
   return (
-    <li className="border-t border-sand/60 py-2 dark:border-twilight">
+    <li className="border-t border-sand/60 py-2">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <button onClick={() => setOpen(!open)} className="font-mono text-xs hover:underline">
-          {open ? "▾" : "▸"} {r.instance_key}
+          <ChevronRight size={13} className={cx("inline transition-transform", open && "rotate-90")} /> {r.instance_key}
         </button>
         <StatusBadge status={r.status} />
         <span className="text-xs text-stone">v{r.version} · {fmtWhen(r.started_at)}</span>
@@ -118,7 +164,7 @@ function RunRow({ r, onSkip, busy }: { r: AutomationRun; onSkip: () => void; bus
               <StatusBadge status={s.status} />
               <Mono>{s.step_id}</Mono>
               <span className="text-stone">{fmtWhen(s.finished_at ?? s.started_at)}</span>
-              {s.output != null && <span className="max-w-full truncate text-dusk dark:text-stone">{JSON.stringify(s.output)}</span>}
+              {s.output != null && <span className="max-w-full truncate text-dusk">{JSON.stringify(s.output)}</span>}
               {s.error != null && <span className="text-ember">{JSON.stringify(s.error)}</span>}
             </div>
           ))}
@@ -176,8 +222,12 @@ function Detail({ id, bid }: { id: string; bid: string }) {
         </div>
       </div>
       <ErrorNote error={toggle.error ?? skip.error} />
-      {a.description && <div className="text-sm italic text-dusk dark:text-stone">Owner said: “{a.description}”</div>}
-      {a.readback && <div className="whitespace-pre-wrap rounded-lg bg-blossom px-3 py-2 text-sm dark:bg-[#3d2a10]">{a.readback}</div>}
+      {a.description && <div className="text-sm italic text-dusk">Owner said: “{a.description}”</div>}
+      {a.readback && (
+        <div className="whitespace-pre-wrap rounded-lg border border-[#d9d6ff] bg-signal-l/60 px-4 py-3 text-[13.5px] leading-relaxed text-ink">
+          {plain(a.readback)}
+        </div>
+      )}
       <div>
         <div className="mb-1 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-stone">Flow</span>
@@ -218,7 +268,7 @@ export function Automations() {
     <div className="space-y-5">
       <PageHeader title="Automations">Procedures the owner described in their own words — each compiled to a checked definition, read back, and run durably.</PageHeader>
       <ErrorNote error={list.error} />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[400px_1fr]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
         <Card>
           {list.data?.length ? (
             <ul className="space-y-1">
@@ -227,15 +277,15 @@ export function Automations() {
                   <button
                     onClick={() => setParams({ a: a.id }, { replace: true })}
                     className={cx(
-                      "w-full rounded-lg px-3 py-2 text-left hover:bg-bone dark:hover:bg-twilight",
-                      selected === a.id && "bg-signal-l dark:bg-[#26214d]",
+                      "w-full rounded-lg px-3 py-2 text-left hover:bg-bone",
+                      selected === a.id && "bg-signal-l",
                     )}
                   >
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{a.name}</span>
                       <StatusBadge status={a.status} />
                     </div>
-                    <div className="mt-0.5 line-clamp-2 text-xs text-dusk dark:text-stone">{a.readback ?? a.description}</div>
+                    <div className="mt-0.5 line-clamp-2 text-xs text-dusk">{plain(a.readback ?? a.description ?? "")}</div>
                     <div className="mt-1 flex gap-3 text-[11px] text-stone">
                       <span>v{a.version}</span>
                       <span>{a.executor}</span>

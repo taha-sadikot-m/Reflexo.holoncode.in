@@ -1,7 +1,11 @@
+import { ArrowRight } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button, ErrorNote } from "../components/ui";
 import { useSession } from "../lib/session";
+
+const input =
+  "h-10 w-full rounded-md bg-white px-3 text-[14px] text-ink shadow-sm ring-1 ring-inset ring-sand placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-signal/50";
 
 export function Login() {
   const { login } = useSession();
@@ -24,33 +28,39 @@ export function Login() {
   };
 
   return (
-    <div className="flex h-full items-center justify-center bg-ink">
-      <form onSubmit={submit} className="w-80 rounded-2xl bg-indigo p-7 text-bone shadow-2xl">
-        <div className="font-display text-2xl font-bold">
-          REFLEXO<span className="text-marigold">.</span>
+    <div className="flex h-full items-center justify-center bg-parchment px-4">
+      <div className="w-full max-w-[380px]">
+        <div className="mb-8 flex items-center justify-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-signal to-[#8f6bff] text-base font-bold text-white shadow-sm">
+            R
+          </div>
+          <span className="text-xl font-semibold tracking-tight text-ink">Reflexo</span>
         </div>
-        <p className="mb-6 mt-1 text-sm text-stone">Bol do. Baaki hum.</p>
-        <label className="mb-1 block text-xs font-semibold text-stone">Username</label>
-        <input
-          className="mb-3 w-full rounded-lg border border-twilight bg-ink px-3 py-2 text-sm outline-none focus:border-marigold"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoComplete="username"
-        />
-        <label className="mb-1 block text-xs font-semibold text-stone">Password</label>
-        <input
-          type="password"
-          className="mb-4 w-full rounded-lg border border-twilight bg-ink px-3 py-2 text-sm outline-none focus:border-marigold"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          autoFocus
-        />
-        <ErrorNote error={error} />
-        <Button type="submit" disabled={busy || !password} className="mt-3 w-full !bg-marigold !text-ink">
-          {busy ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
+        <form onSubmit={submit} className="rounded-xl bg-white p-8 shadow-pop">
+          <h1 className="text-[18px] font-semibold tracking-tight text-ink">Sign in to the admin console</h1>
+          <p className="mb-6 mt-1 text-[13px] text-dusk">Monitor and operate your AI employee.</p>
+          <label className="mb-1.5 block text-[13px] font-medium text-soot">Username</label>
+          <input className={`${input} mb-4`} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+          <label className="mb-1.5 block text-[13px] font-medium text-soot">Password</label>
+          <input
+            type="password"
+            className={`${input} mb-5`}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            autoFocus
+          />
+          <ErrorNote error={error} />
+          <Button type="submit" disabled={busy || !password} className="mt-2 h-10 w-full text-[14px]">
+            {busy ? "Signing in…" : (
+              <>
+                Sign in <ArrowRight size={15} />
+              </>
+            )}
+          </Button>
+        </form>
+        <p className="mt-6 text-center text-xs text-stone">Bol do. Baaki hum.</p>
+      </div>
     </div>
   );
 }
