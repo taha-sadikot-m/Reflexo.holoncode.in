@@ -232,18 +232,23 @@ async def owner_timeline(
 
 
 async def recent_customer_media(
-    s: AsyncSession, conversation_id: UUID, *, within_min: int = 120, limit: int = 3
+    s: AsyncSession, conversation_id: UUID, *, within_min: int = 120, burst_min: int = 10, limit: int = 3
 ) -> list[UUID]:
-    """Images the customer shared in this conversation lately, newest first — what the owner must see to decide
-    about it (a design for a custom cake, a photo of a damaged order, …)."""
+    """The images that belong to what the customer is asking about now, newest first: their latest image (within
+    `within_min`) and the ones sent together with it (up to `burst_min` before it). A photo from an earlier,
+    separate request is not part of it (live 14 Oct: the owner got the design from a previous call as well)."""
     rows = (
         await s.execute(
-            text("""SELECT a->>'media_object_id' AS mid FROM messages m, jsonb_array_elements(m.attachments) a
-                    WHERE m.conversation_id = :c AND m.direction = 'inbound'
-                      AND m.created_at > now() - make_interval(mins => :w)
-                      AND a->>'kind' = 'image' AND a->>'media_object_id' IS NOT NULL
-                    ORDER BY m.created_at DESC LIMIT :n"""),
-            {"c": conversation_id, "w": within_min, "n": limit},
+            text("""WITH imgs AS (
+                        SELECT m.created_at, a->>'media_object_id' AS mid
+                        FROM messages m, jsonb_array_elements(m.attachments) a
+                        WHERE m.conversation_id = :c AND m.direction = 'inbound'
+                          AND m.created_at > now() - make_interval(mins => :w)
+                          AND a->>'kind' = 'image' AND a->>'media_object_id' IS NOT NULL)
+                    SELECT mid FROM imgs
+                    WHERE created_at >= (SELECT max(created_at) FROM imgs) - make_interval(mins => :burst)
+                    ORDER BY created_at DESC LIMIT :n"""),
+            {"c": conversation_id, "w": within_min, "burst": burst_min, "n": limit},
         )
     ).all()
     return [UUID(r.mid) for r in rows]

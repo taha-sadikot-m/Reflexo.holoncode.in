@@ -12,6 +12,7 @@ becomes a question to the owner at the end of the call.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -26,6 +27,7 @@ from reflexo.common.db import Database, ServiceReason
 from reflexo.common.ids import new_id
 from reflexo.common.llm import ToolCall
 from reflexo.common.ports import Registry, reset_registry
+from reflexo.common.timeutil import utcnow
 from reflexo.pipeline import api as pipeline_api
 from reflexo.voice import sessions
 from reflexo.voice.context import start_session
@@ -175,3 +177,31 @@ async def test_a_promise_with_no_record_becomes_a_question_and_the_recap_states_
     assert len(recaps) == 1
     [stored] = await q(db, "SELECT summary FROM call_sessions WHERE id = :c", c=call["call"])
     assert stored.summary.startswith("Aapne photo wala design")
+
+
+async def test_the_owner_gets_the_photos_of_this_request_not_an_earlier_one(
+    registry: Registry, db: Database, fake: agent.FakeProvider
+) -> None:
+    """Live 14 Oct: the design from an earlier call (24 min before) was sent along with the new one."""
+    shop = await bakery(db)
+    call = await on_a_call_with_a_photo(registry, db, shop)  # the photo of THIS request, just now
+    older, extra = new_id(), new_id()
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        # an earlier, separate request (25 min ago) and a photo sent together with this one (3 min ago)
+        for mid, age in ((older, timedelta(minutes=25)), (extra, timedelta(minutes=3))):
+            await s.execute(
+                text("""INSERT INTO messages (id, business_id, conversation_id, direction, author, channel,
+                                              channel_connection_id, content_text, attachments, status, created_at)
+                        SELECT :id, c.business_id, c.id, 'inbound', 'customer', c.channel, c.channel_connection_id,
+                               '[image]', CAST(:a AS jsonb), 'received', :at
+                        FROM conversations c WHERE c.id = :c"""),
+                {
+                    "id": new_id(),
+                    "c": call["conv"],
+                    "at": utcnow() - age,
+                    "a": json.dumps([{"media_object_id": str(mid), "kind": "image", "mime": "image/jpeg"}]),
+                },
+            )
+    async with db.tenant_session(shop.bid) as s:
+        media = await gateway_api.recent_customer_media(s, call["conv"])
+    assert media == [call["media"], extra]  # this request's photos, newest first; not the earlier one
