@@ -500,6 +500,32 @@ async def import_from_file(ctx: ToolContext, args: ImportFromFileArgs, s: AsyncS
     }
 
 
+class ImportFromTextArgs(BaseModel):
+    text: str = Field(
+        min_length=10,
+        max_length=20000,
+        description="The owner's menu / price list exactly as they typed it (several items with prices), complete",
+    )
+    mode: Literal["catalog_update", "onboarding"] = "catalog_update"
+
+
+@tool("import_from_text", ImportFromTextArgs, desks=OWNER, side_effect=True)
+async def import_from_text(ctx: ToolContext, args: ImportFromTextArgs, s: AsyncSession) -> dict[str, Any]:
+    """Read a menu / price list the owner TYPED (several items with prices in one message) and prepare the
+    catalogue changes for the owner to confirm — the same import as a photo or file. For one item, use
+    catalog_change instead."""
+    assert ctx.conversation_id is not None
+    file_id = await owner.save_typed_source(ctx.business_id, ctx.member_id, args.text, ctx.channel)
+    run_id = await ports.registry.require(WorkflowPort).start_import(  # type: ignore[type-abstract]
+        ctx.business_id, file_id, mode=args.mode, member_id=ctx.member_id, reply_conversation_id=ctx.conversation_id
+    )
+    return {
+        "started": True,
+        "import_run": str(run_id),
+        "next": "Tell the owner in one short line that you're reading their list and the summary will follow.",
+    }
+
+
 class ConfirmPendingArgs(BaseModel):
     code: str = Field(description="The 4-digit code of the change waiting for confirmation (see PENDING)")
     approve: bool
@@ -703,6 +729,7 @@ OWNER_TOOLS = [
     "send_to_customer",
     "orders_list",
     "import_from_file",
+    "import_from_text",
     "confirm_pending",
     "playbook_change",
     "order_action",

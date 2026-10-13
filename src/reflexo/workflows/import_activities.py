@@ -50,6 +50,8 @@ async def _file(inp: dict[str, Any]) -> owner.OwnerFile:
 
 
 def _source_kind(f: owner.OwnerFile, mime: str) -> str:
+    if mime.startswith(owner.TYPED_SOURCE_MIME):  # typed in chat (import_from_text)
+        return "text"
     if f.kind == "spreadsheet":
         return "csv" if mime.startswith("text/csv") or (f.filename or "").lower().endswith(".csv") else "excel"
     if f.kind in SOURCE_KIND:
@@ -92,7 +94,7 @@ async def import_extract(inp: dict[str, Any], meta: dict[str, Any]) -> list[dict
     try:
         if meta["kind"] in ("excel", "csv"):
             items = await knowledge.imports.extract_spreadsheet(business_id, content, mime, f.filename)
-        else:
+        else:  # photo, PDF or typed text: the model reads it and quotes where each price came from
             items = await knowledge.imports.extract_visual(business_id, content, mime)
     except knowledge.imports.ImportFailed as exc:
         raise ApplicationError(str(exc), type="ImportFailed", non_retryable=True) from exc
@@ -110,7 +112,7 @@ async def import_prepare(inp: dict[str, Any], meta: dict[str, Any], items: list[
         business_id,
         run_id,
         [knowledge.imports.ExtractedItem.model_validate(i) for i in items],
-        visual=meta["kind"] in ("image", "pdf"),
+        visual=meta["kind"] in ("image", "pdf", "text"),  # model-read: every price must appear in its quote
         origin="onboarding" if inp["mode"] == "onboarding" else "import",
         member_id=UUID(inp["member_id"]) if inp.get("member_id") else None,
         filename=meta.get("filename"),

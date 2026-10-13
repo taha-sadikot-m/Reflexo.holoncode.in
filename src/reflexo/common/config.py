@@ -102,6 +102,11 @@ class Settings(BaseSettings):
     demo_sandbox_hours: int = 24
     demo_daily_cap: int = 300  # new demo shops per day, across everyone
     demo_per_client_per_hour: int = 6  # new demo shops per client address per hour
+    # self-serve sign-up (/signup): open, with limits
+    signup_enabled: bool = True
+    signup_daily_cap: int = 100  # new accounts per day, across everyone
+    signup_per_client_per_hour: int = 3
+    owner_session_hours: int = 72
 
     # commerce / Razorpay (POC_05 §4.5, §6)
     razorpay_key_id: str = ""

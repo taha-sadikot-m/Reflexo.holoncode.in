@@ -36,6 +36,7 @@ class ServiceReason(StrEnum):
     PIPELINE_EVENTS = "pipeline_events"
     SEED = "seed"
     HEALTH = "health"
+    ACCOUNTS = "accounts"  # owner sign-up and log-in (owner_accounts is service-only)
 
 
 class Database:

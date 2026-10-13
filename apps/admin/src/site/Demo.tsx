@@ -20,16 +20,14 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Logo } from "../components/brand";
-import { CallScreen, useWebCall } from "../components/call";
-import { Device } from "../components/phone";
+import { CustomerPhone, OwnerPhone, useShopPhones } from "../components/shop-phones";
 import { cx } from "../components/ui";
-import { api, ApiError, setCsrf, uploadSimMedia, type Business, type Me, type SimMediaRef, type SimThread, type TraceSummary } from "../lib/api";
+import { api, ApiError, setCsrf, type Business, type Me, type TraceSummary } from "../lib/api";
 import { traceLabel } from "../lib/stages";
 
-const ACTOR = 1;
 const NAME_KEY = "reflexo.demo.name";
 
 function readName(): string {
@@ -296,46 +294,17 @@ function UnderTheHood({ businessId }: { businessId: string }) {
 // ---------------------------------------------------------------- the live demo
 
 function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () => void; restarting: boolean }) {
-  const qc = useQueryClient();
   const bid = shop.id;
-  const name = readName() || "Guest";
-  const [customerDraft, setCustomerDraft] = useState("");
-  const [ownerDraft, setOwnerDraft] = useState("");
   const [done, setDone] = useState<Set<string>>(new Set());
-  const call = useWebCall(bid, ACTOR, name);
-  const customer = useQuery({
-    queryKey: ["sim-thread", bid, ACTOR],
-    queryFn: () => api.get<SimThread>("/sim/thread", { business_id: bid, actor: String(ACTOR) }),
-    refetchInterval: 1500,
-  });
-  const owner = useQuery({
-    queryKey: ["sim-owner", bid],
-    queryFn: () => api.get<SimThread>("/sim/owner/thread", { business_id: bid }),
-    refetchInterval: 1500,
-  });
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["sim-thread", bid] });
-    void qc.invalidateQueries({ queryKey: ["sim-owner", bid] });
-  };
-  type Body = { text?: string; option_id?: string; option_title?: string; media?: SimMediaRef };
-  const sendCustomer = useMutation({
-    mutationFn: (body: Body) => api.post("/sim/send", { actor: ACTOR, name, ...body }, { business_id: bid }),
-    onSuccess: refresh,
-  });
-  const sendOwner = useMutation({
-    mutationFn: (body: Body) => api.post("/sim/owner/send", body, { business_id: bid }),
-    onSuccess: refresh,
-  });
-  const pay = useMutation({ mutationFn: (id: string) => api.post(`/sim/razorpay/pay/${id}`, {}, { business_id: bid }), onSuccess: refresh });
+  const phones = useShopPhones(bid, readName() || "Guest");
 
   const onTry = (t: Try, key: string) => {
     setDone((d) => new Set(d).add(key));
-    if (t.who === "customer" && t.send) sendCustomer.mutate({ text: t.send });
-    else if (t.who === "owner" && t.send) sendOwner.mutate({ text: t.send });
-    else if (t.who === "call") void call.start();
+    if (t.who === "customer" && t.send) phones.sendCustomer.mutate({ text: t.send });
+    else if (t.who === "owner" && t.send) phones.sendOwner.mutate({ text: t.send });
+    else if (t.who === "call") void phones.call.start();
     else if (t.href) window.open(t.href, "_blank", "noopener");
   };
-  const ownerWaiting = (owner.data?.items ?? []).some((it, i, all) => it.from === "business" && it.payload?.type === "interactive" && !all.slice(i + 1).some((n) => n.from !== "business"));
 
   return (
     <div className="min-h-full bg-parchment">
@@ -379,108 +348,10 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
           <Guide onTry={onTry} done={done} />
           <UnderTheHood businessId={bid} />
         </aside>
-
-        <Column order="order-1 xl:order-2" label="The customer — you" hint="WhatsApp, as your customers see it" tone="signal">
-          <Device
-            title={shop.name}
-            subtitle="online · replies instantly"
-            thread={customer.data}
-            error={customer.error ?? sendCustomer.error ?? pay.error}
-            busy={sendCustomer.isPending || pay.isPending}
-            onSend={(text) => sendCustomer.mutate({ text })}
-            onTap={(o) => sendCustomer.mutate({ option_id: o.id, option_title: o.title })}
-            onPay={(id) => pay.mutate(id)}
-            draft={customerDraft}
-            onDraft={setCustomerDraft}
-            onAttach={async (file, caption) => {
-              const media = await uploadSimMedia(bid, file);
-              await sendCustomer.mutateAsync({ media, text: caption || undefined });
-            }}
-            emptyHint={
-              <>
-                Say hi to {shop.name} — or tap a suggestion.
-                <br />
-                Tap <Phone size={11} className="inline" /> above to call.
-              </>
-            }
-            actions={
-              <button
-                onClick={() => void call.start()}
-                disabled={call.state !== "idle"}
-                className="rounded-full p-2 transition hover:bg-white/15 disabled:opacity-50"
-                title="Voice call"
-              >
-                <Phone size={18} />
-              </button>
-            }
-            overlay={<CallScreen call={call} shop={shop.name} />}
-            height="h-[620px]"
-          />
-        </Column>
-
-        <Column
-          order="order-2 xl:order-3"
-          label="The owner — Meera's phone"
-          hint={ownerWaiting ? "The AI is waiting for your decision" : "Where the AI asks, reports and learns"}
-          tone="marigold"
-          alert={ownerWaiting}
-        >
-          <Device
-            title="Reflexo · Meera's assistant"
-            subtitle="your AI employee"
-            avatar={<Sparkles size={16} />}
-            thread={owner.data}
-            error={owner.error ?? sendOwner.error}
-            busy={sendOwner.isPending}
-            onSend={(text) => sendOwner.mutate({ text })}
-            onTap={(o) => sendOwner.mutate({ option_id: o.id, option_title: o.title })}
-            draft={ownerDraft}
-            onDraft={setOwnerDraft}
-            onAttach={async (file, caption) => {
-              const media = await uploadSimMedia(bid, file);
-              await sendOwner.mutateAsync({ media, text: caption || undefined });
-            }}
-            placeholder="Message your AI employee"
-            emptyHint="When the AI isn't sure, it asks you here — with buttons. You can also tell it to change prices, timings or rules, or send a photo of a new menu."
-            height="h-[620px]"
-          />
-        </Column>
+        <CustomerPhone className="order-1 xl:order-2" phones={phones} shopName={shop.name} label="The customer — you" />
+        <OwnerPhone className="order-2 xl:order-3" phones={phones} ownerName="Meera" label="The owner — Meera's phone" />
       </main>
     </div>
-  );
-}
-
-function Column({
-  label,
-  hint,
-  tone,
-  alert,
-  order,
-  children,
-}: {
-  label: string;
-  hint: string;
-  tone: "signal" | "marigold";
-  alert?: boolean;
-  order: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className={cx("min-w-0", order)}>
-      <div className="mb-2.5 flex items-center justify-between px-1">
-        <div>
-          <div className={cx("text-[12px] font-semibold uppercase tracking-wider", tone === "signal" ? "text-signal" : "text-marigold-d")}>{label}</div>
-          <div className={cx("text-[12.5px]", alert ? "font-medium text-marigold-d" : "text-stone")}>{hint}</div>
-        </div>
-        {alert && (
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-marigold opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-marigold" />
-          </span>
-        )}
-      </div>
-      {children}
-    </section>
   );
 }
 

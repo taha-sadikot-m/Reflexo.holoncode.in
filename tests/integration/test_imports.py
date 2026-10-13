@@ -212,3 +212,21 @@ async def test_unreadable_file_fails_with_owner_message(registry: Registry, db: 
             break
         await asyncio.sleep(0.2)
     assert "Couldn't import this file" in (await owner_messages(db, shop))[-1]["text"]
+
+
+async def test_typed_menu_is_imported_like_a_file(registry: Registry, db: Database, worker: None) -> None:
+    """The owner types the menu instead of sending a file: it is kept in the file library and read by the same
+    import (source kind 'text', model-read like a photo)."""
+    shop = await bakery(db)
+    conv = await owner_conversation(registry, db, shop)
+    typed = "Kaju Katli 500 g ₹450, 1 kg ₹880. Gulab Jamun 1 kg ₹400."
+    fid = await owner_api.save_typed_source(shop.bid, shop.owner, typed, "telegram")
+    f = await owner_api.get_file(shop.bid, fid)
+    assert f is not None and (f.kind, f.filename) == ("document", "typed-menu.txt")
+    run_id = await registry.require(WorkflowPort).start_import(  # type: ignore[type-abstract]
+        shop.bid, fid, mode="catalog_update", member_id=shop.owner, reply_conversation_id=conv
+    )
+    run = await wait_for(db, run_id, {"review", "failed", "committed"})
+    [row] = await q(db, "SELECT source_kind FROM import_runs WHERE id = :r", r=run_id)
+    assert row.source_kind == "text"
+    assert "photos, PDFs, Excel or CSV" not in str(run.error or "")  # accepted as a source, not refused

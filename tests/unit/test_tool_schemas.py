@@ -37,3 +37,16 @@ def test_option_title_property_survives() -> None:
     schema = TOOLS["reply"].spec().parameters
     raw = json.dumps(schema)
     assert '"title": {"maxLength": 80' in raw or '"title": {"type": "string"' in raw or '"title": {' in raw
+
+
+def test_every_owner_tool_is_offered_to_the_owner_desk() -> None:
+    """A tool tagged for the owner desk but missing from the list the desk binds is invisible to the model (a typed
+    menu import once was): the tag and the list must agree."""
+    import reflexo.agent.tools.customer  # noqa: F401  registers the customer tools too
+    from reflexo.agent.tools.base import TOOLS
+    from reflexo.agent.tools.owner import OWNER_TOOLS
+
+    tagged = {name for name, t in TOOLS.items() if "owner" in t.desks}
+    assert tagged == set(OWNER_TOOLS), (
+        f"tagged, not offered: {tagged - set(OWNER_TOOLS)}; offered, not tagged: {set(OWNER_TOOLS) - tagged}"
+    )

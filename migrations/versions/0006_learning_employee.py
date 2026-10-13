@@ -43,7 +43,9 @@ def upgrade() -> None:
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON playbook_rules TO reflexo_app, reflexo_service")
     op.execute("ALTER TABLE playbook_rules ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE playbook_rules FORCE ROW LEVEL SECURITY")
-    op.execute("CREATE POLICY playbook_rules_service ON playbook_rules TO reflexo_service USING (true) WITH CHECK (true)")
+    op.execute(
+        "CREATE POLICY playbook_rules_service ON playbook_rules TO reflexo_service USING (true) WITH CHECK (true)"
+    )
     op.execute(
         "CREATE POLICY playbook_rules_app ON playbook_rules TO reflexo_app "
         "USING (business_id = NULLIF(current_setting('app.current_business_id', true), '')::uuid) "

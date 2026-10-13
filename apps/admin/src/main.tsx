@@ -21,9 +21,10 @@ import { Orders } from "./pages/Orders";
 import { Overview } from "./pages/Overview";
 import { Playbook } from "./pages/Playbook";
 import { Settings } from "./pages/Settings";
+import { Setup } from "./pages/Setup";
 import { Xray } from "./pages/Xray";
 import { Landing } from "./site/Landing";
-import { SoonPage } from "./site/Soon";
+import { Login as OwnerLogin, Signup } from "./site/Account";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,9 +52,9 @@ function App() {
   if (loading) return null;
   const operator = me?.role !== "owner"; // the engineering pages are the operator's
   if (!me) {
-    // the owner's app has no operator login: an owner signs in on the site (or opens the live demo)
+    // the owner's app has no operator login: an owner signs in on the site
     if (SURFACE === "app") {
-      window.location.replace("/demo");
+      window.location.replace("/login");
       return null;
     }
     return <Login />;
@@ -64,6 +65,7 @@ function App() {
         <Route index element={<Overview />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="orders" element={<Orders />} />
+        {!operator && <Route path="setup" element={<Setup />} />}
         <Route path="brain" element={<BrainSection />}>
           <Route index element={<Navigate to="learning" replace />} />
           <Route path="learning" element={<Learning />} />
@@ -120,8 +122,8 @@ function Site() {
           </Suspense>
         }
       />
-      <Route path="signup" element={<SoonPage what="signup" />} />
-      <Route path="login" element={<SoonPage what="login" />} />
+      <Route path="signup" element={<Signup />} />
+      <Route path="login" element={<OwnerLogin />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

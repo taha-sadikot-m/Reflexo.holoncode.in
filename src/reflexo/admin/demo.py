@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-import time
-from collections import deque
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -20,6 +18,7 @@ from sqlalchemy import text
 
 import reflexo.gateway.api as gateway
 from reflexo.admin import seeding
+from reflexo.admin.limits import Window
 from reflexo.common import ports
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import WorkflowPort
@@ -28,7 +27,7 @@ from reflexo.common.logging import get_logger
 
 log = get_logger(__name__)
 
-_created: dict[str, deque[float]] = {}
+_created = Window(lambda: get_settings().demo_per_client_per_hour)
 _lock = asyncio.Lock()
 
 
@@ -48,16 +47,6 @@ class Sandbox:
     name: str
 
 
-def _client_allowance(client: str) -> int | None:
-    """Seconds until this client may create another demo shop, or None if it may now."""
-    limit = get_settings().demo_per_client_per_hour
-    now = time.monotonic()
-    q = _created.setdefault(client, deque())
-    while q and now - q[0] > 3600:
-        q.popleft()
-    return None if len(q) < limit else int(3600 - (now - q[0])) + 1
-
-
 async def _created_today() -> int:
     async with get_db().service_session(ServiceReason.ADMIN) as s:
         n = (
@@ -75,7 +64,7 @@ async def create(client: str) -> Sandbox:
     if not settings.demo_enabled:
         raise DemoUnavailable("The live demo is switched off right now.")
     async with _lock:  # the limits are read-then-act; one creation at a time keeps them exact on this replica
-        wait = _client_allowance(client)
+        wait = _created.wait(client)
         if wait is not None:
             raise DemoUnavailable("You've opened several demo shops in the last hour — reuse your current one.", wait)
         if await _created_today() >= settings.demo_daily_cap:
@@ -83,7 +72,7 @@ async def create(client: str) -> Sandbox:
         await expire()
         suffix = secrets.token_hex(4)
         business_id = await seeding.load_sandbox(get_db(), suffix)
-        _created[client].append(time.monotonic())
+        _created.hit(client)
     gateway.clear_connection_cache()
     log.info("demo_sandbox_created", business_id=str(business_id))
     return Sandbox(business_id, seeding.SANDBOX_PREFIX + suffix, seeding.read_seed("meeras_bakes")["name"])

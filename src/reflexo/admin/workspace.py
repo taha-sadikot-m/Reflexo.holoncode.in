@@ -900,3 +900,33 @@ async def knowledge_view(business_id: UUID) -> dict[str, Any]:
         ],
         "profile": profile,
     }
+
+
+async def onboarding_view(business_id: UUID) -> dict[str, Any]:
+    """The owner app's setup checklist: onboarding state plus what the shop already has."""
+    import reflexo.owner.api as owner
+
+    session = await owner.onboarding.get(business_id)
+    async with get_db().tenant_session(business_id) as s:
+        row = (
+            await s.execute(
+                text("""SELECT b.status,
+                               (SELECT count(*) FROM offerings o WHERE o.business_id = b.id AND o.status = 'active')
+                                   AS products,
+                               (SELECT count(*) FROM qa_entries q WHERE q.business_id = b.id AND q.status = 'active')
+                                   AS answers,
+                               (SELECT count(*) FROM import_runs i WHERE i.business_id = b.id) AS imports,
+                               (SELECT count(*) FROM conversations c WHERE c.business_id = b.id
+                                  AND c.participant_role = 'customer') AS customer_chats
+                        FROM businesses b WHERE b.id = :b"""),
+                {"b": business_id},
+            )
+        ).one()
+    return {
+        "state": session["state"] if session else ("live" if str(row.status) == "active" else None),
+        "business_status": str(row.status),
+        "products": int(row.products),
+        "answers": int(row.answers),
+        "imports": int(row.imports),
+        "customer_chats": int(row.customer_chats),
+    }

@@ -88,33 +88,42 @@ SANDBOX_PREFIX = "demo-"
 SANDBOX_OWNER_WA = "+919999900001"  # simulated-only: never a real recipient (simulated traffic stays in the Lab)
 
 
-def sandbox_seed(meera: dict[str, Any], suffix: str) -> dict[str, Any]:
-    """A visitor's private copy of Meera's full shop for the public demo: WhatsApp-shaped, every customer and the
-    owner simulated. The WhatsApp connection id is fake and unique, so nothing it does can reach Meta, and the only
-    owner binding is simulated-only, so owner notifications land on the demo's owner phone."""
-    seed = copy.deepcopy(meera)
-    seed["slug"] = f"{SANDBOX_PREFIX}{suffix}"
-    seed["owner"] = {"display_name": meera["owner"]["display_name"], "simulated_whatsapp": SANDBOX_OWNER_WA}
-    seed["connections"] = [
+def simulated_whatsapp(suffix: str, name: str) -> list[dict[str, Any]]:
+    """A WhatsApp-shaped connection whose every message is simulated: its phone number id is fake and unique, so
+    nothing it does can reach Meta; replies go to the simulated phones (Lab transport)."""
+    return [
         {
             "channel": "whatsapp",
             "provider": "meta_whatsapp",
             "external_account_id": f"sim-wa-{suffix}",
-            "display_name": f"{meera['name']} (WhatsApp)",
+            "display_name": f"{name} (WhatsApp)",
             "roles": ["customer", "owner"],
             "credential_ref": "REFLEXO_WA",
         }
     ]
+
+
+def sandbox_seed(meera: dict[str, Any], suffix: str) -> dict[str, Any]:
+    """A visitor's private copy of Meera's full shop for the public demo: every customer and the owner simulated;
+    the only owner binding is simulated-only, so owner notifications land on the demo's owner phone."""
+    seed = copy.deepcopy(meera)
+    seed["slug"] = f"{SANDBOX_PREFIX}{suffix}"
+    seed["owner"] = {"display_name": meera["owner"]["display_name"], "simulated_whatsapp": SANDBOX_OWNER_WA}
+    seed["connections"] = simulated_whatsapp(suffix, meera["name"])
     return seed
 
 
-async def load_sandbox(db: Database, suffix: str, settings: Settings | None = None) -> UUID:
-    """Create one demo sandbox (full catalogue, active) and index its knowledge."""
-    seed = sandbox_seed(read_seed("meeras_bakes"), suffix)
+async def create_business(db: Database, seed: dict[str, Any], *, full: bool, settings: Settings | None = None) -> UUID:
+    """Create one business from a seed-shaped description and index its knowledge (demo sandboxes, sign-ups)."""
     async with db.service_session(ServiceReason.SEED) as s:
-        business_id = await _load_business(s, seed, full=True, settings=settings or get_settings())
+        business_id = await _load_business(s, seed, full=full, settings=settings or get_settings())
     await knowledge.reindex_business(business_id)
     return business_id
+
+
+async def load_sandbox(db: Database, suffix: str, settings: Settings | None = None) -> UUID:
+    """Create one demo sandbox (full catalogue, active)."""
+    return await create_business(db, sandbox_seed(read_seed("meeras_bakes"), suffix), full=True, settings=settings)
 
 
 def _j(value: Any) -> str:

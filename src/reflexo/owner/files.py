@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from reflexo.common.db import get_db
+from reflexo.common.ids import new_id
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,35 @@ async def member_info(business_id: UUID, member_id: UUID) -> tuple[str, str]:
             await s.execute(text("SELECT display_name, role FROM team_members WHERE id = :m"), {"m": member_id})
         ).first()
     return (row.display_name, str(row.role)) if row else ("Owner", "owner")
+
+
+TYPED_SOURCE_MIME = "text/plain"
+
+
+async def save_typed_source(business_id: UUID, member_id: UUID | None, text_: str, channel: str) -> UUID:
+    """A menu or price list the owner typed instead of sending a file: kept in the file library like one, so the
+    same import reads it (and it can be found and re-imported later). Returns the owner file id."""
+    import reflexo.gateway.api as gateway
+
+    media_id = await gateway.store_media(
+        business_id, text_.encode(), TYPED_SOURCE_MIME, source="owner_upload", provider_media_id=None
+    )
+    file_id = new_id()
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("""INSERT INTO owner_files (id, business_id, member_id, media_object_id, filename, kind, description,
+                                             received_via)
+                    VALUES (:id, :b, :m, :mo, 'typed-menu.txt', 'document', :d, CAST(:ch AS channel_type))"""),
+            {
+                "id": file_id,
+                "b": business_id,
+                "m": member_id,
+                "mo": media_id,
+                "d": "Menu / price list typed in chat",
+                "ch": channel,
+            },
+        )
+    return file_id
 
 
 async def get_file(business_id: UUID, file_id: UUID) -> OwnerFile | None:

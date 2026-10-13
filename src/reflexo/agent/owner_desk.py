@@ -155,7 +155,8 @@ def _onboarding_block(session: dict[str, Any]) -> str:
     )
     steps = {
         "sources_requested": "Ask for the menu / price list (photo, PDF, Excel, or typed). When a file appears in "
-        "RECENT FILES, call import_from_file with mode='onboarding'.",
+        "RECENT FILES, call import_from_file with mode='onboarding'; when the owner types their items with prices, "
+        "call import_from_text with their full text and mode='onboarding'.",
         "extracting": "The menu is being read, or waits for the owner to confirm the summary (confirm_pending if "
         "they agree in their own words).",
         "gap_questions": gap_step,

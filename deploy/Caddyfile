@@ -1,0 +1,6 @@
+# HTTPS for the whole app (certificates are issued and renewed automatically). REFLEXO_DOMAIN is the public host
+# name: a real domain, or <ip-with-dashes>.sslip.io until one is set up.
+{$REFLEXO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

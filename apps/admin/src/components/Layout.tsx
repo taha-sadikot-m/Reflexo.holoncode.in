@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Settings,
   ShieldCheck,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +44,9 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   },
 ];
 
+// the owner's own phones: set the shop up by chat, test it as a customer
+const TRY_IT: Item = { to: "/setup", label: "Try & teach", icon: Smartphone, hint: "Set up and test by chat" };
+
 /** One page failing must never blank the panel: it shows what went wrong, the rest keeps working. */
 class PageBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -74,7 +78,13 @@ export function Layout() {
   const location = useLocation();
   const operator = me?.role !== "owner";
   // an owner sees their shop; the engineering tools are the operator's
-  const sections = operator ? SECTIONS : SECTIONS.slice(0, 1).map((s) => ({ ...s, title: "Your shop" }));
+  const sections = operator
+    ? SECTIONS
+    : SECTIONS.slice(0, 1).map((s) => ({
+        ...s,
+        title: "Your shop",
+        items: [...s.items.slice(0, 1), TRY_IT, ...s.items.slice(1)],
+      }));
   const scale = me?.demo_time_scale ?? 1;
   const bid = business?.id ?? "";
   // the same queries the pages use (shared cache): how much needs a person, at a glance

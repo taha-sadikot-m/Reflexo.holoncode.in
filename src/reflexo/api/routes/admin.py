@@ -545,6 +545,12 @@ async def evals_run(_: OperatorMutating, suite: str | None = None) -> dict[str, 
     return {"started": True, "suites": suites or admin.evals.ORDER}
 
 
+@router.get("/onboarding")
+async def onboarding_view(_: Authed, business_id: Business) -> dict[str, Any]:
+    """Where the business is in getting set up: the owner app's checklist."""
+    return await admin.workspace.onboarding_view(business_id)
+
+
 @router.get("/knowledge")
 async def knowledge_view(_: Authed, business_id: Business) -> dict[str, Any]:
     return await admin.workspace.knowledge_view(business_id)

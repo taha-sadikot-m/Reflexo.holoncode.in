@@ -7,10 +7,19 @@ from reflexo.common.contracts import OwnerCommandPort, OwnerNotifyPort
 from reflexo.common.ports import Registry
 from reflexo.owner import onboarding
 from reflexo.owner.commands import OwnerCommands, execute_decision
-from reflexo.owner.files import OwnerFile, get_file, member_info, search_files, set_description
+from reflexo.owner.files import (
+    TYPED_SOURCE_MIME,
+    OwnerFile,
+    get_file,
+    member_info,
+    save_typed_source,
+    search_files,
+    set_description,
+)
 from reflexo.owner.notify import OwnerNotifier
 
 __all__ = [
+    "TYPED_SOURCE_MIME",
     "OwnerCommands",
     "OwnerFile",
     "OwnerNotifier",
@@ -19,6 +28,7 @@ __all__ = [
     "member_info",
     "onboarding",
     "register",
+    "save_typed_source",
     "search_files",
     "set_description",
 ]

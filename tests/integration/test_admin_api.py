@@ -300,3 +300,78 @@ async def test_demo_limits_and_expiry(client: httpx.AsyncClient, db: Database, m
             await s.execute(text("SELECT count(*) FROM businesses WHERE id = :b"), {"b": UUID(first["business_id"])})
         ).scalar_one()
     assert gone == 0
+
+
+# ---------------------------------------------------------------- self-serve sign-up and log-in
+
+
+SIGNUP = {
+    "email": "Owner@Sharma-Sweets.in",
+    "password": "laddoo-2026",
+    "business_name": "Sharma Sweets",
+    "owner_name": "Ravi",
+    "category": "sweet shop",
+    "area": "Indore",
+}
+
+
+async def test_signup_creates_a_shop_in_onboarding_and_signs_the_owner_in(
+    client: httpx.AsyncClient, db: Database
+) -> None:
+    admin.accounts._signups.clear()
+    resp = await client.post("/api/accounts/signup", json=SIGNUP)
+    assert resp.status_code == 200, resp.text
+    business_id = resp.json()["business_id"]
+    client.cookies.set(admin.OWNER_COOKIE, resp.cookies[admin.OWNER_COOKIE])
+    headers = {admin.SURFACE_HEADER: "app", admin.CSRF_HEADER: resp.json()["csrf"]}
+
+    me = (await client.get("/admin/api/me", headers=headers)).json()
+    assert (me["role"], me["business_id"], me["user"]) == ("owner", business_id, "Ravi")
+    setup = (await client.get("/admin/api/onboarding", params={"business_id": business_id}, headers=headers)).json()
+    assert (setup["state"], setup["business_status"], setup["products"]) == ("sources_requested", "onboarding", 0)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        shop = (
+            await s.execute(
+                text("SELECT slug, settings->>'order_number_prefix' AS prefix FROM businesses WHERE id = :b"),
+                {"b": UUID(business_id)},
+            )
+        ).one()
+        welcome = (
+            await s.execute(
+                text("""SELECT c.simulated FROM outbound_messages o JOIN conversations c ON c.id = o.conversation_id
+                        WHERE o.business_id = :b AND c.participant_role = 'owner'"""),
+                {"b": UUID(business_id)},
+            )
+        ).all()
+    assert shop.slug.startswith("sharma-sweets-") and shop.prefix == "SS"
+    assert welcome and all(w.simulated for w in welcome)  # the AI greets on the owner's (simulated) phone
+
+    again = await client.post("/api/accounts/signup", json=SIGNUP | {"email": "owner@sharma-sweets.in"})
+    assert again.status_code == 409  # emails are case-insensitive
+
+    client.cookies.clear()
+    wrong = await client.post("/api/accounts/login", json={"email": SIGNUP["email"], "password": "nope-nope"})
+    assert wrong.status_code == 401
+    ok = await client.post("/api/accounts/login", json={"email": "owner@sharma-sweets.in", "password": "laddoo-2026"})
+    assert ok.status_code == 200 and ok.json()["business_id"] == business_id
+
+
+async def test_signup_validates_and_limits(
+    client: httpx.AsyncClient, db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from reflexo.common.config import get_settings
+
+    admin.accounts._signups.clear()
+    assert (await client.post("/api/accounts/signup", json=SIGNUP | {"email": "not-an-email"})).status_code == 422
+    assert (await client.post("/api/accounts/signup", json=SIGNUP | {"password": "short"})).status_code == 422
+    monkeypatch.setattr(get_settings(), "signup_per_client_per_hour", 1)
+    first = await client.post("/api/accounts/signup", json=SIGNUP | {"email": "a@limits.in"})
+    second = await client.post("/api/accounts/signup", json=SIGNUP | {"email": "b@limits.in"})
+    assert first.status_code == 200 and second.status_code == 429
+
+
+def test_password_hashes_are_salted_and_verify() -> None:
+    one, two = admin.accounts.hash_password("secret-pass"), admin.accounts.hash_password("secret-pass")
+    assert one != two and one.startswith("scrypt$")
+    assert admin.accounts.verify_password("secret-pass", one) and not admin.accounts.verify_password("wrong", one)
+    assert not admin.accounts.verify_password("secret-pass", "garbage")

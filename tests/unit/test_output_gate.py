@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from reflexo.agent.output_gate import check, extract_amounts
 from reflexo.agent.schemas import AgentOutput, GroundingRecords
@@ -271,3 +272,23 @@ def test_buttons_without_text_take_the_text_block_before_them() -> None:
     assert [b.type for b in merged.blocks] == ["buttons"] and merged.blocks[0].text == "Total ₹950. Confirm?"
     with pytest.raises(ValueError):  # nothing to take: still invalid
         out("x", blocks=[{"type": "buttons", "options": options}])
+
+
+def test_reply_without_action_takes_it_from_its_content() -> None:
+    """Live: a correct price answer was refused twice for leaving out `action`. The content says it."""
+    from reflexo.agent.schemas import AgentOutput
+
+    base = {"topic": "pricing", "language": "hi-Latn"}
+    sent = AgentOutput.model_validate({**base, "blocks": [{"type": "text", "text": "Gulab Jamun 1 kg ₹400"}]})
+    assert sent.action == "send"
+    asked = AgentOutput.model_validate(
+        {
+            **base,
+            "blocks": [{"type": "text", "text": "Ek minute, main check karti hoon"}],
+            "owner_question": {"question": "Can we do eggless laddoo?", "options": []},
+        }
+    )
+    assert asked.action == "ask_owner"
+    with pytest.raises(ValidationError):  # nothing to go on: still invalid
+        AgentOutput.model_validate(base)
+    assert AgentOutput.model_validate({**base, "action": "handoff"}).action == "handoff"  # explicit wins

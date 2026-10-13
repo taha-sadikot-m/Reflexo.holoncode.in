@@ -108,6 +108,21 @@ class AgentOutput(BaseModel):
                 blocks.append(block)
         return {**data, "blocks": blocks}
 
+    @model_validator(mode="before")
+    @classmethod
+    def _action_follows_from_the_reply(cls, data: Any) -> Any:
+        """A reply that leaves out `action` while its content says it: an owner question means ask_owner, blocks
+        for the customer mean send. Normalised, not rejected (live: a correct price answer was refused twice for
+        the missing field and the owner's preview showed "I'd check with you" for every question). Without either,
+        the field stays missing and the reply is invalid."""
+        if not isinstance(data, dict) or data.get("action"):
+            return data
+        if data.get("owner_question"):
+            return {**data, "action": "ask_owner"}
+        if data.get("blocks"):
+            return {**data, "action": "send"}
+        return data
+
 
 class GateCheck(BaseModel):
     name: str
