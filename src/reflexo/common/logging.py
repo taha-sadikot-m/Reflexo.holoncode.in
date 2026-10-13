@@ -42,13 +42,25 @@ def _trace_processor(_: Any, __: str, event_dict: MutableMapping[str, Any]) -> M
 
 
 _URL_SECRET = re.compile(r"/bot\d+:[\w-]+")  # Telegram puts the bot token in the request path
+# credentials carried in a query string: Meta's webhook verify token, signed media links, API keys
+_QUERY_SECRET = re.compile(r"([?&](?:[\w.]*token|sig|signature|secret|key|code)=)[^&\s\"]+", re.IGNORECASE)
+
+
+def redact_url_secrets(text: str) -> str:
+    return _QUERY_SECRET.sub(r"\1***", _URL_SECRET.sub("/bot***", text))
 
 
 class _UrlSecretFilter(logging.Filter):
+    """Masks secrets in the message template and in its args — in place, so formatters that unpack the args
+    (uvicorn's access log: client, method, full path, …) keep working."""
+
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        if _URL_SECRET.search(message):
-            record.msg, record.args = _URL_SECRET.sub("/bot***", message), None
+        if isinstance(record.msg, str):
+            record.msg = redact_url_secrets(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(redact_url_secrets(a) if isinstance(a, str) else a for a in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {k: redact_url_secrets(v) if isinstance(v, str) else v for k, v in record.args.items()}
         return True
 
 
@@ -59,6 +71,8 @@ def configure_logging(service: str, level: str = "INFO") -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
     for handler in logging.getLogger().handlers:
         handler.addFilter(_UrlSecretFilter())
+    for name in ("uvicorn.access", "uvicorn.error"):  # own handlers, not propagated to the root
+        logging.getLogger(name).addFilter(_UrlSecretFilter())
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
