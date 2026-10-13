@@ -295,8 +295,8 @@ export function Lab() {
           </p>
         </div>
         <div className="flex gap-3 text-xs font-semibold">
-          <Link to="/xray" className="text-signal hover:underline">Open X-ray →</Link>
-          <Link to="/chaos" className="text-signal hover:underline">Chaos →</Link>
+          <Link to="/quality/xray" className="text-signal hover:underline">Open X-ray →</Link>
+          <Link to="/quality/chaos" className="text-signal hover:underline">Chaos →</Link>
         </div>
       </div>
       <ErrorNote error={start.error ?? sendCustomer.error ?? sendOwner.error ?? pay.error} />

@@ -25,7 +25,7 @@ function ImportCard({ r }: { r: ImportRow }) {
         <Badge>{r.items.length} items</Badge>
         {flagged > 0 && <Badge tone="warn">{flagged} need a look</Badge>}
         {r.change_set_id && (
-          <Link to="/history" className="text-xs text-signal hover:underline">
+          <Link to="/brain/history" className="text-xs text-signal hover:underline">
             change set →
           </Link>
         )}
@@ -79,7 +79,7 @@ export function Imports() {
   });
   return (
     <div className="space-y-5">
-      <PageHeader title="Imports">Price lists and menus the owner sent as photos, PDFs or sheets: what was extracted, how sure the AI was, and the resulting change set.</PageHeader>
+      <PageHeader title="Imports">Menus and price lists the owner sent: what was read, how sure the AI was, and the change it became.</PageHeader>
       <ErrorNote error={q.error} />
       <Card>
         {q.data?.length ? (

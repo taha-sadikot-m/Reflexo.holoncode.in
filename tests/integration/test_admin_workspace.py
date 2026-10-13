@@ -142,3 +142,14 @@ async def test_demo_reset_from_the_settings_page(db: Database, client: httpx.Asy
     settings = (await client.get("/admin/api/settings", params={"business_id": meera})).json()
     assert {c["channel"] for c in settings["connections"]} >= {"whatsapp", "telegram"}
     assert isinstance(settings["flags"], dict)
+
+
+async def test_knowledge_shows_what_the_employee_knows_now(db: Database, client: httpx.AsyncClient) -> None:
+    shop = await bakery(db)
+    await login(client)
+    k = (await client.get("/admin/api/knowledge", params={"business_id": str(shop.bid)})).json()
+    truffle = next(o for o in k["catalogue"] if "Truffle" in o["name"])
+    assert {v["name"] for v in truffle["variants"]} >= {"1 kg"} and all(v["rupees"] for v in truffle["variants"])
+    assert isinstance(k["qa"], list) and "delivery" in k["profile"]
+    other = await bakery(db)
+    assert (await client.get("/admin/api/knowledge", params={"business_id": str(other.bid)})).status_code == 200

@@ -1,6 +1,7 @@
 // Small shared pieces for the workspace pages: page header, status badges, money, relative times, JSON.
 import type { ReactNode } from "react";
 
+import { useInSection } from "./section";
 import { Badge } from "./ui";
 
 type Tone = "neutral" | "good" | "bad" | "warn" | "info" | "accent";
@@ -65,6 +66,14 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
 }
 
 export function PageHeader({ title, children, actions }: { title: string; children?: ReactNode; actions?: ReactNode }) {
+  // inside a section (Brain, Quality) the section owns the title: the page keeps only its one-line purpose
+  if (useInSection())
+    return children || actions ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {children ? <p className="max-w-3xl text-[13px] leading-relaxed text-dusk">{children}</p> : <span />}
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
+      </div>
+    ) : null;
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">

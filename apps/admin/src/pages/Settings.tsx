@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { Json, PageHeader, StatusBadge } from "../components/bits";
 import { Badge, Button, Card, Empty, ErrorNote, Mono, Skeleton } from "../components/ui";
-import { api } from "../lib/api";
+import { api, type OwnerWorkspace } from "../lib/api";
+import { OwnerNotifications } from "../components/owner";
 import { useSession } from "../lib/session";
 import { channelLabel } from "../components/channel";
 
@@ -40,6 +41,12 @@ export function Settings() {
   const bid = business?.id ?? "";
   const qc = useQueryClient();
   const [last, setLast] = useState<ResetResult | null>(null);
+  const owner = useQuery({
+    queryKey: ["owner", bid],
+    queryFn: () => api.get<OwnerWorkspace>("/owner", { business_id: bid }),
+    enabled: !!bid,
+    refetchInterval: 15000,
+  });
   const q = useQuery({
     queryKey: ["settings", bid],
     queryFn: () => api.get<SettingsView>("/settings", { business_id: bid }),
@@ -130,6 +137,11 @@ export function Settings() {
               No runtime flags set
             </Empty>
           )}
+        </Card>
+        <Card title="Sent to the owner" flush className="xl:col-span-2">
+          <div className="max-h-[420px] overflow-y-auto">
+            {owner.data ? <OwnerNotifications items={owner.data.notifications} /> : <div className="p-5"><Skeleton lines={4} /></div>}
+          </div>
         </Card>
       </div>
     </div>

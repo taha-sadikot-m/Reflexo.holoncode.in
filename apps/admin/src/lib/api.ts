@@ -404,3 +404,20 @@ export interface CallRow {
   conversation_id: string | null;
   events: { kind: string; status: string; at: string; payload: Record<string, unknown> }[];
 }
+
+/** One customer across channels (Inbox side panel). */
+export interface CustomerView {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  language: string | null;
+  tags: string[];
+  facts: (string | { text?: string; fact?: string })[];
+  summary: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  identities: { channel: string; external_id: string; display_name: string | null; linked_via: string; last_inbound_at: string | null; created_at: string }[];
+  merged_from: { id: string; name: string | null; created_at: string }[];
+  orders: { id: string; order_number: string; status: string; total_rupees: number | null; channel: string | null; created_at: string }[];
+  history: { at: string; direction: string; author: string; text: string; channel: string; conversation_id: string }[];
+}

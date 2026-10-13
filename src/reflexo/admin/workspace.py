@@ -831,3 +831,72 @@ async def customer_detail(business_id: UUID, customer_id: UUID, limit: int = 200
             for h in reversed(history)
         ],
     }
+
+
+# ---------------------------------------------------------------- knowledge (what the employee knows now)
+
+
+async def knowledge_view(business_id: UUID) -> dict[str, Any]:
+    """The live state the AI answers from: the catalogue (offerings, sizes, prices, stock state), the Q&A it has
+    learned (who each answer applies to, until when, where it came from) and the shop profile (hours, delivery,
+    policies, payments). Change history lives in change sets; this is the current picture."""
+    async with get_db().tenant_session(business_id) as s:
+        offerings = (
+            await s.execute(
+                text("""
+            SELECT o.id, o.name, o.description, o.category, o.base_price_paise, o.status, o.aliases, o.attributes,
+                   o.source, o.updated_at,
+                   coalesce(json_agg(json_build_object('name', v.name, 'price_paise', v.price_paise,
+                                                       'status', v.status) ORDER BY v.price_paise)
+                            FILTER (WHERE v.id IS NOT NULL AND v.status <> 'archived'), '[]') AS variants
+            FROM offerings o LEFT JOIN offering_variants v ON v.offering_id = o.id
+            WHERE o.status <> 'archived'
+            GROUP BY o.id ORDER BY o.category NULLS LAST, o.name""")
+            )
+        ).all()
+        qa = (
+            await s.execute(
+                text("""SELECT q.id, q.question, q.answer, q.scope, q.valid_until, q.topic, q.source, q.created_at,
+                               cu.display_name, cu.phone_e164
+                        FROM qa_entries q LEFT JOIN customers cu ON cu.id = q.customer_id
+                        WHERE q.status = 'active' AND (q.valid_until IS NULL OR q.valid_until > now())
+                        ORDER BY q.scope, q.created_at DESC""")
+            )
+        ).all()
+    profile = (await knowledge.get_profile(business_id)).model_dump(mode="json")
+    return {
+        "catalogue": [
+            {
+                "id": str(o.id),
+                "name": o.name,
+                "description": o.description,
+                "category": o.category,
+                "status": str(o.status),
+                "price_on_request": o.base_price_paise is None and not o.variants,
+                "base_rupees": _rupees(o.base_price_paise),
+                "variants": [
+                    {"name": v["name"], "rupees": _rupees(v["price_paise"]), "status": v["status"]} for v in o.variants
+                ],
+                "aliases": list(o.aliases or [])[:8],
+                "attributes": o.attributes or {},
+                "source": o.source,
+                "updated_at": _iso(o.updated_at),
+            }
+            for o in offerings
+        ],
+        "qa": [
+            {
+                "id": str(q.id),
+                "question": q.question,
+                "answer": q.answer,
+                "scope": str(q.scope),
+                "customer": _who(q.display_name, q.phone_e164),
+                "valid_until": _iso(q.valid_until),
+                "topic": str(q.topic) if q.topic else None,
+                "source": q.source,
+                "created_at": _iso(q.created_at),
+            }
+            for q in qa
+        ],
+        "profile": profile,
+    }

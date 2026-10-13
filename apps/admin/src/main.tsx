@@ -1,27 +1,26 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import "./index.css";
 import { Layout } from "./components/Layout";
 import { ApiError } from "./lib/api";
 import { SessionProvider, useSession } from "./lib/session";
-import { Chaos } from "./pages/Chaos";
-import { Conversations } from "./pages/Conversations";
+import { BrainSection, QualitySection } from "./pages/Sections";
 import { Automations } from "./pages/Automations";
-import { Calls } from "./pages/Calls";
-import { Customers } from "./pages/Customers";
+import { Chaos } from "./pages/Chaos";
+import { Inbox } from "./pages/Inbox";
 import { Evals } from "./pages/Evals";
 import { History } from "./pages/History";
-import { Imports } from "./pages/Imports";
+import { Knowledge } from "./pages/Knowledge";
 import { Lab } from "./pages/Lab";
+import { Learning } from "./pages/Learning";
+import { Login } from "./pages/Login";
 import { Orders } from "./pages/Orders";
-import { Owner } from "./pages/Owner";
+import { Overview } from "./pages/Overview";
 import { Playbook } from "./pages/Playbook";
 import { Settings } from "./pages/Settings";
-import { Login } from "./pages/Login";
-import { Overview } from "./pages/Overview";
 import { Xray } from "./pages/Xray";
 
 const queryClient = new QueryClient({
@@ -36,6 +35,15 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Old addresses keep working (links in messages, bookmarks): same query string, new home. */
+function Moved({ to, extra }: { to: string; extra?: string }) {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  if (extra) for (const [k, v] of new URLSearchParams(extra)) if (!params.has(k)) params.set(k, v);
+  const q = params.toString();
+  return <Navigate to={`${to}${q ? `?${q}` : ""}`} replace />;
+}
+
 function App() {
   const { me, loading } = useSession();
   if (loading) return null;
@@ -44,20 +52,38 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Overview />} />
-        <Route path="xray" element={<Xray />} />
-        <Route path="conversations" element={<Conversations />} />
-        <Route path="chaos" element={<Chaos />} />
-        <Route path="lab" element={<Lab />} />
-        <Route path="customers" element={<Customers />} />
+        <Route path="inbox" element={<Inbox />} />
         <Route path="orders" element={<Orders />} />
-        <Route path="playbook" element={<Playbook />} />
-        <Route path="automations" element={<Automations />} />
-        <Route path="owner" element={<Owner />} />
-        <Route path="history" element={<History />} />
-        <Route path="imports" element={<Imports />} />
-        <Route path="calls" element={<Calls />} />
-        <Route path="evals" element={<Evals />} />
+        <Route path="brain" element={<BrainSection />}>
+          <Route index element={<Navigate to="learning" replace />} />
+          <Route path="learning" element={<Learning />} />
+          <Route path="rules" element={<Playbook />} />
+          <Route path="procedures" element={<Automations />} />
+          <Route path="knowledge" element={<Knowledge />} />
+          <Route path="history" element={<History />} />
+        </Route>
+        <Route path="quality" element={<QualitySection />}>
+          <Route index element={<Navigate to="lab" replace />} />
+          <Route path="lab" element={<Lab />} />
+          <Route path="xray" element={<Xray />} />
+          <Route path="chaos" element={<Chaos />} />
+          <Route path="evals" element={<Evals />} />
+        </Route>
         <Route path="settings" element={<Settings />} />
+
+        {/* earlier addresses */}
+        <Route path="conversations" element={<Moved to="/inbox" />} />
+        <Route path="customers" element={<Moved to="/inbox" />} />
+        <Route path="calls" element={<Moved to="/inbox" />} />
+        <Route path="playbook" element={<Moved to="/brain/rules" />} />
+        <Route path="automations" element={<Moved to="/brain/procedures" />} />
+        <Route path="owner" element={<Moved to="/brain/learning" />} />
+        <Route path="history" element={<Moved to="/brain/history" />} />
+        <Route path="imports" element={<Moved to="/brain/history" extra="view=imports" />} />
+        <Route path="lab" element={<Moved to="/quality/lab" />} />
+        <Route path="xray" element={<Moved to="/quality/xray" />} />
+        <Route path="chaos" element={<Moved to="/quality/chaos" />} />
+        <Route path="evals" element={<Moved to="/quality/evals" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

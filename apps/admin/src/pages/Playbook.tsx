@@ -1,19 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, MessageSquareQuote, Undo2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BookOpenCheck, Brain, MessageSquareQuote, Undo2 } from "lucide-react";
 
 import { PageHeader, StatusBadge, fmtWhen } from "../components/bits";
-import { Badge, Button, Card, Empty, ErrorNote, cx } from "../components/ui";
+import { Badge, Button, Card, Empty, ErrorNote, Skeleton, cx } from "../components/ui";
 import { api, type PlaybookProposal, type PlaybookRuleRow } from "../lib/api";
 import { useSession } from "../lib/session";
 
 const EFFECT: Record<string, { tone: "good" | "bad" | "warn"; label: string }> = {
-  allow: { tone: "good", label: "does it" },
-  deny: { tone: "bad", label: "says no" },
-  propose: { tone: "warn", label: "asks first" },
+  allow: { tone: "good", label: "Does it" },
+  deny: { tone: "bad", label: "Declines" },
+  propose: { tone: "warn", label: "Asks first" },
 };
-
-const LEARNED: Record<string, string> = { g: "learned: always", c: "learned: this customer", once: "just this once" };
 
 function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; busy: boolean }) {
   const effect = EFFECT[r.effect] ?? { tone: "warn" as const, label: r.effect };
@@ -50,33 +47,6 @@ function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; bus
   );
 }
 
-function ProposalRow({ p }: { p: PlaybookProposal }) {
-  return (
-    <li className="border-t border-sand/60 py-2 text-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold">{p.label}</span>
-        <span className="text-dusk">{p.summary}</span>
-        <StatusBadge status={p.status} />
-        {p.done === false && p.status === "approved" && <Badge tone="bad">could not be done</Badge>}
-        {p.learned && <Badge tone={p.learned === "once" ? "neutral" : "accent"}>{LEARNED[p.learned] ?? p.learned}</Badge>}
-        {p.owner_initiated && <Badge>owner's own action</Badge>}
-      </div>
-      <div className="mt-0.5 text-xs text-stone">
-        {p.customer ?? "—"}
-        {p.reason && ` · “${p.reason}”`} · asked {fmtWhen(p.created_at)}
-        {p.decided_at && ` · decided ${fmtWhen(p.decided_at)}${p.decided_via ? ` via ${p.decided_via}` : ""}`}
-        {p.conversation_id && (
-          <>
-            {" · "}
-            <Link to={`/conversations?c=${p.conversation_id}`} className="text-signal hover:underline">
-              chat
-            </Link>
-          </>
-        )}
-      </div>
-    </li>
-  );
-}
 
 export function Playbook() {
   const { business } = useSession();
@@ -93,48 +63,55 @@ export function Playbook() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["playbook", bid] }),
   });
   const rules = q.data?.rules ?? [];
+  const active = rules.filter((r) => r.status === "active");
+  const retired = rules.filter((r) => r.status !== "active");
   const byCap = new Map<string, PlaybookRuleRow[]>();
-  for (const r of rules) byCap.set(r.capability, [...(byCap.get(r.capability) ?? []), r]);
-  const pending = (q.data?.proposals ?? []).filter((p) => p.status === "pending").length;
+  for (const r of active) byCap.set(r.capability, [...(byCap.get(r.capability) ?? []), r]);
+  const CAP_TITLE: Record<string, string> = {
+    "order.cancel": "Cancelling an order",
+    "order.change": "Changing a placed order",
+    "refund.request": "Refunds",
+  };
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Playbook">
-        How this shop works, learned from the owner. When a customer asks for something the AI is not sure it may do, it asks the owner, carries out
-        their decision exactly, and offers to remember it as a rule — read back word for word, and undoable.
+      <PageHeader title="Rules">
+        What the AI may do on its own, must decline, or must ask about first — each rule read back word for word, with where it came from.
+        Undo works exactly like the owner's /undo.
       </PageHeader>
       <ErrorNote error={q.error ?? undo.error} />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Card title={`Rules · ${rules.filter((r) => r.status === "active").length} active`}>
-          {byCap.size ? (
-            <div className="space-y-4">
-              {[...byCap.entries()].map(([cap, rs]) => (
-                <div key={cap}>
-                  <div className="mb-1.5 font-mono text-[11px] text-stone">{cap}</div>
-                  <ul className="space-y-2">
-                    {rs.map((r) => (
-                      <Rule key={r.id} r={r} busy={undo.isPending} onUndo={() => r.change_set_id && undo.mutate(r.change_set_id)} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Empty>No rules yet. They appear when the owner says “Always” after deciding, or teaches one in words.</Empty>
-          )}
+      {!q.data ? (
+        <Card>
+          <Skeleton lines={6} />
         </Card>
-        <Card title={`Asked the owner${pending ? ` · ${pending} waiting` : ""}`}>
-          {q.data?.proposals.length ? (
-            <ul>
-              {q.data.proposals.map((p) => (
-                <ProposalRow key={p.id} p={p} />
-              ))}
-            </ul>
-          ) : (
-            <Empty>Nothing asked yet.</Empty>
-          )}
+      ) : byCap.size ? (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          {[...byCap.entries()].map(([cap, rs]) => (
+            <Card key={cap} title={CAP_TITLE[cap] ?? cap} actions={<Badge tone="good">{rs.length} active</Badge>}>
+              <ul className="space-y-2.5">
+                {rs.map((r) => (
+                  <Rule key={r.id} r={r} busy={undo.isPending} onUndo={() => r.change_set_id && undo.mutate(r.change_set_id)} />
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <Empty icon={BookOpenCheck} hint="A rule appears when the owner taps “Always” after deciding, or teaches one in their own words.">
+            No active rules — the AI asks the owner whenever it is unsure
+          </Empty>
         </Card>
-      </div>
+      )}
+      {retired.length > 0 && (
+        <Card title={`Retired rules · ${retired.length}`}>
+          <ul className="space-y-2.5">
+            {retired.slice(0, 10).map((r) => (
+              <Rule key={r.id} r={r} busy onUndo={() => undefined} />
+            ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }

@@ -58,7 +58,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
           <h2 className="text-[18px] font-semibold tracking-tight text-ink">{o.order_number}</h2>
           {o.conversation_id && (
             <Link
-              to={`/conversations?c=${o.conversation_id}`}
+              to={`/inbox?c=${o.conversation_id}`}
               className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-medium text-signal hover:text-signal-d"
             >
               Open chat <ExternalLink size={12} />
@@ -164,7 +164,7 @@ function Detail({ id, bid }: { id: string; bid: string }) {
                     <Sparkles size={11} /> Learned a rule
                   </Badge>
                 )}
-                <Link to="/playbook" className="ml-auto text-xs font-medium text-signal hover:text-signal-d">
+                <Link to="/brain/rules" className="ml-auto text-xs font-medium text-signal hover:text-signal-d">
                   Playbook
                 </Link>
               </div>

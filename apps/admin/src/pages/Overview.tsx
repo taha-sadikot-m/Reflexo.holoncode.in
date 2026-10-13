@@ -125,7 +125,7 @@ export function Overview() {
           )}
         </Card>
 
-        <Card title="Waiting on the owner" actions={<ViewAll to="/owner" />} flush>
+        <Card title="Waiting on the owner" actions={<ViewAll to="/brain/learning?filter=waiting" />} flush>
           {!owner.data ? (
             <div className="p-5">
               <Skeleton lines={4} />
@@ -165,7 +165,7 @@ export function Overview() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]">
-        <Card title="Live activity" actions={<ViewAll to="/xray" />} flush>
+        <Card title="Live activity" actions={<ViewAll to="/quality/xray" />} flush>
           {!traces.data ? (
             <div className="p-5">
               <Skeleton lines={5} />
@@ -174,7 +174,7 @@ export function Overview() {
             <ul className="divide-y divide-sand">
               {traces.data.items.map((t) => (
                 <li key={t.trace_id}>
-                  <Link to={`/xray?trace=${t.trace_id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-bone/70">
+                  <Link to={`/quality/xray?trace=${t.trace_id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-bone/70">
                     <ChannelIcon channel={t.provider} size="sm" />
                     <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{traceLabel(t)}</span>
                     {t.outcome && (

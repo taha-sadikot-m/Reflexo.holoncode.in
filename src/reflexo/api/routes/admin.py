@@ -459,3 +459,8 @@ async def evals_run(_: Mutating, suite: str | None = None) -> dict[str, Any]:
     if not admin.evals.start(suites):
         raise problem(409, "BUSY", "an eval run is already in progress")
     return {"started": True, "suites": suites or admin.evals.ORDER}
+
+
+@router.get("/knowledge")
+async def knowledge_view(_: Authed, business_id: Business) -> dict[str, Any]:
+    return await admin.workspace.knowledge_view(business_id)

@@ -30,3 +30,12 @@ export function ChannelIcon({ channel, size = "md", className }: { channel: stri
     </span>
   );
 }
+
+/** How an identity was tied to the customer. */
+export const LINKED: Record<string, string> = {
+  first_contact: "first contact",
+  link_code: "linked by code",
+  payment: "linked by payment",
+  same_wa_user: "same WhatsApp user",
+  owner_confirmed: "owner confirmed",
+};

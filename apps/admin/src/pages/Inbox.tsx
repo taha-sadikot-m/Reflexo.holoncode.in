@@ -8,6 +8,10 @@ import {
   CreditCard,
   GalleryHorizontal,
   Hand,
+  PanelRightClose,
+  PanelRightOpen,
+  PhoneCall,
+  UserRound,
   ListChecks,
   MessagesSquare,
   Package,
@@ -20,12 +24,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
-import { fmtWhen } from "../components/bits";
-import { ChannelIcon, channelLabel } from "../components/channel";
-import { Badge, Button, Card, Empty, ErrorNote, Skeleton, cx } from "../components/ui";
-import { api, type ConversationItem, type Thread, type ThreadMessage } from "../lib/api";
+import { StatusBadge, fmtWhen, inr } from "../components/bits";
+import { ChannelIcon, LINKED, channelLabel } from "../components/channel";
+import { Badge, Button, Card, Empty, ErrorNote, Segmented, Skeleton, cx } from "../components/ui";
+import { api, type CallRow, type ConversationItem, type CustomerView, type Thread, type ThreadMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { fmtTime } from "../lib/stages";
 import { useXrayStream } from "../lib/stream";
@@ -51,6 +55,26 @@ const BLOCK_CHIP: Record<string, { icon: LucideIcon; label: string }> = {
 function initials(name: string | null | undefined): string {
   const parts = (name ?? "?").trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+/** WhatsApp formatting as the phone shows it: *bold* and _italic_ (the raw asterisks were visible here). */
+function WaText({ text }: { text: string }) {
+  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^\*[^*\n]+\*$/.test(part) ? (
+          <strong key={i} className="font-semibold text-ink">
+            {part.slice(1, -1)}
+          </strong>
+        ) : /^_[^_\n]+_$/.test(part) ? (
+          <em key={i}>{part.slice(1, -1)}</em>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
 }
 
 function BlockChips({ blocks }: { blocks: Record<string, unknown>[] | null }) {
@@ -95,7 +119,7 @@ function Bubble({ m }: { m: ThreadMessage }) {
           </div>
         )}
         <div className="whitespace-pre-wrap break-words">
-          {m.text}
+          <WaText text={m.text ?? ""} />
           {m.interactive?.title && <span className="ml-1 text-xs text-dusk">· tapped “{m.interactive.title}”</span>}
         </div>
         {m.attachments.length > 0 && (
@@ -118,7 +142,134 @@ function Bubble({ m }: { m: ThreadMessage }) {
   );
 }
 
-function ThreadView({ id, businessId }: { id: string; businessId: string }) {
+const dur = (s: number | null) => (s == null ? "" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+
+/** A phone call, in the chat's timeline where it happened: summary first, transcript on demand. */
+function CallCard({ c }: { c: CallRow }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex justify-center">
+      <div className="w-full max-w-[560px] rounded-xl bg-white p-3.5 shadow-card">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-signal-l text-signal">
+            <PhoneCall size={15} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium text-ink">
+              {c.direction === "inbound" ? "Incoming call" : "Outgoing call"}
+              {c.seconds != null && <span className="tabular text-dusk"> · {dur(c.seconds)}</span>}
+            </div>
+            <div className="text-xs text-stone">
+              {fmtTime(c.started_at)} · {c.status}
+              {c.end_reason ? ` · ${c.end_reason.replace(/_/g, " ")}` : ""}
+            </div>
+          </div>
+          {c.transcript.length > 0 && (
+            <button onClick={() => setOpen(!open)} className="text-[12.5px] font-medium text-signal hover:text-signal-d">
+              {open ? "Hide transcript" : "Transcript"}
+            </button>
+          )}
+        </div>
+        {c.summary && <div className="mt-2.5 rounded-lg bg-parchment px-3 py-2 text-[13px] text-soot">{c.summary}</div>}
+        {open && (
+          <div className="mt-2.5 max-h-72 space-y-1.5 overflow-y-auto border-t border-sand pt-2.5">
+            {c.transcript.map((t, i) => (
+              <div key={i} className="text-[13px]">
+                <span className={cx("mr-1.5 text-[11px] font-semibold uppercase", t.role === "agent" ? "text-signal" : "text-dusk")}>
+                  {t.role === "agent" ? "AI" : "Caller"}
+                </span>
+                <span className="text-soot">{t.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Who this is across every channel, what they ordered, and what the AI remembers about them. */
+function CustomerPanel({ customerId, businessId }: { customerId: string; businessId: string }) {
+  const q = useQuery({
+    queryKey: ["customer", businessId, customerId],
+    queryFn: () => api.get<CustomerView>(`/customers/${customerId}`, { business_id: businessId }),
+    refetchInterval: 10000,
+  });
+  const c = q.data;
+  if (q.error)
+    return (
+      <div className="p-4">
+        <ErrorNote error={q.error} />
+      </div>
+    );
+  if (!c)
+    return (
+      <div className="p-4">
+        <Skeleton lines={6} />
+      </div>
+    );
+  return (
+    <div className="space-y-5 p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-signal-l text-sm font-semibold text-signal-d">{initials(c.name)}</div>
+        <div className="min-w-0">
+          <div className="truncate text-[14px] font-semibold text-ink">{c.name ?? "Unknown"}</div>
+          <div className="text-xs text-stone">
+            {c.phone ?? "—"}
+            {c.language ? ` · ${c.language}` : ""}
+          </div>
+        </div>
+      </div>
+      <div>
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone">Reaches us on</div>
+        <ul className="space-y-1.5">
+          {c.identities.map((i, n) => (
+            <li key={n} className="flex items-center gap-2 text-[13px]">
+              <ChannelIcon channel={i.channel} size="sm" />
+              <span className="text-ink">{channelLabel(i.channel)}</span>
+              <span className="ml-auto text-[11px] text-stone">{LINKED[i.linked_via] ?? i.linked_via}</span>
+            </li>
+          ))}
+        </ul>
+        {c.merged_from.length > 0 && <div className="mt-1.5 text-xs text-stone">One customer across channels — histories merged.</div>}
+      </div>
+      <div>
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone">Orders · {c.orders.length}</div>
+        {c.orders.length ? (
+          <ul className="space-y-1">
+            {c.orders.slice(0, 6).map((o) => (
+              <li key={o.id}>
+                <Link to={`/orders?o=${o.id}`} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-[13px] hover:bg-bone">
+                  <span className="font-medium text-ink">{o.order_number}</span>
+                  <StatusBadge status={o.status} />
+                  <span className="tabular ml-auto text-dusk">{inr(o.total_rupees)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-xs text-stone">No orders yet.</div>
+        )}
+      </div>
+      {(c.summary || c.facts.length > 0) && (
+        <div>
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone">The AI remembers</div>
+          {c.summary && <p className="text-[13px] text-soot">{c.summary}</p>}
+          <ul className="mt-1 space-y-1">
+            {c.facts.map((f, n) => (
+              <li key={n} className="text-[13px] text-dusk">
+                · {typeof f === "string" ? f : (f.text ?? f.fact ?? JSON.stringify(f))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThreadView({ id, businessId, calls }: { id: string; businessId: string; calls: CallRow[] }) {
+  const [panel, setPanel] = useState(() => window.innerWidth >= 1500);
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
@@ -159,6 +310,11 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
       </div>
     );
   const humanActive = !!t.human_active_until && new Date(t.human_active_until) > new Date();
+  // calls sit in the chat where they happened (a call is this customer talking on another line)
+  const timeline: ({ kind: "msg"; at: string; m: ThreadMessage } | { kind: "call"; at: string; c: CallRow })[] = [
+    ...t.messages.map((m) => ({ kind: "msg" as const, at: m.at ?? "", m })),
+    ...calls.map((c) => ({ kind: "call" as const, at: c.started_at ?? "", c })),
+  ].sort((x, y) => x.at.localeCompare(y.at));
   const name = t.customer?.name ?? t.customer?.phone ?? t.role;
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -166,7 +322,8 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-center gap-3 border-b border-sand px-5 py-3.5">
         <ChannelIcon channel={t.channel} size="lg" />
         <div className="min-w-0 flex-1">
@@ -183,6 +340,11 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
             {t.simulated && <Badge tone="info">Simulated</Badge>}
           </div>
         </div>
+        {t.customer && (
+          <Button variant="subtle" onClick={() => setPanel(!panel)} title={panel ? "Hide customer" : "Show customer"}>
+            {panel ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+          </Button>
+        )}
         {humanActive ? (
           <Button variant="ghost" onClick={() => takeover.mutate(false)} disabled={takeover.isPending}>
             <UserCheck size={14} /> Hand back to AI
@@ -208,9 +370,7 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
         </div>
       ) : null}
       <div ref={scroller} className="flex-1 space-y-2.5 overflow-auto bg-parchment/60 px-5 py-4">
-        {t.messages.map((m) => (
-          <Bubble key={m.id} m={m} />
-        ))}
+        {timeline.map((e) => (e.kind === "call" ? <CallCard key={e.c.id} c={e.c} /> : <Bubble key={e.m.id} m={e.m} />))}
       </div>
       <div className="border-t border-sand p-3">
         <ErrorNote error={reply.error} />
@@ -226,11 +386,19 @@ function ThreadView({ id, businessId }: { id: string; businessId: string }) {
           </Button>
         </form>
       </div>
+      </div>
+      {panel && t.customer && (
+        <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-sand">
+          <CustomerPanel customerId={t.customer.id} businessId={businessId} />
+        </aside>
+      )}
     </div>
   );
 }
 
-export function Conversations() {
+type ListFilter = "all" | "attention" | "calls";
+
+export function Inbox() {
   const { business } = useSession();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -246,11 +414,28 @@ export function Conversations() {
   useEffect(() => {
     if (events.length) void qc.invalidateQueries({ queryKey: ["conversations", business?.id] });
   }, [events.length, qc, business?.id]);
+  const callList = useQuery({
+    queryKey: ["calls", business?.id],
+    queryFn: () => api.get<CallRow[]>("/calls", { business_id: business!.id }),
+    enabled: !!business,
+    refetchInterval: 10000,
+  });
+  const [show, setShow] = useState<ListFilter>("all");
+  const [hideLab, setHideLab] = useState(false);
+  const callsByConv = useMemo(() => {
+    const m = new Map<string, CallRow[]>();
+    for (const c of callList.data ?? []) if (c.conversation_id) m.set(c.conversation_id, [...(m.get(c.conversation_id) ?? []), c]);
+    return m;
+  }, [callList.data]);
   const items = useMemo(() => {
-    const all = list.data?.items ?? [];
+    let all = list.data?.items ?? [];
+    if (hideLab) all = all.filter((c) => !c.simulated);
+    if (show === "attention") all = all.filter((c) => c.needs_attention || c.human_active);
+    if (show === "calls") all = all.filter((c) => callsByConv.has(c.id));
     const f = filter.trim().toLowerCase();
     return f ? all.filter((c) => `${c.customer ?? ""} ${c.last_text}`.toLowerCase().includes(f)) : all;
-  }, [list.data, filter]);
+  }, [list.data, filter, show, hideLab, callsByConv]);
+  const attention = (list.data?.items ?? []).filter((c) => c.needs_attention || c.human_active).length;
 
   return (
     <div className="grid h-[calc(100vh-112px)] grid-cols-[340px_minmax(0,1fr)] gap-5">
@@ -260,6 +445,31 @@ export function Conversations() {
             <h2 className="text-[15px] font-semibold text-ink">Conversations</h2>
             {list.data && <span className="tabular text-xs text-stone">{list.data.items.length}</span>}
           </div>
+          <div className="mb-2.5">
+            <Segmented<ListFilter>
+              value={show}
+              onChange={setShow}
+              options={[
+                { value: "all", label: "All" },
+                {
+                  value: "attention",
+                  label: (
+                    <span>
+                      Needs you{attention ? <span className="tabular ml-1 text-ember">{attention}</span> : null}
+                    </span>
+                  ),
+                },
+                {
+                  value: "calls",
+                  label: (
+                    <span className="inline-flex items-center gap-1">
+                      <PhoneCall size={12} /> Calls
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
           <label className="relative block">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone" />
             <input
@@ -268,6 +478,10 @@ export function Conversations() {
               placeholder="Search name or message"
               className="h-8 w-full rounded-md bg-parchment pl-8 pr-3 text-[13px] text-ink ring-1 ring-inset ring-sand placeholder:text-stone focus:bg-white focus:outline-none focus:ring-2 focus:ring-signal/50"
             />
+          </label>
+          <label className="mt-2 flex items-center gap-2 px-1 text-xs text-dusk">
+            <input type="checkbox" checked={hideLab} onChange={(e) => setHideLab(e.target.checked)} className="accent-signal" />
+            Hide Simulation Lab chats
           </label>
         </div>
         <ErrorNote error={list.error} />
@@ -297,6 +511,7 @@ export function Conversations() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="flex-1 truncate text-[13.5px] font-medium text-ink">{c.customer ?? c.role}</span>
+                    {callsByConv.has(c.id) && <PhoneCall size={12} className="shrink-0 text-signal" />}
                     <span className="shrink-0 text-[11px] text-stone">{fmtWhen(c.last_at)}</span>
                   </div>
                   <div className="mt-0.5 truncate text-[12.5px] text-dusk">
@@ -322,10 +537,10 @@ export function Conversations() {
       </Card>
       <Card flush className="min-h-0 overflow-hidden">
         {selected && business ? (
-          <ThreadView id={selected} businessId={business.id} />
+          <ThreadView id={selected} businessId={business.id} calls={callsByConv.get(selected) ?? []} />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <Empty icon={MessagesSquare} hint="Every channel in one place — WhatsApp, Telegram, Messenger and Instagram.">
+            <Empty icon={UserRound} hint="Every channel in one place — chats, calls and the customer behind them.">
               Select a conversation
             </Empty>
           </div>

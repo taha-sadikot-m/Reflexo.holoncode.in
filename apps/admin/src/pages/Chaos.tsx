@@ -130,7 +130,7 @@ function ActionCard({
               </Mono>
             </span>
             {outcome.conversation_id && (
-              <Link to={`/conversations?c=${outcome.conversation_id}`} className="text-xs font-semibold text-signal hover:underline">
+              <Link to={`/inbox?c=${outcome.conversation_id}`} className="text-xs font-semibold text-signal hover:underline">
                 Conversation →
               </Link>
             )}

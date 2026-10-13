@@ -1,66 +1,45 @@
 import {
-  Activity,
-  BookOpenCheck,
-  Bomb,
+  Brain,
   Building2,
   ChevronDown,
   Clock3,
   ExternalLink,
-  FileUp,
-  FlaskConical,
-  Gauge,
-  History,
+  Inbox,
   LayoutDashboard,
   LogOut,
-  MessagesSquare,
-  Phone,
   Receipt,
   RotateCcw,
   Settings,
-  UserRound,
-  Users,
-  Workflow,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { api, type ConversationItem, type OwnerWorkspace } from "../lib/api";
 import { useSession } from "../lib/session";
 import { Button, cx } from "./ui";
 
-type Item = { to: string; label: string; icon: LucideIcon; end?: boolean };
+type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: "inbox" | "brain"; hint: string };
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   {
-    title: "Operate",
+    title: "Business",
     items: [
-      { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
-      { to: "/conversations", label: "Conversations", icon: MessagesSquare },
-      { to: "/orders", label: "Orders", icon: Receipt },
-      { to: "/customers", label: "Customers", icon: Users },
-      { to: "/calls", label: "Calls", icon: Phone },
+      { to: "/", label: "Home", icon: LayoutDashboard, end: true, hint: "Today at a glance" },
+      { to: "/inbox", label: "Inbox", icon: Inbox, count: "inbox", hint: "Chats, calls and customers" },
+      { to: "/orders", label: "Orders", icon: Receipt, hint: "Orders, payments, capacity" },
+      { to: "/brain", label: "Brain", icon: Brain, count: "brain", hint: "Learning, rules, knowledge" },
     ],
   },
   {
-    title: "Shop brain",
+    title: "Engineering",
     items: [
-      { to: "/playbook", label: "Playbook", icon: BookOpenCheck },
-      { to: "/automations", label: "Automations", icon: Workflow },
-      { to: "/owner", label: "Owner inbox", icon: UserRound },
-      { to: "/history", label: "Knowledge history", icon: History },
-      { to: "/imports", label: "Imports", icon: FileUp },
+      { to: "/quality", label: "Quality", icon: ShieldCheck, hint: "Lab, X-ray, chaos, evals" },
+      { to: "/settings", label: "Settings", icon: Settings, hint: "Channels, reset, flags" },
     ],
   },
-  {
-    title: "Testing",
-    items: [
-      { to: "/lab", label: "Simulation Lab", icon: FlaskConical },
-      { to: "/xray", label: "Pipeline X-ray", icon: Activity },
-      { to: "/chaos", label: "Chaos", icon: Bomb },
-      { to: "/evals", label: "Evals", icon: Gauge },
-    ],
-  },
-  { title: "System", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
 ];
 
 /** One page failing must never blank the panel: it shows what went wrong, the rest keeps working. */
@@ -107,6 +86,26 @@ export function Layout() {
   const { me, businesses, business, setBusinessId, logout } = useSession();
   const location = useLocation();
   const scale = me?.demo_time_scale ?? 1;
+  const bid = business?.id ?? "";
+  // the same queries the pages use (shared cache): how much needs a person, at a glance
+  const convs = useQuery({
+    queryKey: ["conversations", bid],
+    queryFn: () => api.get<{ items: ConversationItem[] }>("/conversations", { business_id: bid }),
+    enabled: !!bid,
+    refetchInterval: 15000,
+  });
+  const owner = useQuery({
+    queryKey: ["owner", bid],
+    queryFn: () => api.get<OwnerWorkspace>("/owner", { business_id: bid }),
+    enabled: !!bid,
+    refetchInterval: 15000,
+  });
+  const counts = {
+    inbox: (convs.data?.items ?? []).filter((c) => (c.needs_attention || c.human_active) && !c.simulated).length,
+    brain:
+      (owner.data?.questions ?? []).filter((q) => q.status === "open" || q.status === "asked").length +
+      (owner.data?.approvals ?? []).filter((a) => a.status === "pending").length,
+  };
   useEffect(() => {
     // the panel is light only; clear what an older build's dark toggle left behind
     document.documentElement.classList.remove("dark");
@@ -128,22 +127,28 @@ export function Layout() {
             <div key={section.title}>
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone">{section.title}</div>
               <div className="space-y-0.5">
-                {section.items.map(({ to, label, icon: Icon, end }) => (
+                {section.items.map(({ to, label, icon: Icon, end, count, hint }) => (
                   <NavLink
                     key={to}
                     to={to}
                     end={end}
                     className={({ isActive }) =>
                       cx(
-                        "group flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13.5px] font-medium transition-colors",
+                        "group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] font-medium transition-colors",
                         isActive ? "bg-signal-l text-signal-d" : "text-dusk hover:bg-bone hover:text-ink",
                       )
                     }
                   >
                     {({ isActive }) => (
                       <>
-                        <Icon size={16} strokeWidth={1.9} className={isActive ? "text-signal" : "text-stone group-hover:text-dusk"} />
-                        {label}
+                        <Icon size={17} strokeWidth={1.9} className={isActive ? "text-signal" : "text-stone group-hover:text-dusk"} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block">{label}</span>
+                          <span className={cx("block truncate text-[11.5px] font-normal", isActive ? "text-signal-d/70" : "text-stone")}>{hint}</span>
+                        </span>
+                        {count && counts[count] > 0 && (
+                          <span className="tabular rounded-full bg-ember px-1.5 py-px text-[11px] font-semibold text-white">{counts[count]}</span>
+                        )}
                       </>
                     )}
                   </NavLink>

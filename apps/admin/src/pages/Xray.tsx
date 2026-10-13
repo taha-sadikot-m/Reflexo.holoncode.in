@@ -229,7 +229,7 @@ export function Xray() {
               actions={
                 <>
                   {summary?.conversation_id && (
-                    <Link className="text-xs font-semibold text-signal hover:underline" to={`/conversations?c=${summary.conversation_id}`}>
+                    <Link className="text-xs font-semibold text-signal hover:underline" to={`/inbox?c=${summary.conversation_id}`}>
                       Open conversation
                     </Link>
                   )}

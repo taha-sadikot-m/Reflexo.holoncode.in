@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Minus, Pencil, Plus, type LucideIcon, Undo2 } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { Json, PageHeader, StatusBadge, fmtWhen } from "../components/bits";
-import { Badge, Button, Card, Empty, ErrorNote, Mono, cx } from "../components/ui";
-import { api, type ChangeSetRow } from "../lib/api";
+import { Badge, Button, Card, cx, Empty, ErrorNote, Mono, Segmented, Skeleton } from "../components/ui";
+import { api, type ChangeSetRow, type OwnerWorkspace } from "../lib/api";
 import { useSession } from "../lib/session";
+import { OwnerFiles } from "../components/owner";
+import { Imports } from "./Imports";
 
 const OP_ICON: Record<string, LucideIcon> = { create: Plus, update: Pencil, delete: Minus, archive: Minus };
 
@@ -59,7 +62,7 @@ function Item({ it }: { it: ChangeSetRow["items"][number] }) {
   );
 }
 
-export function History() {
+function ChangeLog() {
   const { business } = useSession();
   const bid = business?.id ?? "";
   const qc = useQueryClient();
@@ -75,10 +78,6 @@ export function History() {
   });
   return (
     <div className="space-y-5">
-      <PageHeader title="Knowledge history">
-        Every change to what the AI knows — catalogue, prices, Q&amp;A, profile, playbook rules — as an atomic change set. Undo here is the same as
-        the owner's <Mono>/undo</Mono>, and is refused if the rows changed since.
-      </PageHeader>
       <ErrorNote error={q.error ?? undo.error} />
       <Card>
         {q.data?.length ? (
@@ -114,6 +113,46 @@ export function History() {
           <Empty>No changes yet.</Empty>
         )}
       </Card>
+    </div>
+  );
+}
+
+type View = "changes" | "imports" | "files";
+
+export function History() {
+  const { business } = useSession();
+  const bid = business?.id ?? "";
+  const [params, setParams] = useSearchParams();
+  const view = (params.get("view") as View) || "changes";
+  const owner = useQuery({
+    queryKey: ["owner", bid],
+    queryFn: () => api.get<OwnerWorkspace>("/owner", { business_id: bid }),
+    enabled: !!bid && view === "files",
+    refetchInterval: 10000,
+  });
+  return (
+    <div className="space-y-5">
+      <PageHeader title="History">
+        Every change to what the AI knows, as one undoable step — and where it came from: the owner's words, an imported menu or price list, or a
+        decision it learned from. Undo here is the owner's <Mono>/undo</Mono>, refused if the data changed since.
+      </PageHeader>
+      <Segmented<View>
+        value={view}
+        onChange={(v) => setParams(v === "changes" ? {} : { view: v }, { replace: true })}
+        options={[
+          { value: "changes", label: "Changes" },
+          { value: "imports", label: "Imports" },
+          { value: "files", label: "Owner's files" },
+        ]}
+      />
+      {view === "changes" && <ChangeLog />}
+      {view === "imports" && <Imports />}
+      {view === "files" && (
+        <Card flush>
+          <ErrorNote error={owner.error} />
+          {owner.data ? <OwnerFiles items={owner.data.files} /> : <div className="p-5"><Skeleton lines={4} /></div>}
+        </Card>
+      )}
     </div>
   );
 }
