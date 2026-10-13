@@ -50,12 +50,14 @@ class CallRouter:
         self, business_id: UUID, customer_id: UUID, conversation_id: UUID, message_id: UUID, kind: str = "text"
     ) -> str:
         async with get_db().tenant_session(business_id) as s:
+            # FOR SHARE: a call that is ending (mark_ended updates this row) waits for this event to be committed,
+            # so the leftovers check at the end of the call sees it — no message falls between call and chat
             live = (
                 await s.execute(
                     text("""SELECT id, status FROM call_sessions
                             WHERE status IN ('ringing', 'connecting', 'active')
                               AND (conversation_id = :conv OR customer_id = :cust)
-                            ORDER BY created_at DESC LIMIT 1"""),
+                            ORDER BY created_at DESC LIMIT 1 FOR SHARE"""),
                     {"conv": conversation_id, "cust": customer_id},
                 )
             ).first()
@@ -118,6 +120,26 @@ async def claim_pending(call_session_id: UUID) -> list[CallEvent]:
             str((r.payload or {}).get("text") or ""),
             dict(r.payload or {}),
         )
+        for r in sorted(rows, key=lambda r: r.created_at)
+    ]
+
+
+async def unanswered(call_session_id: UUID) -> list[CallEvent]:
+    """Chat messages sent during the call that the call never answered (still queued, claimed by a loop that
+    stopped, or failed). Call only after the session is ended: no new event can join this call by then."""
+    async with get_db().service_session(ServiceReason.VOICE) as s:
+        rows = (
+            await s.execute(
+                text("""UPDATE call_events SET status = 'failed', processed_at = now(),
+                               payload = payload || '{"returned_to_chat": true}'::jsonb
+                        WHERE call_session_id = :c AND status IN ('pending', 'delivered', 'failed')
+                          AND NOT (payload ? 'returned_to_chat')
+                        RETURNING id, call_session_id, kind, message_id, payload, created_at"""),
+                {"c": call_session_id},
+            )
+        ).all()
+    return [
+        CallEvent(r.id, r.call_session_id, str(r.kind), r.message_id, str((r.payload or {}).get("text") or ""), {})
         for r in sorted(rows, key=lambda r: r.created_at)
     ]
 

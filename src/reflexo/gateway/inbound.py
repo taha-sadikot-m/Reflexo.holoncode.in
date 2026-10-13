@@ -379,6 +379,7 @@ class GatewayInbound:
                     "message_id": str(message_id),
                     "media": media.model_dump(),
                     "owner_member_id": str(sender.member_id) if sender.member_id else None,
+                    "simulated": simulated or sender.conversation_simulated,
                 },
                 business_id=conn.business_id,
                 priority=PriorityClass.P0,
@@ -532,6 +533,41 @@ class GatewayInbound:
             turn_id=turn_id,
             desk=str(desk),
         )
+
+
+async def answer_in_chat(business_id: UUID, message_ids: list[UUID]) -> int:
+    """Messages that were routed into a call the call never answered (the caller hung up first): the chat AI
+    answers them, one turn per conversation, from the latest of them. Returns the turns scheduled."""
+    if not message_ids:
+        return 0
+    async with get_db().tenant_session(business_id) as s:
+        latest = (
+            await s.execute(
+                text("""SELECT DISTINCT ON (conversation_id) id, conversation_id FROM messages
+                        WHERE id = ANY(:ids) AND direction = 'inbound' AND turn_id IS NULL
+                        ORDER BY conversation_id, created_at DESC"""),
+                {"ids": message_ids},
+            )
+        ).all()
+        for m in latest:
+            await ports.registry.require(TurnScheduler).schedule(  # type: ignore[type-abstract]
+                s,
+                business_id=business_id,
+                conversation_id=m.conversation_id,
+                message_id=m.id,
+                desk=Desk.CUSTOMER,
+                priority=PriorityClass.P0,
+                ends_thought=True,
+            )
+    for m in latest:
+        await emit(
+            "turn_scheduled",
+            PipelineEventStatus.OK,
+            business_id=business_id,
+            conversation_id=m.conversation_id,
+            reason="after_call",
+        )
+    return len(latest)
 
 
 async def hand_back_to_ai(business_id: UUID, conversation_id: UUID) -> bool:

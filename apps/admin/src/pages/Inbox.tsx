@@ -29,6 +29,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { StatusBadge, fmtWhen, inr } from "../components/bits";
 import { ChannelIcon, LINKED, channelLabel } from "../components/channel";
 import { Badge, Button, Card, Empty, ErrorNote, Segmented, Skeleton, cx } from "../components/ui";
+import { WaText } from "../components/phone";
 import { api, type CallRow, type ConversationItem, type CustomerView, type Thread, type ThreadMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { fmtTime } from "../lib/stages";
@@ -58,25 +59,6 @@ function initials(name: string | null | undefined): string {
 }
 
 /** WhatsApp formatting as the phone shows it: *bold* and _italic_ (the raw asterisks were visible here). */
-function WaText({ text }: { text: string }) {
-  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
-  return (
-    <>
-      {parts.map((part, i) =>
-        /^\*[^*\n]+\*$/.test(part) ? (
-          <strong key={i} className="font-semibold text-ink">
-            {part.slice(1, -1)}
-          </strong>
-        ) : /^_[^_\n]+_$/.test(part) ? (
-          <em key={i}>{part.slice(1, -1)}</em>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-
 function BlockChips({ blocks }: { blocks: Record<string, unknown>[] | null }) {
   if (!blocks) return null;
   const chips: { icon: LucideIcon; label: string }[] = [];
@@ -526,7 +508,7 @@ export function Inbox() {
                         </Badge>
                       )}
                       {c.human_active && <Badge tone="warn">Person handling</Badge>}
-                      {c.simulated && <Badge tone="info">Simulated</Badge>}
+                      {c.simulated && !business?.sandbox && <Badge tone="info">Simulated</Badge>}
                     </div>
                   )}
                 </div>

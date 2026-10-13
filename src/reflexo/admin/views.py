@@ -12,6 +12,7 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+from reflexo.admin.seeding import SANDBOX_PREFIX
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.logging import mask_phone_numbers
 from reflexo.common.redis import get_redis
@@ -32,7 +33,15 @@ async def businesses() -> list[dict[str, Any]]:
             await s.execute(text("SELECT id, name, slug, status, kill_switch FROM businesses ORDER BY created_at"))
         ).all()
     return [
-        {"id": str(r.id), "name": r.name, "slug": r.slug, "status": str(r.status), "kill_switch": r.kill_switch}
+        {
+            "id": str(r.id),
+            "name": r.name,
+            "slug": r.slug,
+            "status": str(r.status),
+            "kill_switch": r.kill_switch,
+            # a public-demo copy: all of its traffic is simulated, so the owner's views count it as real
+            "sandbox": r.slug.startswith(SANDBOX_PREFIX),
+        }
         for r in rows
     ]
 

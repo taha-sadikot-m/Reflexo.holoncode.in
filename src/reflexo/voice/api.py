@@ -3,10 +3,12 @@
 voice-bridge (WhatsApp WebRTC to LiveKit), call sessions, in-call events, LiveKit voice agent. Spec: POC_04 §10, POC_01 §5.3.
 """
 
+from reflexo.voice import web_call
 from reflexo.voice.context import SessionNotLive, VoiceCtx, start_session
 from reflexo.voice.sessions import CallSession
+from reflexo.voice.web_call import WebCall, WebCallUnavailable
 
-__all__ = ["CallSession", "SessionNotLive", "VoiceCtx", "start_session"]
+__all__ = ["CallSession", "SessionNotLive", "VoiceCtx", "WebCall", "WebCallUnavailable", "start_session", "web_call"]
 
 from reflexo.common.contracts import CallRouterPort
 from reflexo.common.ports import Registry

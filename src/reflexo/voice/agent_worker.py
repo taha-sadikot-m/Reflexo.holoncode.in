@@ -73,9 +73,11 @@ def _session(vad: Any) -> Any:
 
 
 async def entrypoint(job: Any) -> None:
+    from livekit import rtc
     from livekit.agents import AutoSubscribe
 
-    from reflexo.voice import sessions
+    import reflexo.gateway.api as gateway
+    from reflexo.voice import call_events, sessions
     from reflexo.voice.agent import GOODBYE, ReflexoVoiceAgent, record_turn
     from reflexo.voice.context import SessionNotLive, start_session
     from reflexo.voice.in_call import InCallChat
@@ -132,6 +134,13 @@ async def entrypoint(job: Any) -> None:
 
             spawn(goodbye())
 
+    @job.room.on("participant_disconnected")  # type: ignore[untyped-decorator]
+    def on_left(participant: Any) -> None:
+        # the caller hung up: the call is over now, not when our shutdown gets to it — chat messages sent from
+        # here on go to the chat AI instead of into a call nobody is on
+        if getattr(participant, "kind", None) != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            spawn(sessions.mark_ended(call_session_id, "caller_hangup"))
+
     voice_agent = ReflexoVoiceAgent(ctx)
     in_call = InCallChat(ctx, session, voice_agent)
     voice_agent.in_call = in_call
@@ -144,6 +153,11 @@ async def entrypoint(job: Any) -> None:
         why = str(reason or "")
         why = why if why.startswith(("agent_end", "silence", "session_not_live")) else "caller_hangup"
         ended = await sessions.mark_ended(call_session_id, why[:100])
+        try:  # chat messages the call never answered (sent as the caller hung up): the chat AI answers them
+            left = await call_events.unanswered(call_session_id)
+            await gateway.answer_in_chat(ctx.business_id, [e.message_id for e in left if e.message_id])
+        except Exception:
+            log.exception("call_leftovers_failed", call_session_id=str(call_session_id))
         if why != "session_not_live":
             await send_summary(ctx)  # never raises: a failed recap must not break the shutdown
         await emit(

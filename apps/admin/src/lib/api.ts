@@ -16,18 +16,21 @@ export const setCsrf = (token: string | null) => {
 };
 
 const BASE = "/admin/api";
+// the ops console signs in with the operator cookie; the owner's app and the public demo with the owner cookie
+export const SURFACE = window.location.pathname.split("/")[1] === "admin" ? "admin" : "app";
 
 async function request<T>(method: string, path: string, body?: unknown, params?: Record<string, string>): Promise<T> {
   const url = new URL(BASE + path, window.location.origin);
   for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined && v !== "") url.searchParams.set(k, v);
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const headers: Record<string, string> = { Accept: "application/json", "X-Reflexo-Surface": SURFACE };
+  const raw = body instanceof Blob; // a file goes as the raw body, its type in Content-Type
+  if (body !== undefined) headers["Content-Type"] = raw ? body.type : "application/json";
   if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
   const resp = await fetch(url, {
     method,
     headers,
     credentials: "same-origin",
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
   });
   if (!resp.ok) {
     let code = "ERROR";
@@ -47,12 +50,26 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
 export const api = {
   get: <T>(path: string, params?: Record<string, string>) => request<T>("GET", path, undefined, params),
   post: <T>(path: string, body?: unknown, params?: Record<string, string>) => request<T>("POST", path, body ?? {}, params),
+  upload: <T>(path: string, file: Blob, params?: Record<string, string>) => request<T>("POST", path, file, params),
 };
+
+/** A photo or PDF from a simulated phone: stored first, then sent as a message that refers to it. */
+export interface SimMediaRef {
+  id: string;
+  mime: string;
+  filename?: string | null;
+}
+export async function uploadSimMedia(businessId: string, file: File): Promise<SimMediaRef> {
+  const res = await api.upload<{ media_id: string; mime: string }>("/sim/upload", file, { business_id: businessId });
+  return { id: res.media_id, mime: res.mime, filename: file.name };
+}
 
 // ---------------------------------------------------------------- types (mirror reflexo.admin.views)
 
 export interface Me {
   user: string;
+  role: "operator" | "owner";
+  business_id: string | null;
   csrf: string;
   expires_at: number;
   env: string;
@@ -65,6 +82,7 @@ export interface Business {
   slug: string;
   status: string;
   kill_switch: boolean;
+  sandbox: boolean;
 }
 export interface TraceSummary {
   trace_id: string;
@@ -183,6 +201,7 @@ export interface SimThreadItem {
   from: "customer" | "business";
   text?: string | null;
   option?: string | null;
+  media?: { url: string; kind: string | null; filename: string | null }[];
   payload?: Record<string, any>;
   status?: string;
 }

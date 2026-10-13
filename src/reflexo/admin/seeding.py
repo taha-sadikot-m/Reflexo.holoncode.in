@@ -84,6 +84,39 @@ def eval_seed(meera: dict[str, Any]) -> dict[str, Any]:
     return seed
 
 
+SANDBOX_PREFIX = "demo-"
+SANDBOX_OWNER_WA = "+919999900001"  # simulated-only: never a real recipient (simulated traffic stays in the Lab)
+
+
+def sandbox_seed(meera: dict[str, Any], suffix: str) -> dict[str, Any]:
+    """A visitor's private copy of Meera's full shop for the public demo: WhatsApp-shaped, every customer and the
+    owner simulated. The WhatsApp connection id is fake and unique, so nothing it does can reach Meta, and the only
+    owner binding is simulated-only, so owner notifications land on the demo's owner phone."""
+    seed = copy.deepcopy(meera)
+    seed["slug"] = f"{SANDBOX_PREFIX}{suffix}"
+    seed["owner"] = {"display_name": meera["owner"]["display_name"], "simulated_whatsapp": SANDBOX_OWNER_WA}
+    seed["connections"] = [
+        {
+            "channel": "whatsapp",
+            "provider": "meta_whatsapp",
+            "external_account_id": f"sim-wa-{suffix}",
+            "display_name": f"{meera['name']} (WhatsApp)",
+            "roles": ["customer", "owner"],
+            "credential_ref": "REFLEXO_WA",
+        }
+    ]
+    return seed
+
+
+async def load_sandbox(db: Database, suffix: str, settings: Settings | None = None) -> UUID:
+    """Create one demo sandbox (full catalogue, active) and index its knowledge."""
+    seed = sandbox_seed(read_seed("meeras_bakes"), suffix)
+    async with db.service_session(ServiceReason.SEED) as s:
+        business_id = await _load_business(s, seed, full=True, settings=settings or get_settings())
+    await knowledge.reindex_business(business_id)
+    return business_id
+
+
 def _j(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -308,17 +341,10 @@ async def _terminate(workflows: WorkflowPort, ids: list[str]) -> tuple[int, int]
     return done, failed
 
 
-async def reset(
-    db: Database,
-    mode: Mode = "onboarding",
-    settings: Settings | None = None,
-    workflows: WorkflowPort | None = None,
-    slugs: tuple[str, ...] = DEMO_SLUGS,
-) -> SeedReport:
-    """`demo-reset`: terminate the demo businesses' live workflows (their rows are about to go: a timer firing
-    later would act on nothing, or retry forever), then wipe + reseed. Temporal being down does not block the
-    reset — it is reported, and those workflows fail harmlessly when they wake."""
-    started = time.perf_counter()
+async def remove(db: Database, slugs: tuple[str, ...], workflows: WorkflowPort | None = None) -> tuple[int, int, bool]:
+    """Terminate the businesses' live workflows (their rows are about to go: a timer firing later would act on
+    nothing, or retry forever), then delete them. Temporal being down does not block it — it is reported, and those
+    workflows fail harmlessly when they wake. Returns (deleted, workflows terminated, Temporal unreachable)."""
     ids = await live_workflows(db, slugs) if workflows else []
     terminated, unreachable = 0, False
     if ids and workflows:
@@ -328,16 +354,21 @@ async def reset(
         except TimeoutError:
             unreachable = True
             log.warning("demo_reset_terminate_timeout", workflows=len(ids))
-    deleted = await wipe(db, slugs)
+    return await wipe(db, slugs), terminated, unreachable
+
+
+async def reset(
+    db: Database,
+    mode: Mode = "onboarding",
+    settings: Settings | None = None,
+    workflows: WorkflowPort | None = None,
+    slugs: tuple[str, ...] = DEMO_SLUGS,
+) -> SeedReport:
+    """`demo-reset`: remove the demo businesses (workflows stopped first), then reseed."""
+    started = time.perf_counter()
+    deleted, terminated, unreachable = await remove(db, slugs, workflows)
     report = await load(db, mode, settings, slugs)
     report.workflows_terminated, report.workflows_unreachable = terminated, unreachable
     report.seconds = time.perf_counter() - started
-    log.info(
-        "demo_reset",
-        mode=mode,
-        deleted=deleted,
-        workflows=len(ids),
-        terminated=terminated,
-        seconds=round(report.seconds, 2),
-    )
+    log.info("demo_reset", mode=mode, deleted=deleted, terminated=terminated, seconds=round(report.seconds, 2))
     return report

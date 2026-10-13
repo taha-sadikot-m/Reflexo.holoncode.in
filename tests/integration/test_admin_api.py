@@ -241,3 +241,62 @@ async def test_health_and_businesses(client: httpx.AsyncClient, db: Database) ->
     assert {q["pool"] for q in health["queues"]} == {"inbound", "turns", "outbound", "jobs"}
     ids = {b["id"] for b in (await client.get("/admin/api/businesses")).json()}
     assert str(shop.business_id) in ids
+
+
+# ---------------------------------------------------------------- the public demo: owner sessions on a sandbox
+
+
+async def start_demo(client: httpx.AsyncClient) -> dict[str, str]:
+    resp = await client.post("/api/demo/start")
+    assert resp.status_code == 200, resp.text
+    # the cookie is Secure outside dev; the ASGI test transport is plain http, so carry it by hand
+    client.cookies.set(admin.OWNER_COOKIE, resp.cookies[admin.OWNER_COOKIE])
+    return {"business_id": resp.json()["business_id"], "csrf": resp.json()["csrf"]}
+
+
+async def test_demo_owner_is_locked_to_their_sandbox(client: httpx.AsyncClient, db: Database) -> None:
+    admin.demo._created.clear()
+    other_shop = (await make_shop(db)).business_id
+    demo = await start_demo(client)
+    app_headers = {admin.SURFACE_HEADER: "app", admin.CSRF_HEADER: demo["csrf"]}
+
+    me = (await client.get("/admin/api/me", headers=app_headers)).json()
+    assert (me["role"], me["business_id"]) == ("owner", demo["business_id"])
+    shops = (await client.get("/admin/api/businesses", headers=app_headers)).json()
+    assert [(b["id"], b["sandbox"]) for b in shops] == [(demo["business_id"], True)]
+    own = await client.get("/admin/api/orders", params={"business_id": demo["business_id"]}, headers=app_headers)
+    assert own.status_code == 200
+    # another business, the engineering tools, and the operator surface are all closed to an owner
+    assert (
+        await client.get("/admin/api/orders", params={"business_id": str(other_shop)}, headers=app_headers)
+    ).status_code == 404
+    assert (await client.get("/admin/api/evals", headers=app_headers)).status_code == 403
+    assert (await client.post("/admin/api/demo-reset", headers=app_headers)).status_code == 403
+    assert (await client.get("/admin/api/me")).status_code == 401  # the ops console needs the operator cookie
+
+    # the operator, signed in alongside in the same browser, still sees everything
+    csrf = await login(client)
+    every = (await client.get("/admin/api/businesses", headers={admin.CSRF_HEADER: csrf})).json()
+    assert {demo["business_id"], str(other_shop)} <= {b["id"] for b in every}
+
+
+async def test_demo_limits_and_expiry(client: httpx.AsyncClient, db: Database, monkeypatch: pytest.MonkeyPatch) -> None:
+    from reflexo.common.config import get_settings
+
+    admin.demo._created.clear()
+    monkeypatch.setattr(get_settings(), "demo_per_client_per_hour", 1)
+    first = await start_demo(client)
+    again = await client.post("/api/demo/start")
+    assert again.status_code == 429 and int(again.headers["retry-after"]) > 0
+
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE businesses SET created_at = now() - interval '25 hours' WHERE id = :b"),
+            {"b": UUID(first["business_id"])},
+        )
+    assert await admin.demo.expire() >= 1
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        gone = (
+            await s.execute(text("SELECT count(*) FROM businesses WHERE id = :b"), {"b": UUID(first["business_id"])})
+        ).scalar_one()
+    assert gone == 0

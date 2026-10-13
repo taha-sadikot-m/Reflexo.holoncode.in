@@ -12,15 +12,18 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 import reflexo.admin.api as admin
+import reflexo.gateway.api as gateway
+import reflexo.voice.api as voice
 from reflexo.common.config import get_settings
 
 router = APIRouter(prefix="/admin/api")
 
 
-def problem(status: int, code: str, detail: str) -> HTTPException:
+def problem(status: int, code: str, detail: str, headers: dict[str, str] | None = None) -> HTTPException:
     return HTTPException(
         status_code=status,
         detail={"type": "about:blank", "title": code, "status": status, "code": code, "detail": detail},
+        headers=headers,
     )
 
 
@@ -30,14 +33,17 @@ async def problem_handler(_: Request, exc: HTTPException) -> JSONResponse:
         if isinstance(exc.detail, dict)
         else {"title": str(exc.detail), "status": exc.status_code, "code": "ERROR", "detail": str(exc.detail)}
     )
-    return JSONResponse(body, status_code=exc.status_code, media_type="application/problem+json")
+    return JSONResponse(body, status_code=exc.status_code, media_type="application/problem+json", headers=exc.headers)
 
 
 # ---------------------------------------------------------------- session
 
 
 def session(request: Request) -> admin.Session:
-    s = admin.verify_session(request.cookies.get(admin.COOKIE))
+    """The web app says which surface it is (the ops console, or an owner's app/demo); each has its own cookie, so
+    an operator and an owner can be signed in side by side in one browser."""
+    surface = request.headers.get(admin.SURFACE_HEADER)
+    s = admin.verify_session(request.cookies.get(admin.OWNER_COOKIE if surface == "app" else admin.COOKIE))
     if s is None:
         raise problem(401, "UNAUTHENTICATED", "login required")
     return s
@@ -53,7 +59,29 @@ Authed = Annotated[admin.Session, Depends(session)]
 Mutating = Annotated[admin.Session, Depends(csrf)]
 
 
-async def business(business_id: Annotated[UUID, Query()]) -> UUID:
+def operator(s: Authed) -> admin.Session:
+    """Engineering tools (X-ray stream, chaos, scenarios, evals, settings, demo reset) are for the operator only."""
+    if not s.is_operator:
+        raise problem(403, "FORBIDDEN", "operator only")
+    return s
+
+
+def operator_mutating(s: Mutating) -> admin.Session:
+    return operator(s)
+
+
+Operator = Annotated[admin.Session, Depends(operator)]
+OperatorMutating = Annotated[admin.Session, Depends(operator_mutating)]
+
+
+async def visible_businesses(s: admin.Session) -> list[dict[str, Any]]:
+    every = await admin.businesses()
+    return every if s.is_operator else [b for b in every if b["id"] == s.business_id]
+
+
+async def business(business_id: Annotated[UUID, Query()], s: Authed) -> UUID:
+    if s.business_id is not None and str(business_id) != s.business_id:
+        raise problem(404, "NOT_FOUND", "unknown business")
     if str(business_id) not in {b["id"] for b in await admin.businesses()}:
         raise problem(404, "NOT_FOUND", "unknown business")
     return business_id
@@ -90,8 +118,8 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict[s
 
 
 @router.post("/logout")
-async def logout(response: Response, _: Mutating) -> dict[str, bool]:
-    response.delete_cookie(admin.COOKIE, path="/admin")
+async def logout(response: Response, s: Mutating) -> dict[str, bool]:
+    response.delete_cookie(admin.COOKIE if s.is_operator else admin.OWNER_COOKIE, path="/admin")
     return {"ok": True}
 
 
@@ -100,6 +128,8 @@ async def me(s: Authed) -> dict[str, Any]:
     settings = get_settings()
     return {
         "user": s.user,
+        "role": "operator" if s.is_operator else "owner",
+        "business_id": s.business_id,
         "csrf": s.csrf,
         "expires_at": s.expires_at,
         "env": settings.env,
@@ -112,17 +142,17 @@ async def me(s: Authed) -> dict[str, Any]:
 
 
 @router.get("/health")
-async def health(_: Authed) -> dict[str, Any]:
+async def health(_: Operator) -> dict[str, Any]:
     return await admin.health()
 
 
 @router.get("/businesses")
-async def businesses(_: Authed) -> list[dict[str, Any]]:
-    return await admin.businesses()
+async def businesses(s: Authed) -> list[dict[str, Any]]:
+    return await visible_businesses(s)
 
 
 @router.get("/stream")
-async def stream(_: Authed, business_id: Business) -> EventSourceResponse:
+async def stream(_: Operator, business_id: Business) -> EventSourceResponse:
     return EventSourceResponse(admin.xray_stream(business_id), ping=15)
 
 
@@ -195,7 +225,7 @@ async def release(conversation_id: UUID, _: Mutating, business_id: Business) -> 
 
 
 @router.get("/chaos")
-async def chaos_overview(_: Authed, business_id: Business) -> dict[str, Any]:
+async def chaos_overview(_: Operator, business_id: Business) -> dict[str, Any]:
     return {
         "actions": [{"kind": k, "expected": admin.chaos.EXPECTED[k]} for k in admin.chaos.KINDS],
         "flags": await admin.chaos.active_flags(),
@@ -204,7 +234,7 @@ async def chaos_overview(_: Authed, business_id: Business) -> dict[str, Any]:
 
 
 @router.post("/chaos/{kind}", status_code=202)
-async def chaos_start(kind: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+async def chaos_start(kind: str, _: OperatorMutating, business_id: Business) -> dict[str, Any]:
     """Starts the action and returns at once; poll GET /chaos for the verified outcome."""
     if kind not in admin.chaos.EXPECTED:
         raise problem(404, "NOT_FOUND", f"unknown chaos action {kind}")
@@ -216,7 +246,7 @@ async def chaos_start(kind: str, _: Mutating, business_id: Business) -> dict[str
 
 
 @router.post("/chaos/flags/{key}/clear")
-async def chaos_clear_flag(key: str, _: Mutating) -> dict[str, Any]:
+async def chaos_clear_flag(key: str, _: OperatorMutating) -> dict[str, Any]:
     try:
         cleared = await admin.chaos.clear_flag(key)
     except ValueError:
@@ -227,19 +257,53 @@ async def chaos_clear_flag(key: str, _: Mutating) -> dict[str, Any]:
 # ---------------------------------------------------------------- simulated actors (POC_07 §3.2)
 
 
+SIM_UPLOAD_MAX_BYTES = 8 * 1024 * 1024
+SIM_UPLOAD_TYPES = ("image/jpeg", "image/png", "image/webp", "application/pdf")
+
+
+@router.post("/sim/upload")
+async def sim_upload(request: Request, _: Mutating, business_id: Business) -> dict[str, Any]:
+    """A photo or PDF picked on a simulated phone (raw body, its type in Content-Type); send it with /sim/send."""
+    mime = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if mime not in SIM_UPLOAD_TYPES:
+        raise problem(415, "UNSUPPORTED_MEDIA", "send a JPEG, PNG or WebP photo, or a PDF")
+    content = await request.body()
+    if not content or len(content) > SIM_UPLOAD_MAX_BYTES:
+        raise problem(413, "TOO_LARGE", "files up to 8 MB")
+    media_id = await gateway.store_simulated_upload(business_id, content, mime)
+    return {"media_id": str(media_id), "mime": mime}
+
+
+class SimMediaRef(BaseModel):
+    id: UUID
+    mime: str = Field(max_length=100)
+    filename: str | None = Field(default=None, max_length=200)
+
+    def sim(self) -> admin.sim.SimMedia:
+        return admin.sim.SimMedia(self.id, self.mime, self.filename)
+
+
 class SimSendBody(BaseModel):
     actor: int = Field(ge=1, le=9999)
+    name: str | None = Field(default=None, max_length=60)
     text: str | None = Field(default=None, max_length=4000)
     option_id: str | None = Field(default=None, max_length=100)
     option_title: str | None = Field(default=None, max_length=100)
+    media: SimMediaRef | None = None
 
 
 @router.post("/sim/send")
 async def sim_send(body: SimSendBody, _: Mutating, business_id: Business) -> dict[str, Any]:
-    if not body.text and not body.option_id:
-        raise problem(422, "VALIDATION_FAILED", "text or option_id required")
+    if not body.text and not body.option_id and not body.media:
+        raise problem(422, "VALIDATION_FAILED", "text, media or option_id required")
     result = await admin.sim.customer_says(
-        business_id, body.actor, text_=body.text, option_id=body.option_id, option_title=body.option_title
+        business_id,
+        body.actor,
+        text_=body.text,
+        option_id=body.option_id,
+        option_title=body.option_title,
+        name=body.name,
+        media=body.media.sim() if body.media else None,
     )
     return {"status": result.status, "external_message_id": result.external_message_id, "wa_id": result.wa_id}
 
@@ -254,20 +318,40 @@ async def sim_pay(payment_link_id: UUID, _: Mutating, business_id: Business) -> 
     return {"status": await admin.sim.pay_link(business_id, payment_link_id)}
 
 
+class SimCallBody(BaseModel):
+    actor: int = Field(ge=1, le=9999)
+    name: str | None = Field(default=None, max_length=60)
+
+
+@router.post("/sim/call")
+async def sim_call(body: SimCallBody, _: Mutating, business_id: Business) -> dict[str, Any]:
+    """Call the business from the browser as a simulated customer: the real voice agent, joined by microphone."""
+    try:
+        call = await voice.web_call.start(business_id, admin.sim.actor_wa_id(body.actor), body.name)
+    except voice.WebCallUnavailable as exc:
+        raise problem(503, "VOICE_UNAVAILABLE", str(exc)) from None
+    return {"call_session_id": str(call.call_session_id), "room": call.room, "url": call.url, "token": call.token}
+
+
 class SimOwnerBody(BaseModel):
     text: str | None = Field(default=None, max_length=4000)
     option_id: str | None = Field(default=None, max_length=100)
     option_title: str | None = Field(default=None, max_length=100)
+    media: SimMediaRef | None = None
 
 
 @router.post("/sim/owner/send")
 async def sim_owner_send(body: SimOwnerBody, _: Mutating, business_id: Business) -> dict[str, Any]:
     """The Lab's owner device (simulated owner binding)."""
-    if not body.text and not body.option_id:
-        raise problem(422, "VALIDATION_FAILED", "text or option_id required")
+    if not body.text and not body.option_id and not body.media:
+        raise problem(422, "VALIDATION_FAILED", "text, media or option_id required")
     try:
         result = await admin.sim.owner_says(
-            business_id, text_=body.text, option_id=body.option_id, option_title=body.option_title
+            business_id,
+            text_=body.text,
+            option_id=body.option_id,
+            option_title=body.option_title,
+            media=body.media.sim() if body.media else None,
         )
     except LookupError as exc:
         raise problem(409, "NO_SIM_OWNER", str(exc)) from None
@@ -283,12 +367,12 @@ async def sim_owner_thread(_: Authed, business_id: Business) -> dict[str, Any]:
 
 
 @router.get("/scenarios")
-async def scenarios_list(_: Authed) -> dict[str, Any]:
+async def scenarios_list(_: Operator) -> dict[str, Any]:
     return {"scenarios": admin.scenarios.catalogue(), "runs": admin.scenarios.recent()}
 
 
 @router.post("/scenarios/{scenario_id}/run", status_code=202)
-async def scenario_run(scenario_id: str, _: Mutating, business_id: Business) -> dict[str, Any]:
+async def scenario_run(scenario_id: str, _: OperatorMutating, business_id: Business) -> dict[str, Any]:
     try:
         run = admin.scenarios.start(scenario_id, business_id)
     except LookupError:
@@ -297,7 +381,7 @@ async def scenario_run(scenario_id: str, _: Mutating, business_id: Business) -> 
 
 
 @router.get("/scenarios/runs/{run_id}")
-async def scenario_run_detail(run_id: str, _: Authed) -> dict[str, Any]:
+async def scenario_run_detail(run_id: str, _: Operator) -> dict[str, Any]:
     run = admin.scenarios.get(run_id)
     if run is None:
         raise problem(404, "NOT_FOUND", "unknown run")
@@ -305,7 +389,7 @@ async def scenario_run_detail(run_id: str, _: Authed) -> dict[str, Any]:
 
 
 @router.post("/scenarios/runs/{run_id}/stop")
-async def scenario_stop(run_id: str, _: Mutating) -> dict[str, bool]:
+async def scenario_stop(run_id: str, _: OperatorMutating) -> dict[str, bool]:
     return {"stopped": admin.scenarios.stop(run_id)}
 
 
@@ -414,13 +498,13 @@ async def calls(_: Authed, business_id: Business) -> list[dict[str, Any]]:
 
 
 @router.get("/settings")
-async def settings_view(_: Authed, business_id: Business) -> dict[str, Any]:
+async def settings_view(_: Operator, business_id: Business) -> dict[str, Any]:
     return await admin.workspace.settings_view(business_id)
 
 
 @router.post("/demo-reset")
 async def demo_reset(
-    _: Mutating, mode: Annotated[str, Query(pattern="^(onboarding|full)$")] = "onboarding"
+    _: OperatorMutating, mode: Annotated[str, Query(pattern="^(onboarding|full)$")] = "onboarding"
 ) -> dict[str, Any]:
     """`make demo-reset [FULL=1]` from the Settings page: every demo business is wiped and reseeded (new ids)."""
     try:
@@ -446,12 +530,12 @@ async def customer(customer_id: UUID, _: Authed, business_id: Business) -> dict[
 
 
 @router.get("/evals")
-async def evals_overview(_: Authed) -> dict[str, Any]:
+async def evals_overview(_: Operator) -> dict[str, Any]:
     return {"runs": await admin.evals.recent(), **admin.evals.status()}
 
 
 @router.post("/evals/run", status_code=202)
-async def evals_run(_: Mutating, suite: str | None = None) -> dict[str, Any]:
+async def evals_run(_: OperatorMutating, suite: str | None = None) -> dict[str, Any]:
     """Start a run in the API process (one at a time); progress via GET /evals."""
     suites = None if suite in (None, "", "all") else [s.strip() for s in suite.split(",")]
     if suites and (unknown := set(suites) - set(admin.evals.ORDER)):

@@ -71,6 +71,15 @@ async def media_path(media_id: UUID) -> tuple[Path, str] | None:
     return Path(get_settings().media_dir) / row.storage_key, str(row.mime)
 
 
+SIM_MEDIA_PREFIX = "sim-media:"  # a simulated phone's upload: stored before the message is sent, never downloaded
+
+
+async def store_simulated_upload(business_id: UUID, content: bytes, mime: str) -> UUID:
+    """A photo or file sent from a simulated phone (Lab, public demo): stored now; the simulated message refers to
+    it as `sim-media:<id>` in place of a provider media id."""
+    return await store_media(business_id, content, mime, source="inbound", provider_media_id=None)
+
+
 async def store_media(
     business_id: UUID, content: bytes, mime: str, *, source: str, provider_media_id: str | None
 ) -> UUID:
@@ -100,6 +109,17 @@ async def store_media(
     return media_id
 
 
+async def _simulated_upload(business_id: UUID, raw_id: str) -> tuple[UUID, str]:
+    """The stored upload a simulated message refers to — this business's own (RLS), or the job fails."""
+    async with get_db().tenant_session(business_id) as s:
+        mime = (
+            await s.execute(text("SELECT mime FROM media_objects WHERE id = :id"), {"id": UUID(raw_id)})
+        ).scalar_one_or_none()
+    if mime is None:
+        raise LookupError("simulated upload not found for this business")
+    return UUID(raw_id), str(mime)
+
+
 def register_jobs(registry: Registry, adapters: dict[str, ChannelAdapter]) -> None:
     from reflexo.common.contracts import JobHandlerRegistry
 
@@ -112,16 +132,22 @@ def register_jobs(registry: Registry, adapters: dict[str, ChannelAdapter]) -> No
         conn = await get_connection(UUID(p["connection_id"]))
         if conn is None:
             raise LookupError("connection gone")
-        if media.url and conn.provider == "simulator":
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(media.url, timeout=30.0, follow_redirects=True)
-                resp.raise_for_status()
-                content, mime = resp.content, media.mime or resp.headers.get("content-type", "application/octet-stream")
+        if p.get("simulated") and media.provider_media_id.startswith(SIM_MEDIA_PREFIX):
+            media_id, mime = await _simulated_upload(
+                business_id, media.provider_media_id.removeprefix(SIM_MEDIA_PREFIX)
+            )
         else:
-            content, mime = await adapters[conn.provider].download_media(credentials(conn), media)
-        media_id = await store_media(
-            business_id, content, mime, source="inbound", provider_media_id=media.provider_media_id
-        )
+            if media.url and conn.provider == "simulator":
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(media.url, timeout=30.0, follow_redirects=True)
+                    resp.raise_for_status()
+                    content = resp.content
+                    mime = media.mime or resp.headers.get("content-type", "application/octet-stream")
+            else:
+                content, mime = await adapters[conn.provider].download_media(credentials(conn), media)
+            media_id = await store_media(
+                business_id, content, mime, source="inbound", provider_media_id=media.provider_media_id
+            )
         kind = file_kind(mime)
         async with get_db().tenant_session(business_id) as s:
             await s.execute(

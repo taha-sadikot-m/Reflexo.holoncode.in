@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     admin_session_secret: SecretStr = SecretStr("dev-admin-session-secret")
     admin_session_hours: int = 8
 
+    # public demo (/demo): every visitor gets a private copy of the demo shop, deleted after demo_sandbox_hours
+    demo_enabled: bool = True
+    demo_sandbox_hours: int = 24
+    demo_daily_cap: int = 300  # new demo shops per day, across everyone
+    demo_per_client_per_hour: int = 6  # new demo shops per client address per hour
+
     # commerce / Razorpay (POC_05 §4.5, §6)
     razorpay_key_id: str = ""
     razorpay_key_secret: SecretStr = SecretStr("")
@@ -107,6 +113,7 @@ class Settings(BaseSettings):
 
     # voice (POC_04 §10, §13)
     livekit_url: str = ""
+    livekit_public_url: str = ""  # what browsers connect to (wss://...); defaults to livekit_url
     livekit_api_key: str = ""
     livekit_api_secret: SecretStr = SecretStr("")
     deepgram_api_key: SecretStr = SecretStr("")

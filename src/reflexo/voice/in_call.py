@@ -82,7 +82,7 @@ class InCallChat:
                 step="processed",
             )
         except Exception as exc:
-            log.exception("call_event_failed", event=str(ev.id))
+            log.exception("call_event_failed", call_event_id=str(ev.id))
             await call_events.mark(ev.id, "failed", {"error": type(exc).__name__})
 
     async def _media(self, ev: call_events.CallEvent) -> str:

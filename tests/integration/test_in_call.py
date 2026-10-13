@@ -99,6 +99,27 @@ async def test_chat_message_during_a_call_goes_to_the_call_not_the_chat_agent(re
     assert await turns(db, call["conv"]) == 1
 
 
+async def test_messages_the_call_never_answered_go_back_to_the_chat_ai(registry: Registry, db: Database) -> None:
+    """The caller types and hangs up before the agent gets to it: when the call ends, the chat AI answers — one
+    turn for the conversation, from the latest unanswered message — and a second sweep finds nothing."""
+    call = await caller_on_a_call(registry, db)
+    for body in ("Mera order cancel kar do", "please jaldi"):
+        await deliver(
+            registry, db, "meta_whatsapp", wa_message(call["pnid"], WA, f"wamid.{new_id()}", body), call["pnid"]
+        )
+    await call_events.claim_pending(call["call"])  # one claimed by a loop that then stopped, both unanswered
+    assert await turns(db, call["conv"]) == 0
+
+    await sessions.mark_ended(call["call"], "caller_hangup")
+    left = await call_events.unanswered(call["call"])
+    assert [e.text for e in left] == ["Mera order cancel kar do", "please jaldi"]
+    assert await gateway_api.answer_in_chat(call["bid"], [e.message_id for e in left if e.message_id]) == 1
+    [turn] = await q(db, "SELECT message_ids FROM conversation_turns WHERE conversation_id = :c", c=call["conv"])
+    texts = await q(db, "SELECT content_text FROM messages WHERE id = ANY(:m)", m=list(turn.message_ids))
+    assert "please jaldi" in {t.content_text for t in texts}
+    assert await call_events.unanswered(call["call"]) == []  # answered once
+
+
 async def test_message_while_connecting_is_buffered_for_the_agent(registry: Registry, db: Database) -> None:
     call = await caller_on_a_call(registry, db, status="connecting")
     router = voice_api.CallRouter()

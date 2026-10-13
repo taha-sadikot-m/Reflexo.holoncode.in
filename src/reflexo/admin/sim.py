@@ -29,6 +29,35 @@ def actor_wa_id(actor: int) -> str:
 
 
 @dataclass(frozen=True)
+class SimMedia:
+    """A file the simulated phone sent: stored first (`gateway.store_simulated_upload`), then referenced."""
+
+    media_object_id: UUID
+    mime: str
+    filename: str | None = None
+
+
+def _message(
+    mid: str, text_: str | None, option_id: str | None, option_title: str | None, media: SimMedia | None
+) -> dict[str, Any]:
+    if option_id:
+        return {
+            "id": mid,
+            "type": "interactive",
+            "interactive": {"type": "button_reply", "button_reply": {"id": option_id, "title": option_title or ""}},
+        }
+    if media is not None:
+        kind = "image" if media.mime.startswith("image/") else "document"
+        body: dict[str, Any] = {"id": f"{gateway.SIM_MEDIA_PREFIX}{media.media_object_id}", "mime_type": media.mime}
+        if text_:
+            body["caption"] = text_
+        if kind == "document":
+            body["filename"] = media.filename or "file"
+        return {"id": mid, "type": kind, kind: body}
+    return {"id": mid, "type": "text", "text": {"body": text_ or ""}}
+
+
+@dataclass(frozen=True)
 class SimResult:
     status: int
     external_message_id: str
@@ -80,19 +109,13 @@ async def customer_says(
     option_title: str | None = None,
     external_message_id: str | None = None,
     name: str | None = None,
+    media: SimMedia | None = None,
 ) -> SimResult:
-    """One simulated customer message (or button tap) through the signed WhatsApp ingress."""
+    """One simulated customer message (text, photo/file, or button tap) through the signed WhatsApp ingress."""
     pnid = await whatsapp_number(business_id)
     wa_id = actor_wa_id(actor)
     mid = external_message_id or f"wamid.SIM{new_id().hex}"
-    if option_id:
-        message: dict[str, Any] = {
-            "id": mid,
-            "type": "interactive",
-            "interactive": {"type": "button_reply", "button_reply": {"id": option_id, "title": option_title or ""}},
-        }
-    else:
-        message = {"id": mid, "type": "text", "text": {"body": text_ or ""}}
+    message = _message(mid, text_, option_id, option_title, media)
     raw = json.dumps(_payload(pnid, wa_id, name or f"Sim Customer {actor}", message)).encode()
     return SimResult(await post_raw(raw), mid, wa_id)
 
@@ -156,7 +179,7 @@ async def _items(business_id: UUID, conv: UUID, limit: int) -> dict[str, Any]:
     async with get_db().tenant_session(business_id) as s:
         inbound = (
             await s.execute(
-                text("""SELECT created_at, content_text, interactive_reply FROM messages
+                text("""SELECT created_at, content_text, interactive_reply, attachments FROM messages
                         WHERE conversation_id = :c AND direction = 'inbound' ORDER BY created_at DESC LIMIT :n"""),
                 {"c": conv, "n": limit},
             )
@@ -176,12 +199,22 @@ async def _items(business_id: UUID, conv: UUID, limit: int) -> dict[str, Any]:
                 {"c": conv},
             )
         ).all()
+    signer = gateway.media_signer()
     items = [
         {
             "at": r.created_at.isoformat(),
             "from": "customer",
             "text": r.content_text,
             "option": (r.interactive_reply or {}).get("title"),
+            "media": [
+                {
+                    "url": signer.url_for(UUID(str(a["media_object_id"]))),
+                    "kind": a.get("kind"),
+                    "filename": a.get("filename"),
+                }
+                for a in (r.attachments or [])
+                if a.get("media_object_id")
+            ],
         }
         for r in inbound
     ] + [
@@ -222,7 +255,12 @@ async def sim_owner_wa_id(business_id: UUID) -> str | None:
 
 
 async def owner_says(
-    business_id: UUID, *, text_: str | None = None, option_id: str | None = None, option_title: str | None = None
+    business_id: UUID,
+    *,
+    text_: str | None = None,
+    option_id: str | None = None,
+    option_title: str | None = None,
+    media: SimMedia | None = None,
 ) -> SimResult:
     """The simulated owner writes (or taps a button) on WhatsApp — the real ingress, accepted as the owner only
     because the event is signed and flagged simulated."""
@@ -231,14 +269,7 @@ async def owner_says(
         raise LookupError("this business has no simulated owner binding")
     pnid = await whatsapp_number(business_id)
     mid = f"wamid.SIMOWN{new_id().hex}"
-    if option_id:
-        message: dict[str, Any] = {
-            "id": mid,
-            "type": "interactive",
-            "interactive": {"type": "button_reply", "button_reply": {"id": option_id, "title": option_title or ""}},
-        }
-    else:
-        message = {"id": mid, "type": "text", "text": {"body": text_ or ""}}
+    message = _message(mid, text_, option_id, option_title, media)
     raw = json.dumps(_payload(pnid, wa_id, "Owner (Lab)", message)).encode()
     return SimResult(await post_raw(raw), mid, wa_id)
 

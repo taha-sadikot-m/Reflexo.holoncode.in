@@ -35,8 +35,16 @@ from reflexo.gateway.adapters.simulator import SimulatorAdapter
 from reflexo.gateway.adapters.telegram import TelegramAdapter
 from reflexo.gateway.connections import ConnectionInfo, credentials, find_connection, get_connection
 from reflexo.gateway.connections import clear_cache as clear_connection_cache
-from reflexo.gateway.inbound import GatewayInbound, hand_back_to_ai
-from reflexo.gateway.media import MediaSigner, file_kind, media_path, register_jobs, store_media
+from reflexo.gateway.inbound import GatewayInbound, answer_in_chat, hand_back_to_ai
+from reflexo.gateway.media import (
+    SIM_MEDIA_PREFIX,
+    MediaSigner,
+    file_kind,
+    media_path,
+    register_jobs,
+    store_media,
+    store_simulated_upload,
+)
 from reflexo.gateway.outbound import EnqueueResult, Outbound
 from reflexo.gateway.views import (
     ConversationView,
@@ -207,10 +215,11 @@ async def resolve_customer(
 
 
 async def resolve_caller(
-    s: AsyncSession, conn: ConnectionInfo, wa_id: str, display_name: str | None = None
+    s: AsyncSession, conn: ConnectionInfo, wa_id: str, display_name: str | None = None, *, simulated: bool = False
 ) -> identity.ResolvedSender:
     """A WhatsApp caller is the same person as the WhatsApp chat sender: same customer, same chat conversation
-    (the call is linked to it), and owner bindings apply exactly as for messages."""
+    (the call is linked to it), and owner bindings apply exactly as for messages. `simulated`: a demo/Lab caller,
+    whose conversation must stay on the Lab transport."""
     from datetime import UTC, datetime
 
     from reflexo.common.enums import ChannelProvider, ChannelType
@@ -227,7 +236,7 @@ async def resolve_caller(
         sender_external_id=wa_id_to_e164(wa_id),
         sender_display_name=display_name,
     )
-    return await identity.resolve(s, conn, ev, simulated=False)
+    return await identity.resolve(s, conn, ev, simulated=simulated)
 
 
 __all__ += ["ResolvedSender", "credentials", "resolve_caller"]
@@ -321,4 +330,5 @@ def sign_simulator(raw_body: bytes) -> str:
 __all__ += ["sign_simulator"]
 
 
-__all__ += ["hand_back_to_ai"]  # end a human takeover; the AI answers what waited
+__all__ += ["SIM_MEDIA_PREFIX", "store_simulated_upload"]  # photos/files from simulated phones
+__all__ += ["answer_in_chat", "hand_back_to_ai"]  # the chat AI answers what waited (after a call / a takeover)

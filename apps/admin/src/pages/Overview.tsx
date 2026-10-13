@@ -27,11 +27,12 @@ function ViewAll({ to }: { to: string }) {
 }
 
 export function Overview() {
-  const { business } = useSession();
+  const { business, me } = useSession();
+  const operator = me?.role !== "owner";
   const bid = business?.id ?? "";
   const p = { business_id: bid };
   const on = { enabled: !!bid, refetchInterval: 5000 };
-  const health = useQuery({ queryKey: ["health"], queryFn: () => api.get<Health>("/health"), refetchInterval: 5000 });
+  const health = useQuery({ queryKey: ["health"], queryFn: () => api.get<Health>("/health"), refetchInterval: 5000, enabled: operator });
   const orders = useQuery({ queryKey: ["orders", bid, ""], queryFn: () => api.get<{ items: OrderRow[]; counts: Record<string, number> }>("/orders", p), ...on });
   const owner = useQuery({ queryKey: ["owner", bid], queryFn: () => api.get<OwnerWorkspace>("/owner", p), ...on });
   const convs = useQuery({ queryKey: ["conversations", bid], queryFn: () => api.get<{ items: ConversationItem[] }>("/conversations", p), ...on });
@@ -42,7 +43,7 @@ export function Overview() {
     ...on,
   });
 
-  const real = (orders.data?.items ?? []).filter((o) => !o.simulated && o.status !== "draft");
+  const real = (orders.data?.items ?? []).filter((o) => (business?.sandbox || !o.simulated) && o.status !== "draft");
   const today = real.filter((o) => isToday(o.created_at));
   const revenue = today.filter((o) => o.payment_status === "paid").reduce((sum, o) => sum + (o.total_rupees ?? 0), 0);
   const openQuestions = (owner.data?.questions ?? []).filter((q) => q.status === "open" || q.status === "asked");
@@ -164,8 +165,8 @@ export function Overview() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card title="Live activity" actions={<ViewAll to="/quality/xray" />} flush>
+      <div className={cx("grid grid-cols-1 gap-5", operator && "xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]")}>
+        <Card title="Live activity" actions={operator ? <ViewAll to="/quality/xray" /> : undefined} flush>
           {!traces.data ? (
             <div className="p-5">
               <Skeleton lines={5} />
@@ -195,6 +196,7 @@ export function Overview() {
           )}
         </Card>
 
+        {operator && (
         <Card
           title="System health"
           actions={
@@ -258,6 +260,7 @@ export function Overview() {
             </div>
           )}
         </Card>
+        )}
       </div>
     </div>
   );

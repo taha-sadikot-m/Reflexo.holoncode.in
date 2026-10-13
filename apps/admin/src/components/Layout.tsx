@@ -72,6 +72,9 @@ class PageBoundary extends Component<{ children: ReactNode; resetKey: string }, 
 export function Layout() {
   const { me, businesses, business, setBusinessId, logout } = useSession();
   const location = useLocation();
+  const operator = me?.role !== "owner";
+  // an owner sees their shop; the engineering tools are the operator's
+  const sections = operator ? SECTIONS : SECTIONS.slice(0, 1).map((s) => ({ ...s, title: "Your shop" }));
   const scale = me?.demo_time_scale ?? 1;
   const bid = business?.id ?? "";
   // the same queries the pages use (shared cache): how much needs a person, at a glance
@@ -88,7 +91,7 @@ export function Layout() {
     refetchInterval: 15000,
   });
   const counts = {
-    inbox: (convs.data?.items ?? []).filter((c) => (c.needs_attention || c.human_active) && !c.simulated).length,
+    inbox: (convs.data?.items ?? []).filter((c) => (c.needs_attention || c.human_active) && (business?.sandbox || !c.simulated)).length,
     brain:
       (owner.data?.questions ?? []).filter((q) => q.status === "open" || q.status === "asked").length +
       (owner.data?.approvals ?? []).filter((a) => a.status === "pending").length,
@@ -107,10 +110,10 @@ export function Layout() {
     <div className="flex h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-sand bg-white">
         <div className="px-5 pb-4 pt-5">
-          <Logo sub={window.location.pathname.startsWith("/app") ? "Your AI employee" : "Operations console"} />
+          <Logo sub={operator ? "Operations console" : "Your AI employee"} />
         </div>
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <div key={section.title}>
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone">{section.title}</div>
               <div className="space-y-0.5">
@@ -151,7 +154,7 @@ export function Layout() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium text-ink">{me?.user}</div>
-              <div className="text-[11px] uppercase tracking-wide text-stone">{me?.env}</div>
+              <div className="text-[11px] uppercase tracking-wide text-stone">{operator ? me?.env : "Owner"}</div>
             </div>
             <button onClick={() => void logout()} className="rounded-md p-1.5 text-stone hover:bg-bone hover:text-ink" title="Sign out">
               <LogOut size={15} />
@@ -162,25 +165,32 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-sand bg-white px-6">
-          <label className="relative flex items-center">
-            <Building2 size={15} className="pointer-events-none absolute left-2.5 text-stone" />
-            <select
-              aria-label="Business"
-              value={business?.id ?? ""}
-              onChange={(e) => setBusinessId(e.target.value)}
-              className="h-8 appearance-none rounded-md bg-white pl-8 pr-8 text-[13px] font-medium text-ink shadow-sm ring-1 ring-inset ring-sand hover:bg-bone focus:outline-none"
-            >
-              {businesses.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                  {b.kill_switch ? " (paused)" : ""}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-stone" />
-          </label>
+          {operator ? (
+            <label className="relative flex items-center">
+              <Building2 size={15} className="pointer-events-none absolute left-2.5 text-stone" />
+              <select
+                aria-label="Business"
+                value={business?.id ?? ""}
+                onChange={(e) => setBusinessId(e.target.value)}
+                className="h-8 appearance-none rounded-md bg-white pl-8 pr-8 text-[13px] font-medium text-ink shadow-sm ring-1 ring-inset ring-sand hover:bg-bone focus:outline-none"
+              >
+                {businesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                    {b.kill_switch ? " (paused)" : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-stone" />
+            </label>
+          ) : (
+            <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+              <Building2 size={15} className="text-stone" /> {business?.name}
+              {business?.sandbox && <span className="rounded-full bg-verdant-l px-2 py-0.5 text-[11.5px] font-semibold text-[#05603a]">Live demo</span>}
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            {scale < 1 && (
+            {operator && scale < 1 && (
               <span
                 className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-blossom px-2.5 py-1 text-[12px] font-medium text-saffron ring-1 ring-inset ring-[#fde3b8]"
                 title="Waits in automations run on demo time"
@@ -188,20 +198,30 @@ export function Layout() {
                 <Clock3 size={13} /> Demo time · 1 day = {Math.round(86400 * scale)} s
               </span>
             )}
-            {[
-              ["Temporal", me?.links.temporal ?? "/temporal"],
-              ["Jaeger", me?.links.jaeger ?? "/jaeger"],
-            ].map(([label, href]) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-dusk hover:bg-bone hover:text-ink"
-              >
-                {label} <ExternalLink size={12} />
-              </a>
-            ))}
+            {operator ? (
+              <>
+                {[
+                  ["Temporal", me?.links.temporal ?? "/temporal"],
+                  ["Jaeger", me?.links.jaeger ?? "/jaeger"],
+                ].map(([label, href]) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12.5px] font-medium text-dusk hover:bg-bone hover:text-ink"
+                  >
+                    {label} <ExternalLink size={12} />
+                  </a>
+                ))}
+              </>
+            ) : (
+              business?.sandbox && (
+                <a href="/demo" className="inline-flex items-center gap-1.5 rounded-lg bg-signal px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-signal-d">
+                  Back to the live demo
+                </a>
+              )
+            )}
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-auto">

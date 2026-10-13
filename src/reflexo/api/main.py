@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from sqlalchemy import text
 
-from reflexo.api.routes import admin, integrations, media, webhooks
+from reflexo.api.routes import admin, demo, integrations, media, webhooks
 from reflexo.bootstrap import bootstrap
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.redis import get_redis
@@ -32,7 +32,9 @@ app.include_router(webhooks.router)
 app.include_router(media.router)
 app.include_router(admin.router)
 app.include_router(integrations.router)
+app.include_router(demo.router)
 app.add_exception_handler(HTTPException, admin.problem_handler)  # type: ignore[arg-type]
+
 
 @app.get("/healthz")
 async def healthz() -> JSONResponse:

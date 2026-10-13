@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import "./index.css";
 import { Layout } from "./components/Layout";
-import { ApiError } from "./lib/api";
+import { ApiError, SURFACE } from "./lib/api";
 import { SessionProvider, useSession } from "./lib/session";
 import { BrainSection, QualitySection } from "./pages/Sections";
 import { Automations } from "./pages/Automations";
@@ -49,7 +49,15 @@ function Moved({ to, extra }: { to: string; extra?: string }) {
 function App() {
   const { me, loading } = useSession();
   if (loading) return null;
-  if (!me) return <Login />;
+  const operator = me?.role !== "owner"; // the engineering pages are the operator's
+  if (!me) {
+    // the owner's app has no operator login: an owner signs in on the site (or opens the live demo)
+    if (SURFACE === "app") {
+      window.location.replace("/demo");
+      return null;
+    }
+    return <Login />;
+  }
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -64,14 +72,18 @@ function App() {
           <Route path="knowledge" element={<Knowledge />} />
           <Route path="history" element={<History />} />
         </Route>
-        <Route path="quality" element={<QualitySection />}>
-          <Route index element={<Navigate to="lab" replace />} />
-          <Route path="lab" element={<Lab />} />
-          <Route path="xray" element={<Xray />} />
-          <Route path="chaos" element={<Chaos />} />
-          <Route path="evals" element={<Evals />} />
-        </Route>
-        <Route path="settings" element={<Settings />} />
+        {operator && (
+          <>
+            <Route path="quality" element={<QualitySection />}>
+              <Route index element={<Navigate to="lab" replace />} />
+              <Route path="lab" element={<Lab />} />
+              <Route path="xray" element={<Xray />} />
+              <Route path="chaos" element={<Chaos />} />
+              <Route path="evals" element={<Evals />} />
+            </Route>
+            <Route path="settings" element={<Settings />} />
+          </>
+        )}
 
         {/* earlier addresses */}
         <Route path="conversations" element={<Moved to="/inbox" />} />
@@ -92,12 +104,22 @@ function App() {
   );
 }
 
+// the live demo carries the voice client (LiveKit): loaded only when a visitor opens it
+const Demo = lazy(() => import("./site/Demo").then((m) => ({ default: m.Demo })));
+
 /** The public site: what a visitor sees before they have an account. */
 function Site() {
   return (
     <Routes>
       <Route index element={<Landing />} />
-      <Route path="demo" element={<SoonPage what="demo" />} />
+      <Route
+        path="demo"
+        element={
+          <Suspense fallback={null}>
+            <Demo />
+          </Suspense>
+        }
+      />
       <Route path="signup" element={<SoonPage what="signup" />} />
       <Route path="login" element={<SoonPage what="login" />} />
       <Route path="*" element={<Navigate to="/" replace />} />
