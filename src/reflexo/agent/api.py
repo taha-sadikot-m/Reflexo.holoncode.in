@@ -17,9 +17,9 @@ from reflexo.agent.model_gateway.langchain import GatewayChatModel, to_gateway_m
 from reflexo.agent.model_gateway.providers import Attempt, FakeProvider, FakeReply, GeminiProvider, ModelProvider
 from reflexo.agent.output_gate import extract_amounts
 from reflexo.agent.proposals import ProposalService
-from reflexo.agent.questions import SLA_QUEUE, QuestionService
+from reflexo.agent.questions import SLA_QUEUE, QuestionService, ask_owner, on_record_since
 from reflexo.agent.runs import record_run
-from reflexo.agent.schemas import AgentOutput
+from reflexo.agent.schemas import AgentOutput, OwnerQuestionDraft
 from reflexo.agent.tools.base import ToolContext, run_tool
 from reflexo.common import ports
 from reflexo.common.config import get_settings
@@ -133,6 +133,13 @@ VOICE_TOOLS = (
     "order_update",
     "order_confirm",
     "order_status",
+    # one employee on every channel: the caller can ask for what a chat customer can (ADR-015), and the agent
+    # can ask the owner — a voice promise is always backed by a record (live 14 Oct: "I'll confirm with the
+    # owner" on a call, with no way to, and nothing reached the owner)
+    "order_cancel",
+    "order_change",
+    "refund_request",
+    "ask_owner",
 )
 __all__ += ["VOICE_TOOLS", "ToolContext", "extract_amounts", "run_tool"]
 
@@ -187,3 +194,10 @@ async def gate_check(
 
 
 __all__ += ["gate_check"]
+
+
+__all__ += [
+    "OwnerQuestionDraft",
+    "ask_owner",
+    "on_record_since",
+]  # any desk asks the owner the same way; what is on record for a chat

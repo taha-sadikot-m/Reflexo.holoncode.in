@@ -8,8 +8,10 @@ and the owner is asked, with buttons, whether it applies to everyone.
 
 from __future__ import annotations
 
+import json
 import re
-from datetime import datetime, time
+import secrets
+from datetime import datetime, time, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -20,13 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent.model_gateway.gateway import ModelGateway
+from reflexo.agent.schemas import OwnerQuestionDraft
+from reflexo.common import ports
 from reflexo.common.contracts import (
     AnswerResult,
     JobEnqueuer,
+    OwnerNotifyPort,
     TurnScheduler,
 )
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass
+from reflexo.common.ids import new_id
 from reflexo.common.llm import CallCtx, ChatMessage, ModelError
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
@@ -52,6 +58,150 @@ STILL_WAITING = {
     "hi": "हमारी टीम जल्दी आपको बताएगी 🙏",
     "en": "Our team will get back to you shortly 🙏",
 }
+
+
+# ---------------------------------------------------------------- asking (POC_04 §7 steps 1-3): one way, every desk
+
+
+async def _short_code(s: AsyncSession, business_id: UUID) -> str:
+    taken = set(
+        (
+            await s.execute(
+                text("SELECT short_code FROM owner_questions WHERE business_id = :b AND status = 'open'"),
+                {"b": business_id},
+            )
+        ).scalars()
+    )
+    for _ in range(50):
+        code = f"{secrets.randbelow(9000) + 1000}"
+        if code not in taken:
+            return code
+    raise RuntimeError("no free owner-question short code")
+
+
+async def create_owner_question(
+    s: AsyncSession,
+    *,
+    business_id: UUID,
+    conversation_id: UUID,
+    customer_id: UUID,
+    turn_id: UUID | None,
+    draft: OwnerQuestionDraft,
+    sla_min: int,
+) -> tuple[UUID, str]:
+    qid, code = new_id(), await _short_code(s, business_id)
+    await s.execute(
+        text("""INSERT INTO owner_questions (id, business_id, conversation_id, customer_id, source_turn_id, question,
+                                             ai_guess, options, short_code, asked_at, sla_due_at)
+                VALUES (:id, :b, :c, :cust, :t, :q, :g, CAST(:o AS jsonb), :code, now(), :due)"""),
+        {
+            "id": qid,
+            "b": business_id,
+            "c": conversation_id,
+            "cust": customer_id,
+            "t": turn_id,
+            "q": draft.question[:1000],
+            "g": draft.ai_guess,
+            "o": json.dumps(draft.options, ensure_ascii=False),
+            "code": code,
+            "due": utcnow() + timedelta(minutes=sla_min),
+        },
+    )
+    return qid, code
+
+
+def contact_line(conv: gateway.ConversationView, customer: gateway.CustomerView | None) -> str:
+    who = (customer.display_name if customer else None) or "Customer"
+    phone = f" ({customer.phone_e164})" if customer and customer.phone_e164 else ""
+    return f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"
+
+
+def question_notice(
+    *,
+    qid: UUID,
+    code: str,
+    question: str,
+    facts: str,
+    conversation_id: UUID,
+    brief: str | None = None,
+    guess: str | None = None,
+    options: list[str] | None = None,
+    head: str | None = None,
+) -> tuple[str, list[tuple[str, str]]]:
+    """The owner's view of a question, as a colleague would ask it: what is needed, the brief, one facts line,
+    how to answer — buttons for the options, "I'll reply" and "Show chat"."""
+    note = f"\n{brief.strip()}" if brief and brief.strip() else ""
+    mine = f"\nMy guess: {guess}" if guess else ""
+    top = head or f"❓ *Question {code}* — {question}{note}{mine}"
+    body = f"{top}\n\n{facts}\n\nReply: `{code} <answer>`"
+    buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate((options or [])[:2])]
+    buttons += [(f"oq:{qid}:later", "I'll reply"), (f"chat:{conversation_id}", "💬 Show chat")]
+    return body, buttons
+
+
+async def ask_owner(
+    business_id: UUID,
+    conversation_id: UUID,
+    draft: OwnerQuestionDraft,
+    *,
+    brief: str | None = None,
+    turn_id: UUID | None = None,
+    facts_extra: str | None = None,
+) -> tuple[UUID, str]:
+    """Ask the owner on behalf of a customer conversation from any desk (chat, voice, the end-of-call check):
+    the question is recorded, the SLA reminder scheduled, and the owner gets it with the photos the customer
+    shared. The answer reaches the customer through the usual relay turn on this conversation."""
+    settings = await knowledge.business_settings(business_id)
+    sla = int(settings.get("owner_question_sla_min") or 15)
+    async with get_db().tenant_session(business_id) as s:
+        conv = await gateway.conversation_view(s, conversation_id)
+        if conv is None or conv.customer is None:
+            raise LookupError("no customer conversation to ask about")
+        qid, code = await create_owner_question(
+            s,
+            business_id=business_id,
+            conversation_id=conversation_id,
+            customer_id=conv.customer.id,
+            turn_id=turn_id,
+            draft=draft,
+            sla_min=sla,
+        )
+        await ports.registry.require(JobEnqueuer).enqueue(  # type: ignore[type-abstract]
+            SLA_QUEUE,
+            {"business_id": str(business_id), "question_id": str(qid)},
+            business_id=business_id,
+            priority=PriorityClass.P2,
+            dedupe_key=f"oqsla:{qid}",
+            delay_s=sla * 60,
+            session=s,
+        )
+        media = await gateway.recent_customer_media(s, conversation_id)
+    notifier = ports.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
+    if notifier is not None:
+        facts = contact_line(conv, conv.customer) + (f"\n{facts_extra}" if facts_extra else "")
+        body, buttons = question_notice(
+            qid=qid,
+            code=code,
+            question=draft.question,
+            facts=facts,
+            conversation_id=conversation_id,
+            brief=brief,
+            guess=draft.ai_guess,
+            options=draft.options,
+        )
+        await notifier.notify(
+            business_id,
+            "question",
+            body,
+            dedupe_key=f"oq:{qid}",
+            about_conversation=conversation_id,
+            priority=PriorityClass.P1,
+            buttons=buttons,
+            ref={"question_id": str(qid)},
+            media=media,
+        )
+    await emit("owner_question", PipelineEventStatus.OK, business_id=business_id, conversation_id=conversation_id)
+    return qid, code
 
 
 class ScopeDecision(BaseModel):
@@ -272,3 +422,42 @@ async def relay_message(s: AsyncSession, conversation_id: UUID, source_turn_id: 
         )
     ).scalar_one_or_none()
     return latest
+
+
+async def on_record_since(business_id: UUID, conversation_id: UUID, since: datetime) -> list[str]:
+    """What the system did for this customer conversation since `since`, as plain facts: orders placed or changed,
+    questions to the owner, decisions requested. The ground truth a call summary and a promise check rest on."""
+    async with get_db().tenant_session(business_id) as s:
+        orders = (
+            await s.execute(
+                text("""SELECT o.order_number, o.status, o.payment_status, o.total_paise, o.delivery_date,
+                               o.delivery_slot
+                        FROM orders o JOIN conversations c ON c.customer_id = o.customer_id
+                        WHERE c.id = :c AND o.updated_at >= :t ORDER BY o.created_at"""),
+                {"c": conversation_id, "t": since},
+            )
+        ).all()
+        asked = (
+            await s.execute(
+                text("""SELECT short_code, question, status FROM owner_questions
+                        WHERE conversation_id = :c AND created_at >= :t ORDER BY created_at"""),
+                {"c": conversation_id, "t": since},
+            )
+        ).all()
+        proposed = (
+            await s.execute(
+                text("""SELECT preview->>'label' AS label, preview->>'summary' AS summary, status
+                        FROM approval_requests WHERE kind = 'tool_call' AND subject->>'conversation_id' = :c
+                          AND created_at >= :t ORDER BY created_at"""),
+                {"c": str(conversation_id), "t": since},
+            )
+        ).all()
+    facts = [
+        f"Order {o.order_number}: {str(o.status).replace('_', ' ')}, payment {o.payment_status}, total "
+        f"₹{o.total_paise / 100:,.0f}"
+        + (f", delivery {o.delivery_date} {o.delivery_slot or ''}".rstrip() if o.delivery_date else "")
+        for o in orders
+    ]
+    facts += [f"Asked the owner (question {q.short_code}, {q.status}): {q.question}" for q in asked]
+    facts += [f"Asked the owner to decide ({p.status}): {p.label} {p.summary}" for p in proposed]
+    return facts

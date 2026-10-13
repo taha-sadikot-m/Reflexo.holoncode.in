@@ -340,9 +340,11 @@ class OwnerNotifyPort(Protocol):
         buttons: list[tuple[str, str]] | None = None,
         ref: dict[str, str] | None = None,
         about_conversation: UUID | None = None,
+        media: list[UUID] | None = None,
     ) -> None:
         """`about_conversation`: the customer conversation this is about. If it is simulated (Lab, chaos), the
-        notification goes only to the simulated owner device — never to the real owner's phone."""
+        notification goes only to the simulated owner device — never to the real owner's phone. `media`: images
+        the owner needs to see with it (what the customer shared), sent before the text."""
         ...
 
 

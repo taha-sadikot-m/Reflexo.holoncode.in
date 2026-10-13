@@ -229,3 +229,21 @@ async def owner_timeline(
         for r in rows
     ]
     return list(reversed(out))
+
+
+async def recent_customer_media(
+    s: AsyncSession, conversation_id: UUID, *, within_min: int = 120, limit: int = 3
+) -> list[UUID]:
+    """Images the customer shared in this conversation lately, newest first — what the owner must see to decide
+    about it (a design for a custom cake, a photo of a damaged order, …)."""
+    rows = (
+        await s.execute(
+            text("""SELECT a->>'media_object_id' AS mid FROM messages m, jsonb_array_elements(m.attachments) a
+                    WHERE m.conversation_id = :c AND m.direction = 'inbound'
+                      AND m.created_at > now() - make_interval(mins => :w)
+                      AND a->>'kind' = 'image' AND a->>'media_object_id' IS NOT NULL
+                    ORDER BY m.created_at DESC LIMIT :n"""),
+            {"c": conversation_id, "w": within_min, "n": limit},
+        )
+    ).all()
+    return [UUID(r.mid) for r in rows]

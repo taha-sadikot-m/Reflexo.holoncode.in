@@ -9,8 +9,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from reflexo.agent import capabilities
-from reflexo.agent.tools.base import ToolContext, tool
+from reflexo.agent import capabilities, questions
+from reflexo.agent.schemas import OwnerQuestionDraft
+from reflexo.agent.tools.base import ToolContext, ToolError, tool
 
 ACTION_DESKS = {"customer", "voice"}
 REASON_DESC = "Why the customer wants this, in their words"
@@ -82,3 +83,41 @@ async def refund_request(ctx: ToolContext, args: RefundRequestArgs, s: AsyncSess
 
 
 ACTION_TOOLS = ["order_cancel", "order_change", "refund_request"]
+
+
+class AskOwnerArgs(BaseModel):
+    question: str = Field(
+        description="What the owner must answer or decide, short and clear — e.g. 'Price for this design as a 1 kg "
+        "chocolate cake (photo in chat), pickup Fri 16 Oct?'",
+        max_length=500,
+    )
+    note_for_owner: str = Field(description=NOTE_DESC, max_length=600)
+    my_guess: str | None = Field(default=None, description="Your best guess of the answer, if you have one")
+
+
+@tool("ask_owner", AskOwnerArgs, desks={"voice"}, side_effect=True)
+async def ask_owner(ctx: ToolContext, args: AskOwnerArgs, s: AsyncSession) -> dict[str, Any]:
+    """Ask the shop owner something only they can answer or decide (a price on request, a custom design, an
+    exception). The owner gets your question with the photos the customer shared; their answer goes to the
+    customer's WhatsApp chat automatically. Only after this succeeds may you tell the caller you've asked."""
+    if ctx.conversation_id is None or ctx.customer_id is None:
+        raise ToolError(
+            "NO_CHAT",
+            "this caller has no WhatsApp chat to send the answer to",
+            guidance="Tell the caller the owner will call them back; don't promise a message.",
+        )
+    _, code = await questions.ask_owner(
+        ctx.business_id,
+        ctx.conversation_id,
+        OwnerQuestionDraft(question=args.question, ai_guess=args.my_guess),
+        brief=args.note_for_owner,
+        facts_extra="📞 asked during a phone call" if ctx.call_session_id else None,
+    )
+    return {
+        "outcome": "asked_owner",
+        "question_code": code,
+        "tell_customer": "You have asked the owner; their answer will come to the customer's WhatsApp chat.",
+    }
+
+
+OWNER_QUESTION_TOOLS = ["ask_owner"]

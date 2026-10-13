@@ -42,6 +42,7 @@ class Notes:
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
         self.buttons: list[list[tuple[str, str]]] = []
+        self.media: list[list[UUID]] = []
 
     async def notify(
         self,
@@ -55,9 +56,11 @@ class Notes:
         buttons: list[tuple[str, str]] | None = None,
         ref: dict[str, str] | None = None,
         about_conversation: UUID | None = None,
+        media: list[UUID] | None = None,
     ) -> None:
         self.sent.append((kind, text_))
         self.buttons.append(buttons or [])
+        self.media.append(media or [])
 
 
 @pytest.fixture(autouse=True)

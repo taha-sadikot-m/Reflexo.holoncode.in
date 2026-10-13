@@ -217,6 +217,7 @@ async def _propose(
     conv = await gateway.conversation_view(s, ctx.conversation_id)
     customer = conv.customer if conv else None
     name = (customer.display_name if customer else None) or "A customer"
+    media = await gateway.recent_customer_media(s, ctx.conversation_id)  # e.g. the photo of a damaged cake
     proposal = await approvals.create(
         s,
         ctx.business_id,
@@ -252,6 +253,7 @@ async def _propose(
             buttons=[(f"apv:{proposal.id}:a", f"✅ Yes, {cap.verb}"[:20]), (f"apv:{proposal.id}:r", "❌ No")],
             ref={"approval_id": str(proposal.id)},
             about_conversation=ctx.conversation_id,
+            media=media,
         )
     return proposal
 

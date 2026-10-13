@@ -48,6 +48,7 @@ from reflexo.gateway.views import (
     mark_needs_attention,
     messages_by_ids,
     owner_timeline,
+    recent_customer_media,
     recent_messages,
     set_customer_language,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "media_signer",
     "messages_by_ids",
     "outbound",
+    "recent_customer_media",
     "recent_messages",
     "register",
     "resolve_customer",

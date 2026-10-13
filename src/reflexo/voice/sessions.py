@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -31,11 +32,13 @@ class CallSession:
     bridge_host: str | None
     end_reason: str | None
     connection_id: UUID | None = None  # from the linked WhatsApp conversation
+    created_at: datetime | None = None
 
 
 _SELECT = """
     SELECT cs.id, cs.business_id, cs.provider_call_id, cs.status, cs.customer_id, cs.member_id, cs.conversation_id,
-           cs.caller_e164, cs.livekit_room, cs.bridge_host, cs.end_reason, c.channel_connection_id AS connection_id
+           cs.caller_e164, cs.livekit_room, cs.bridge_host, cs.end_reason, c.channel_connection_id AS connection_id,
+           cs.created_at
     FROM call_sessions cs LEFT JOIN conversations c ON c.id = cs.conversation_id
 """
 
@@ -54,6 +57,7 @@ def _row(r: Any) -> CallSession:
         bridge_host=r.bridge_host,
         end_reason=r.end_reason,
         connection_id=r.connection_id,
+        created_at=r.created_at,
     )
 
 
@@ -177,3 +181,22 @@ async def transcript(call_session_id: UUID) -> list[dict[str, Any]]:
             await s.execute(text("SELECT transcript FROM call_sessions WHERE id = :id"), {"id": call_session_id})
         ).scalar_one_or_none()
     return list(rows or [])
+
+
+async def claim_summary(call_session_id: UUID) -> bool:
+    """The end-of-call step runs once per call (shutdown callbacks can fire twice): True for the first claimant."""
+    async with get_db().service_session(ServiceReason.VOICE) as s:
+        row = (
+            await s.execute(
+                text("UPDATE call_sessions SET summary = '' WHERE id = :id AND summary IS NULL RETURNING id"),
+                {"id": call_session_id},
+            )
+        ).first()
+    return row is not None
+
+
+async def set_summary(call_session_id: UUID, summary: str) -> None:
+    async with get_db().service_session(ServiceReason.VOICE) as s:
+        await s.execute(
+            text("UPDATE call_sessions SET summary = :s WHERE id = :id"), {"s": summary, "id": call_session_id}
+        )

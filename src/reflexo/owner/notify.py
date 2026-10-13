@@ -7,6 +7,7 @@ Telegram first (no 24 h window), else WhatsApp, through the normal outbound path
 from __future__ import annotations
 
 import json
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -35,9 +36,11 @@ class OwnerNotifier:
         buttons: list[tuple[str, str]] | None = None,
         ref: dict[str, str] | None = None,
         about_conversation: UUID | None = None,
+        media: list[UUID] | None = None,
     ) -> None:
         """`buttons` = [(option_id, title)] (tap = deterministic owner command); `ref` (e.g. question_id) is stored
-        so a swipe-reply to this message can be traced back to what it was about."""
+        so a swipe-reply to this message can be traced back to what it was about. `media`: images shown first —
+        the owner decides about what the customer showed, not about a description of it."""
         async with get_db().tenant_session(business_id) as s:
             nid = (
                 await s.execute(
@@ -51,7 +54,10 @@ class OwnerNotifier:
                         "m": member_id,
                         "k": kind,
                         "p": str(priority),
-                        "payload": json.dumps({"text": text_, **(ref or {})}, ensure_ascii=False),
+                        "payload": json.dumps(
+                            {"text": text_, **(ref or {}), **({"media": [str(m) for m in media]} if media else {})},
+                            ensure_ascii=False,
+                        ),
                         "d": dedupe_key,
                     },
                 )
@@ -99,7 +105,7 @@ class OwnerNotifier:
                 s,
                 business_id=business_id,
                 conversation_id=conv_id,
-                blocks=_blocks(text_, buttons),
+                blocks=[*_images(media), *_blocks(text_, buttons)],
                 origin="system",
                 idempotency_base=f"notify:{nid}",
                 priority=priority,
@@ -123,7 +129,11 @@ class OwnerNotifier:
         return await gateway.get_connection(cid) if cid else None
 
 
-def _blocks(text_: str, buttons: list[tuple[str, str]] | None) -> list[dict[str, object]]:
+def _images(media: list[UUID] | None) -> list[dict[str, Any]]:
+    return [{"type": "image", "media_object_id": str(m)} for m in media or []]
+
+
+def _blocks(text_: str, buttons: list[tuple[str, str]] | None) -> list[dict[str, Any]]:
     if not buttons:
         return [{"type": "text", "text": text_}]
     options = [{"id": oid[:48], "title": title[:80]} for oid, title in buttons[:10]]

@@ -218,6 +218,88 @@ class ReflexoVoiceAgent(Agent):
         return await self._run("order_status", {"order_number": order_number} if order_number else {})
 
     # ---------------------------------------------------------------- the WhatsApp chat during the call
+    # ---------------------------------------------------------------- acting for the caller (ADR-015)
+    @function_tool()
+    async def ask_owner(
+        self,
+        context: RunContext,  # type: ignore[type-arg]
+        question: str,
+        note_for_owner: str,
+        my_guess: str | None = None,
+    ) -> str:
+        """Ask the shop owner something only they can answer or decide: a price on request, a custom design from a
+        photo, an exception. The owner sees your question with the photos the caller sent; their answer goes to the
+        caller's WhatsApp chat. Call it BEFORE telling the caller you'll check with the owner.
+
+        Args:
+            question: what the owner must answer, short and clear (e.g. price of this design, 1 kg, pickup Fri)
+            note_for_owner: 2-3 lines like a colleague: who, what they want, the facts, your suggestion
+            my_guess: your best guess of the answer, if any
+        """
+        return await self._run(
+            "ask_owner", {"question": question, "note_for_owner": note_for_owner, "my_guess": my_guess}
+        )
+
+    @function_tool()
+    async def cancel_order(self, context: RunContext, order_id: str, reason: str, note_for_owner: str) -> str:  # type: ignore[type-arg]
+        """The caller wants to cancel an order. The shop's own rules decide: tell the caller exactly the outcome
+        (done / declined with the rule / asked the owner).
+
+        Args:
+            order_id: the order (from order_status)
+            reason: why, in the caller's words
+            note_for_owner: 2-3 lines for the owner if they must decide
+        """
+        return await self._run(
+            "order_cancel", {"order_id": order_id, "reason": reason, "note_for_owner": note_for_owner}
+        )
+
+    @function_tool()
+    async def change_order(
+        self,
+        context: RunContext,  # type: ignore[type-arg]
+        order_id: str,
+        reason: str,
+        note_for_owner: str,
+        delivery_date: str | None = None,
+        delivery_slot: str | None = None,
+        address: str | None = None,
+        message_on_cake: str | None = None,
+    ) -> str:
+        """The caller wants to change a placed order (date YYYY-MM-DD, time slot, address, message on cake). The
+        shop's rules decide: tell the caller exactly the outcome.
+
+        Args:
+            order_id: the order (from order_status)
+            reason: why, in the caller's words
+            note_for_owner: 2-3 lines for the owner if they must decide
+            delivery_date: new date, YYYY-MM-DD
+            delivery_slot: new slot, e.g. 4pm-8pm
+            address: new address
+            message_on_cake: new message
+        """
+        changes = _details(
+            delivery_date=delivery_date, delivery_slot=delivery_slot, address=address, message_on_cake=message_on_cake
+        )
+        return await self._run(
+            "order_change",
+            {"order_id": order_id, "changes": changes, "reason": reason, "note_for_owner": note_for_owner},
+        )
+
+    @function_tool()
+    async def request_refund(self, context: RunContext, order_id: str, reason: str, note_for_owner: str) -> str:  # type: ignore[type-arg]
+        """The caller wants their money back for a paid order. The shop's rules decide: tell the caller exactly the
+        outcome.
+
+        Args:
+            order_id: the paid order
+            reason: why, in the caller's words
+            note_for_owner: 2-3 lines for the owner if they must decide
+        """
+        return await self._run(
+            "refund_request", {"order_id": order_id, "reason": reason, "note_for_owner": note_for_owner}
+        )
+
     @function_tool()
     async def send_to_chat(
         self,

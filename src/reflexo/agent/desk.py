@@ -6,10 +6,7 @@ message(s), owner question, customer facts and the `agent_runs` row. Notificatio
 
 from __future__ import annotations
 
-import json
-import secrets
 import time
-from datetime import timedelta
 from typing import Any, cast
 from uuid import UUID
 
@@ -27,7 +24,7 @@ from reflexo.agent.context import PreparedContext, holding_text, prepare
 from reflexo.agent.graphs.customer import CustomerState, TurnDeps, build_graph
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.owner_desk import OwnerDesk
-from reflexo.agent.questions import SLA_QUEUE
+from reflexo.agent.questions import SLA_QUEUE, contact_line, create_owner_question, question_notice
 from reflexo.agent.runs import record_run
 from reflexo.agent.schemas import AgentOutput, OwnerQuestionDraft
 from reflexo.agent.tools.base import ToolContext
@@ -36,11 +33,9 @@ from reflexo.common.config import get_settings
 from reflexo.common.contracts import JobEnqueuer, OwnerNotifyPort, TurnHandle, TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass, TurnOutcome
-from reflexo.common.ids import new_id
 from reflexo.common.llm import CallCtx, current_call_ctx
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
-from reflexo.common.timeutil import utcnow
 from reflexo.common.xray import emit
 
 log = get_logger(__name__)
@@ -63,53 +58,6 @@ OUTCOME = {
     "fallback": TurnOutcome.FALLBACK,
     "no_reply": TurnOutcome.NO_REPLY,
 }
-
-
-async def _short_code(s: AsyncSession, business_id: UUID) -> str:
-    taken = set(
-        (
-            await s.execute(
-                text("SELECT short_code FROM owner_questions WHERE business_id = :b AND status = 'open'"),
-                {"b": business_id},
-            )
-        ).scalars()
-    )
-    for _ in range(50):
-        code = f"{secrets.randbelow(9000) + 1000}"
-        if code not in taken:
-            return code
-    raise RuntimeError("no free owner-question short code")
-
-
-async def create_owner_question(
-    s: AsyncSession,
-    *,
-    business_id: UUID,
-    conversation_id: UUID,
-    customer_id: UUID,
-    turn_id: UUID | None,
-    draft: OwnerQuestionDraft,
-    sla_min: int,
-) -> tuple[UUID, str]:
-    qid, code = new_id(), await _short_code(s, business_id)
-    await s.execute(
-        text("""INSERT INTO owner_questions (id, business_id, conversation_id, customer_id, source_turn_id, question,
-                                             ai_guess, options, short_code, asked_at, sla_due_at)
-                VALUES (:id, :b, :c, :cust, :t, :q, :g, CAST(:o AS jsonb), :code, now(), :due)"""),
-        {
-            "id": qid,
-            "b": business_id,
-            "c": conversation_id,
-            "cust": customer_id,
-            "t": turn_id,
-            "q": draft.question[:1000],
-            "g": draft.ai_guess,
-            "o": json.dumps(draft.options, ensure_ascii=False),
-            "code": code,
-            "due": utcnow() + timedelta(minutes=sla_min),
-        },
-    )
-    return qid, code
 
 
 class CustomerDesk:
@@ -364,16 +312,26 @@ class CustomerDesk:
         name = customer.display_name or "A customer"
         note = f"\n{brief.strip()}" if brief and brief.strip() else ""
         show_chat = (f"chat:{conv.id}", "💬 Show chat")
+        async with get_db().tenant_session(business_id) as s:  # the owner sees what the customer showed
+            media = await gateway.recent_customer_media(s, conv.id)
         if question and draft:
             qid, code = question
-            guess = f"\nMy guess: {draft.ai_guess}" if draft.ai_guess else ""
-            if action == "fallback":
-                head = f'❓ *Question {code}* — {name} wrote: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
-            else:
-                head = f"❓ *Question {code}* — {draft.question}{note}{guess}"
-            body = f"{head}\n\n{facts}\n\nReply: `{code} <answer>`"
-            buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate(draft.options[:2])]
-            buttons += [(f"oq:{qid}:later", "I'll reply"), show_chat]
+            head = (
+                f'❓ *Question {code}* — {name} wrote: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
+                if action == "fallback"
+                else None
+            )
+            body, buttons = question_notice(
+                qid=qid,
+                code=code,
+                question=draft.question,
+                facts=facts,
+                conversation_id=conv.id,
+                brief=brief,
+                guess=draft.ai_guess,
+                options=draft.options,
+                head=head,
+            )
             await notifier.notify(
                 business_id,
                 "question",
@@ -383,6 +341,7 @@ class CustomerDesk:
                 priority=PriorityClass.P1,
                 buttons=buttons,
                 ref={"question_id": str(qid)},
+                media=media,
             )
         elif action == "fallback" and prepared and prepared.open_question:
             code = prepared.open_question["code"]
@@ -408,6 +367,7 @@ class CustomerDesk:
                 about_conversation=conv.id,
                 priority=PriorityClass.P1,
                 buttons=[show_chat],
+                media=media,
             )
 
     async def _schedule_sla(self, s: AsyncSession, business_id: UUID, question_id: UUID, sla_min: int) -> None:
@@ -479,9 +439,7 @@ def owner_context(
 ) -> str:
     """One compact facts line for the owner: who, where, the open order. The conversation itself is one tap away
     ([💬 Show chat]), never pasted in (live: owners read the transcript dump as a log, not a message)."""
-    who = customer.display_name or "Customer"
-    phone = f" ({customer.phone_e164})" if customer.phone_e164 else ""
-    line = f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"
+    line = contact_line(conv, customer)
     order = prepared.open_order if prepared else None
     if order:
         items = ", ".join(f"{ln['qty']} × {ln['item']}" for ln in order.get("lines", []))
