@@ -508,7 +508,10 @@ async def revert(business_id: UUID, cs_id: UUID | None = None, *, member_id: UUI
         if cs_id is None:
             cs_id = (
                 await s.execute(
+                    # the latest change that is not itself an undo: /undo twice steps back twice, it never
+                    # redoes (live 13 Oct: an undo was the newest set, and the next /undo brought it back)
                     text("""SELECT id FROM knowledge_change_sets WHERE business_id = :b AND status = 'applied'
+                              AND revert_of IS NULL
                             ORDER BY applied_at DESC, id DESC LIMIT 1 FOR UPDATE"""),
                     {"b": business_id},
                 )

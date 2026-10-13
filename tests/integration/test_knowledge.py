@@ -371,6 +371,21 @@ async def test_soft_delete_and_restore(registry: Registry, db: Database) -> None
     assert (await knowledge.search_catalog(bid, "cookies"))[0].offering_id == oid
 
 
+async def test_undo_twice_steps_back_twice(registry: Registry, db: Database) -> None:
+    bid = await make_shop(db)
+    vid = await variant_id(db, bid, "Fudge Brownies", "Box of 6")
+    oid = await offering_id(db, bid, "Choco-chip Cookies")
+    await knowledge.apply_now(
+        bid, "owner_command", "Brownies ₹450", [("variant", "update", vid, {"price_paise": 45000})]
+    )
+    await knowledge.apply_now(bid, "owner_command", "Remove cookies", [("offering", "delete", oid, None)])
+    assert (await knowledge.revert(bid)).summary == "Undo: Remove cookies"
+    assert (await knowledge.revert(bid)).summary == "Undo: Brownies ₹450"  # not a redo of the first undo
+    async with db.tenant_session(bid) as s:
+        price = (await s.execute(text("SELECT price_paise FROM offering_variants WHERE id = :v"), {"v": vid})).scalar()
+    assert price == 42000 and await knowledge.get_card(bid, oid) is not None
+
+
 async def test_undo_refused_when_changed_afterwards(registry: Registry, db: Database) -> None:
     bid = await make_shop(db)
     vid = await variant_id(db, bid, "Fudge Brownies", "Box of 6")
