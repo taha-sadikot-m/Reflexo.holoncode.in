@@ -2,6 +2,8 @@
 
 **Live:** [reflexo.holoncode.in](https://reflexo.holoncode.in) · **Try it, no sign-up:** [/demo](https://reflexo.holoncode.in/demo) · **Hire one for your own business:** [/signup](https://reflexo.holoncode.in/signup)
 
+**Operations console:** [reflexo.holoncode.in/admin](https://reflexo.holoncode.in/admin) · user `reviewer` · password `Reflexo-Review-2026` (read-only)
+
 Most "AI assistants" stop at an answer. Reflexo is built to **finish the work**: it takes a short request from a
 customer or the owner, works out what that means for *this* business, plans the steps, uses real tools to do them,
 watches what happens, recovers when something fails, asks a human only when it should, **verifies the outcome
@@ -273,6 +275,7 @@ plain language on the phone they already use. Every change is read back before i
 | **Be the owner** | The second phone is the owner's: decide what the employee proposes, teach it a rule, change prices in words |
 | **Open the back office** | Orders, every chat and call, and the Brain: learned rules, procedures, knowledge, history |
 | **Hire one** ([/signup](https://reflexo.holoncode.in/signup)) | Set up a new business by chatting with it |
+| **Look inside** ([/admin](https://reflexo.holoncode.in/admin)) | The engineering console: every message traced stage by stage (X-ray), the inbox, orders, the Brain, chaos tests and eval results. Sign in as `reviewer` / `Reflexo-Review-2026`: read-only, showing the showcase shops |
 
 ---
 
