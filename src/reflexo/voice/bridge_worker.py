@@ -19,7 +19,7 @@ from sqlalchemy import text
 
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import JobQueuePort, JobRow
-from reflexo.common.db import ServiceReason, get_db
+from reflexo.common.db import ServiceReason, get_db, plain_dsn
 from reflexo.common.logging import get_logger
 from reflexo.common.redis import get_redis
 from reflexo.common.timeutil import utcnow
@@ -114,7 +114,7 @@ class BridgeWorker:
                         await pubsub.aclose()  # type: ignore[no-untyped-call]
 
     async def _pg_wake(self) -> None:
-        dsn = get_settings().database_service_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        dsn = plain_dsn(get_settings().database_service_url)
         while not self._stop.is_set():
             try:
                 conn = await asyncpg.connect(dsn)

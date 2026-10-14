@@ -36,7 +36,7 @@ from reflexo.common.contracts import (
     TurnRef,
     TurnRunnerPort,
 )
-from reflexo.common.db import ServiceReason, get_db
+from reflexo.common.db import ServiceReason, get_db, plain_dsn
 from reflexo.common.enums import PipelineEventStatus, TurnOutcome
 from reflexo.common.flags import business_killed
 from reflexo.common.ids import new_id
@@ -68,7 +68,7 @@ class PoolConfig:
 
 
 def _dsn(sqlalchemy_url: str) -> str:
-    return sqlalchemy_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    return plain_dsn(sqlalchemy_url)
 
 
 class Worker:

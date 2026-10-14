@@ -13,6 +13,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 
 from reflexo.common.config import get_settings
+from reflexo.common.db import plain_dsn
 from reflexo.common.logging import get_logger
 
 log = get_logger(__name__)
@@ -21,8 +22,7 @@ _pool: Any = None
 
 
 def _dsn() -> str:
-    url = get_settings().database_service_url
-    return url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    return plain_dsn(get_settings().database_service_url)
 
 
 async def get_checkpointer() -> BaseCheckpointSaver[Any]:

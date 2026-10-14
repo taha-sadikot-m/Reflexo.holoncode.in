@@ -100,3 +100,14 @@ def set_db(db: Database | None) -> None:
     """Override the process-wide database (tests)."""
     global _db
     _db = db
+
+
+def plain_dsn(sqlalchemy_url: str) -> str:
+    """The libpq-style connection string for drivers used directly (asyncpg LISTEN, psycopg for the LangGraph
+    saver): no SQLAlchemy dialect prefix, and SQLAlchemy-asyncpg's `ssl=<mode>` as libpq's `sslmode=<mode>` (a
+    managed Postgres such as Neon requires TLS; psycopg does not know `ssl`)."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(sqlalchemy_url.replace("postgresql+asyncpg://", "postgresql://", 1))
+    query = [("sslmode", v) if k == "ssl" else (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)]
+    return urlunsplit(parts._replace(query=urlencode(query)))

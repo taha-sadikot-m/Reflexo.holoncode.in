@@ -127,3 +127,12 @@ def test_demo_env_refuses_placeholder_secrets() -> None:
         )
     assert ok.env == "demo"
     assert Settings(env="dev").media_url_secret.get_secret_value()  # dev keeps working defaults
+
+
+def test_plain_dsn_for_drivers_used_directly() -> None:
+    from reflexo.common.db import plain_dsn
+
+    local = "postgresql+asyncpg://reflexo_service:pw@localhost:5442/reflexo"
+    assert plain_dsn(local) == "postgresql://reflexo_service:pw@localhost:5442/reflexo"
+    managed = "postgresql+asyncpg://u:p@ep-x.ap-southeast-1.aws.neon.tech/neondb?ssl=require"
+    assert plain_dsn(managed) == "postgresql://u:p@ep-x.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"

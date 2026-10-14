@@ -1,7 +1,9 @@
 # Deploying the POC on one server
 
-One Ubuntu 24.04 host (c6i.2xlarge, 100 GB) runs everything in Docker; only Caddy (80/443) is reachable from
-outside. Voice uses LiveKit Cloud, so no media ports are opened on the server.
+One Ubuntu 24.04 host (m6i.large: 2 vCPU, 8 GB; 30 GB disk) runs the app in Docker; only Caddy (80/443) is
+reachable from outside. The database is managed Postgres (Neon) and Temporal runs on its own server; both are
+addressed from `.env`. Voice uses LiveKit Cloud, so no media ports are opened on the server. Put the server in the
+database's region: the app makes many small queries per reply.
 
 ## First time
 
@@ -11,7 +13,7 @@ outside. Voice uses LiveKit Cloud, so no media ports are opened on the server.
 3. Copy the repo to `/opt/reflexo` (`git archive HEAD` + the `.env` built for this host — never commit it).
    The host name is a real domain, or `<ip-with-dashes>.sslip.io` until one exists; Caddy gets the certificate.
 4. `cd /opt/reflexo && docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build`
-5. Seed the demo businesses once: `docker compose -f deploy/docker-compose.prod.yml --env-file .env exec api python scripts/seed.py reset --full`
+5. Seed the demo businesses once (if the database is new): `docker compose -f deploy/docker-compose.prod.yml --env-file .env exec api python scripts/seed.py reset --full`
 6. Point the provider webhooks at `https://<host>`: Meta WhatsApp (`/webhooks/meta_whatsapp`), Razorpay
    (`/integrations/webhooks/razorpay`), Telegram (`/webhooks/telegram/<connection id>`).
 
@@ -29,4 +31,4 @@ Copy the new code, then the same `up -d --build`. Migrations run when the API st
 | temporal-worker | imports, automations, approvals |
 | voice-agent | LiveKit Agents worker (WhatsApp and browser calls) |
 | voice-bridge | WhatsApp WebRTC calls ↔ LiveKit (host network) |
-| postgres, redis, temporal | state, queues, workflows (127.0.0.1 only) |
+| redis | wake-ups, rate limits, live call signals (127.0.0.1 only) |
