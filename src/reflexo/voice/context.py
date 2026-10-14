@@ -9,6 +9,7 @@ from string import Template
 from typing import Any
 from uuid import UUID
 
+import reflexo.agent.api as agent
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.common.db import get_db
@@ -49,14 +50,20 @@ class SessionNotLive(Exception):
 def _greeting(
     settings: dict[str, Any], persona_greeting: str | None, business_name: str, role: str, customer_name: str | None
 ) -> str:
+    english = agent.reply_language(None, "en") == "en"
     if role in ("owner", "team"):
         name = f" {customer_name}" if customer_name else ""
+        if english:
+            return f"Hello{name}! This is {business_name}'s assistant. What would you like to do?"
         return f"Namaste{name} ji! {business_name} ka assistant bol raha hoon. Bataiye, kya karna hai?"
-    if persona_greeting:
+    # the owner's own greeting, when it is in the language the AI speaks
+    if persona_greeting and (not english or agent.detect_language(persona_greeting, "en") == "en"):
         spoken = "".join(ch for ch in persona_greeting if ch.isalnum() or ch.isspace() or ch in ".,!?'-").strip()
         if spoken and spoken[-1] not in ".!?":
             spoken += "."
-        return f"{spoken} Bataiye, kya chahiye?"
+        return f"{spoken} How can I help you?" if english else f"{spoken} Bataiye, kya chahiye?"
+    if english:
+        return f"Hello, this is {business_name}. How can I help you?"
     return f"Namaste, {business_name} se bol rahi hoon. Bataiye, kya chahiye?"
 
 
@@ -69,21 +76,28 @@ async def start_session(call_session_id: UUID) -> VoiceCtx:
     profile = await knowledge.get_profile(session.business_id)
     block = await knowledge.profile_block(session.business_id)
     customer_name: str | None = None
-    language = str(settings.get("default_language") or "hi-Latn")
+    language = agent.reply_language(None, str(settings.get("default_language") or "hi-Latn"))
     facts = "none"
     if session.conversation_id is not None:
         async with get_db().tenant_session(session.business_id) as s:
             conv = await gateway.conversation_view(s, session.conversation_id)
         if conv and conv.customer:
             customer_name = conv.customer.display_name
-            language = conv.customer.language or language
+            language = agent.reply_language(None, conv.customer.language or language)
             facts = "; ".join(f"{f.get('key')}: {f.get('value')}" for f in conv.customer.facts) or "none"
     role = "owner" if session.member_id is not None else "customer"
     business_name = str(settings.get("name"))
     instructions = _PROMPT.substitute(
         business_name=business_name,
         persona_name=profile.persona.name or business_name,
-        formality="use 'aap' (formal)" if profile.persona.formality == "aap" else profile.persona.formality,
+        formality=(
+            "polite"
+            if language == "en"
+            else "use 'aap' (formal)"
+            if profile.persona.formality == "aap"
+            else profile.persona.formality
+        ),
+        language_rule=agent.language_rule("caller"),
         caller=("the OWNER of the business" if role == "owner" else f"a customer ({customer_name or 'name unknown'})"),
         language=language,
         facts=facts,

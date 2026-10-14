@@ -115,6 +115,7 @@ export function CustomerPhone({ phones, shopName, label, className }: { phones: 
           </button>
         }
         overlay={<CallScreen call={call} shop={shopName} />}
+        expectReply={call.state === "idle"}
         height="h-[620px]"
       />
     </PhoneColumn>

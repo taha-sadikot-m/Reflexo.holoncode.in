@@ -375,7 +375,7 @@ async def test_start_session_context(db: Database, graph: Graph, bridges: dict[s
     ctx = await voice_api.start_session(row.id)
     assert ctx.role == "customer" and ctx.customer_id == row.customer_id
     assert "PHONE CALL" in ctx.instructions and "Business info" in ctx.instructions
-    assert ctx.greeting.startswith("Namaste") and 5000 in ctx.allowed_paise
+    assert ctx.greeting.startswith("Hello") and 5000 in ctx.allowed_paise
     await c.end("wacid.S", "test", terminate=False)
     with pytest.raises(voice_api.SessionNotLive):
         await voice_api.start_session(row.id)

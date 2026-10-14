@@ -24,6 +24,7 @@ with workflow.unsafe.imports_passed_through():
     import reflexo.owner.api as owner
     from reflexo.common.db import get_db
     from reflexo.common.enums import PipelineEventStatus
+    from reflexo.common.language import fixed
     from reflexo.common.llm import CallCtx, ChatMessage
     from reflexo.common.xray import emit
 
@@ -54,7 +55,12 @@ async def after_import(inp: dict[str, Any]) -> dict[str, Any]:
     if gap is None:
         return {"preview": True}
     await owner.onboarding.set_state(business_id, "gap_questions", {"current": gap.key})
-    await _say(business_id, conversation_id, f"onb:{inp['import_run_id']}:gap", f"{gap.ask}\n(ya 'baad mein' likhiye)")
+    await _say(
+        business_id,
+        conversation_id,
+        f"onb:{inp['import_run_id']}:gap",
+        f"{gap.ask}\n" + fixed("(or say 'later')", "(ya 'baad mein' likhiye)"),
+    )
     return {"preview": False}
 
 
@@ -65,8 +71,9 @@ async def preview(inp: dict[str, Any]) -> list[dict[str, str]]:
     cards = await knowledge.search_catalog(business_id, "cake", k=8)
     profile = await knowledge.profile_block(business_id)
     prompt = (
-        f"Write {PREVIEW_QUESTIONS} short, realistic messages customers would send this shop on WhatsApp — a mix of "
-        "Hinglish and English: prices of specific items, eggless/custom options, delivery, payment, timings.\n"
+        f"Write {PREVIEW_QUESTIONS} short, realistic messages customers would send this shop on WhatsApp — "
+        + fixed("in English", "a mix of Hinglish and English")
+        + ": prices of specific items, eggless/custom options, delivery, payment, timings.\n"
         f"Items: {', '.join(c.name for c in cards) or 'see profile'}\nProfile:\n{profile.text[:1500]}"
     )
     gw = agent.gateway()
@@ -80,17 +87,23 @@ async def preview(inp: dict[str, Any]) -> list[dict[str, str]]:
     for q in generated.questions[:PREVIEW_QUESTIONS]:
         pairs.append({"q": q, "a": await agent.preview_answer(business_id, q)})
     await owner.onboarding.set_state(business_id, "preview", {"preview_qas": pairs})
-    body = "Aise jawab dungi 👇\n\n" + "\n\n".join(f"❓ {p['q']}\n💬 {p['a']}" for p in pairs)
-    body += "\n\nKuch galat ho to batayiye — warna 'theek hai' likhiye aur main live ho jaungi."
+    body = fixed("Here's how I'd answer 👇", "Aise jawab dungi 👇") + "\n\n"
+    body += "\n\n".join(f"❓ {p['q']}\n💬 {p['a']}" for p in pairs)
+    body += fixed(
+        "\n\nTell me if anything is wrong — otherwise reply 'ok' and I'll go live.",
+        "\n\nKuch galat ho to batayiye — warna 'theek hai' likhiye aur main live ho jaungi.",
+    )
     await _say(business_id, conversation_id, f"onb:{inp.get('import_run_id') or inp['preview_id']}:preview", body)
     await emit("onboarding", PipelineEventStatus.OK, business_id=business_id, step="preview", questions=len(pairs))
     return pairs
 
 
-PREVIEW_FAILED = (
-    "Preview abhi nahi ban paya 🙏 — 'preview' likhiye to dobara try karti hoon, "
-    "ya 'live karo' to seedha live ho jaungi."
-)
+def preview_failed_text() -> str:
+    return fixed(
+        "I couldn't prepare the preview just now 🙏 — reply 'preview' to try again, or 'go live' to go live now.",
+        "Preview abhi nahi ban paya 🙏 — 'preview' likhiye to dobara try karti hoon, "
+        "ya 'live karo' to seedha live ho jaungi.",
+    )
 
 
 @activity.defn(name="onboarding.preview_failed")
@@ -98,7 +111,7 @@ async def preview_failed(inp: dict[str, Any]) -> None:
     """The preview could not be generated (model down): tell the owner how to continue instead of stalling."""
     business_id = UUID(inp["business_id"])
     key = f"onb:{inp.get('import_run_id') or inp['preview_id']}:preview_failed"
-    await _say(business_id, UUID(inp["reply_conversation_id"]), key, PREVIEW_FAILED)
+    await _say(business_id, UUID(inp["reply_conversation_id"]), key, preview_failed_text())
     await emit("onboarding", PipelineEventStatus.ERROR, business_id=business_id, step="preview")
 
 

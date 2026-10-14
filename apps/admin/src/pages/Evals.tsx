@@ -25,7 +25,7 @@ interface Overview {
 }
 
 const ABOUT: Record<string, string> = {
-  tool_selection: "Customer desk calls the right tools (and not the wrong ones) — 60 % Hinglish",
+  tool_selection: "Customer desk calls the right tools (and not the wrong ones)",
   gate_adversarial: "Forced wrong prices, invented discounts, foreign links/numbers are all blocked",
   grounding: "Business facts are cited and correct",
   language: "Replies in the customer's language and script",

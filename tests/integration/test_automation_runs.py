@@ -166,7 +166,7 @@ async def test_cod_confirmation_consumes_the_customers_haan(registry: Registry, 
     await confirmed_cod_order(registry, shop)
 
     async def asked() -> bool:
-        return any("confirm karne ke liye YES reply karein" in t for t in await customer_texts(db, shop))
+        return any("Please reply YES to confirm order" in t for t in await customer_texts(db, shop))
 
     await eventually(asked)
 
@@ -201,7 +201,7 @@ async def test_cod_confirmation_without_reply_tells_the_owner(registry: Registry
         rows = await q(
             db, "SELECT payload FROM owner_notifications WHERE business_id = :b AND kind = 'automation'", b=shop["bid"]
         )
-        return any("ne 2 ghante mein confirm nahi kiya" in r.payload.get("text", "") for r in rows)
+        return any("was not confirmed within 2 hours" in r.payload.get("text", "") for r in rows)
 
     await eventually(owner_told, within_s=40)
 
@@ -217,7 +217,9 @@ async def test_delivery_reminder_fast_forwards(registry: Registry, db: Database,
     assert delivered
 
     async def reminded() -> bool:
-        return any("Reminder: kal aapka order MB-1001 deliver hoga" in t for t in await customer_texts(db, shop))
+        return any(
+            "Reminder: your order MB-1001 will be delivered tomorrow" in t for t in await customer_texts(db, shop)
+        )
 
     await eventually(reminded)
 

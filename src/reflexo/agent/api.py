@@ -201,3 +201,14 @@ __all__ += [
     "ask_owner",
     "on_record_since",
 ]  # any desk asks the owner the same way; what is on record for a chat
+
+from reflexo.agent.language import default_language, fixed, language_rule, reply_language  # noqa: E402
+from reflexo.agent.language import detect as detect_language  # noqa: E402
+
+__all__ += [
+    "default_language",
+    "detect_language",
+    "fixed",
+    "language_rule",
+    "reply_language",
+]  # the platform's language policy (en | auto)

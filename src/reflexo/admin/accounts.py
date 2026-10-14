@@ -26,6 +26,7 @@ from reflexo.admin.limits import Window
 from reflexo.common.config import get_settings
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.ids import new_id
+from reflexo.common.language import default_language
 from reflexo.common.logging import get_logger
 
 log = get_logger(__name__)
@@ -90,7 +91,7 @@ def _seed(business_name: str, owner_name: str, category: str, area: str, suffix:
     return {
         "slug": _slug(business_name),
         "name": business_name,
-        "default_language": "hi-Latn",
+        "default_language": default_language(),
         "order_number_prefix": _prefix(business_name),
         "order_number_start": 1000,
         "settings": {},
@@ -184,7 +185,7 @@ async def _welcome(business_id: UUID, member_id: UUID) -> None:
         await gateway.ConversationSender().send_blocks(
             business_id,
             conv,
-            [{"type": "text", "text": owner.onboarding.WELCOME}],
+            [{"type": "text", "text": owner.onboarding.welcome()}],
             origin="system",
             idempotency_base=f"welcome:{business_id}",
         )

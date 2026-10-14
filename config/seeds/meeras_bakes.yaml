@@ -2,7 +2,7 @@
 # Identity values that differ per environment come from .env (REFLEXO_SEED_*), referenced by *_setting keys.
 slug: meeras-bakes
 name: "Meera's Bakes"
-default_language: hi-Latn
+default_language: en
 order_number_prefix: MB
 order_number_start: 1000
 
@@ -59,8 +59,8 @@ profile:
     tone: friendly
     formality: aap
     emoji: light
-    greeting: "Namaste! Meera's Bakes mein aapka swagat hai 🎂"
-    languages: ["hi-Latn", "en", "hi"]
+    greeting: "Hello! Welcome to Meera's Bakes 🎂"
+    languages: ["en", "hi-Latn", "hi"]
 
 owner:
   display_name: "Meera"

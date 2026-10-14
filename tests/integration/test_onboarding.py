@@ -173,7 +173,7 @@ async def test_onboarding_from_menu_to_live(
     await wait_for(db, run_id, {"committed"})
 
     async def asked_delivery() -> bool:
-        return "Delivery kahan tak" in (await owner_messages(db, shop))[-1].get("text", "")
+        return "Where do you deliver" in (await owner_messages(db, shop))[-1].get("text", "")
 
     await eventually(asked_delivery)
     session = await owner_api.onboarding.get(shop.bid)
@@ -194,7 +194,7 @@ async def test_onboarding_from_menu_to_live(
 
     async def preview_text() -> str | None:  # with a fast fake model it can land before the desk's own reply
         texts = [m.get("text", "") for m in (await owner_messages(db, shop))[-3:]]
-        return next((t for t in texts if "Aise jawab dungi" in t), None)
+        return next((t for t in texts if "Here's how I'd answer" in t), None)
 
     preview = await eventually(preview_text)
     assert all(question in preview for question in QUESTIONS) and preview.count("💬 Ji haan, zaroor!") == 5

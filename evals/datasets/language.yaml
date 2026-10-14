@@ -1,5 +1,6 @@
-# The reply's language matches the customer's: declared language AND script (Devanagari for hi, Latin for
-# hi-Latn / en). 7 Hinglish, 6 Hindi, 7 English (POC_08 §4.2).
+# Reply language (POC_08 §4.2). Policy "en" (the default): every reply is English — declared, Latin script, no
+# Hinglish words — whatever the customer wrote. Policy "auto": the reply matches the customer's language and script
+# (expected_lang). 7 Hinglish, 6 Hindi, 7 English messages.
 cases:
   - {id: l-hl-rate, message: "bhaiya red velvet ka rate batao", expected_lang: hi-Latn}
   - {id: l-hl-kal, message: "parso ke liye cake mil jayega kya?", expected_lang: hi-Latn}

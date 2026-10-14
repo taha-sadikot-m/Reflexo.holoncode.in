@@ -304,10 +304,10 @@ async def test_i_will_reply_button_and_sla_reminder(registry: Registry, db: Data
     for _ in range(2):  # job retried: one reminder only
         await service.run_sla(shop.bid, question.id)  # type: ignore[attr-defined]
     texts = await outbound_texts(db, handle.ref.conversation_id)
-    assert texts.count("Hamari team jaldi aapko batayegi 🙏") == 1
+    assert texts.count("Our team will get back to you shortly 🙏") == 1
     await owner_says(registry, db, shop, f"{question.short_code.strip()} Nahi")
     await service.run_sla(shop.bid, question.id)  # type: ignore[attr-defined]
-    assert (await outbound_texts(db, handle.ref.conversation_id)).count("Hamari team jaldi aapko batayegi 🙏") == 1
+    assert (await outbound_texts(db, handle.ref.conversation_id)).count("Our team will get back to you shortly 🙏") == 1
 
 
 async def test_undo_pause_resume_help(registry: Registry, db: Database, fake: agent.FakeProvider) -> None:

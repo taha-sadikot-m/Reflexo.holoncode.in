@@ -93,7 +93,7 @@ async def test_ninth_cake_is_denied_with_alternatives_and_release_frees_a_slot(
 
     ninth = await guard(registry).check(bid, order(truffle, day))
     assert not ninth.allowed and ninth.code == "CAPACITY_FULL"
-    assert "ke liye cake orders full ho gaye hain" in (ninth.reason or "")
+    assert "are full" in (ninth.reason or "")
     assert len(ninth.alternatives) >= 2 and day not in ninth.alternatives
 
     await guard(registry).release(bid, UUID(booked[0]["order_id"]), "order_cancelled")

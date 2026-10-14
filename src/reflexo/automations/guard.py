@@ -27,11 +27,20 @@ from reflexo.common.config import get_settings
 from reflexo.common.contracts import GuardResult, OwnerNotifyPort
 from reflexo.common.db import get_db
 from reflexo.common.enums import PipelineEventStatus, PriorityClass
+from reflexo.common.language import fixed
 from reflexo.common.logging import get_logger
 from reflexo.common.xray import emit
 
 log = get_logger(__name__)
-FAIL_CLOSED = "Abhi confirm nahi kar pa rahi, ek minute mein try karti hoon 🙏"
+
+
+def fail_closed() -> str:
+    return fixed(
+        "I can't confirm that right now — I'll try again in a minute 🙏",
+        "Abhi confirm nahi kar pa rahi, ek minute mein try karti hoon 🙏",
+    )
+
+
 ALTERNATIVES = 5
 LOOKAHEAD_DAYS = 30
 
@@ -85,7 +94,7 @@ class AutomationGuard:
         except Exception as exc:  # fail closed: never confirm an order we could not check
             log.exception("guard_failed", business_id=str(business_id), error=type(exc).__name__)
             await self._tell_owner(business_id, order)
-            return GuardResult(False, FAIL_CLOSED, [], code="GUARD_ERROR")
+            return GuardResult(False, fail_closed(), [], code="GUARD_ERROR")
         await emit(
             "guard",
             PipelineEventStatus.OK if result.allowed else PipelineEventStatus.SKIP,

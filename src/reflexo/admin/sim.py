@@ -208,7 +208,7 @@ async def _items(business_id: UUID, conv: UUID, limit: int) -> dict[str, Any]:
             "option": (r.interactive_reply or {}).get("title"),
             "media": [
                 {
-                    "url": signer.url_for(UUID(str(a["media_object_id"]))),
+                    "url": signer.path_for(UUID(str(a["media_object_id"]))),
                     "kind": a.get("kind"),
                     "filename": a.get("filename"),
                 }

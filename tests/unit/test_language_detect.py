@@ -26,3 +26,19 @@ def test_clear_messages(text: str, expected: str) -> None:
 def test_unclear_messages_keep_the_established_language(text: str) -> None:
     assert detect(text, default="hi-Latn") == "hi-Latn"
     assert detect(text, default="en") == "en"
+
+
+def test_english_policy_answers_everyone_in_english(monkeypatch: pytest.MonkeyPatch) -> None:
+    from reflexo.agent.language import language_rule, reply_language
+    from reflexo.common.config import get_settings
+    from reflexo.common.language import default_language, fixed
+
+    monkeypatch.setattr(get_settings(), "language_policy", "en")
+    assert reply_language("Mera order cancel kar do", "hi-Latn") == "en"
+    assert reply_language("मुझे केक चाहिए", "hi") == "en"
+    assert "English" in language_rule("customer") and "English" in language_rule("caller")
+    assert fixed("Hello", "Namaste") == "Hello" and default_language("hi-Latn") == "en"
+
+    monkeypatch.setattr(get_settings(), "language_policy", "auto")  # mirror mode is still there
+    assert reply_language("Mera order cancel kar do", "en") == "hi-Latn"
+    assert fixed("Hello", "Namaste") == "Namaste" and default_language("hi-Latn") == "hi-Latn"

@@ -17,18 +17,36 @@ from sqlalchemy import text
 import reflexo.knowledge.api as knowledge
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
+from reflexo.common.language import fixed
 
 STATES = ("sources_requested", "extracting", "gap_questions", "preview", "live")
-WELCOME = "Namaste! Apna menu ya price list bhejiye — photo, PDF ya Excel — ya type kar dijiye. 📄"
-LIVE = "Ho gaya! 🎉 Ab customers ko main handle karungi. Kuch badalna ho to bas mujhe bata dijiye."
+
+
+def welcome() -> str:
+    return fixed(
+        "Hello! Send me your menu or price list — a photo, PDF or Excel — or just type it here. 📄",
+        "Namaste! Apna menu ya price list bhejiye — photo, PDF ya Excel — ya type kar dijiye. 📄",
+    )
+
+
+def live() -> str:
+    return fixed(
+        "All set! 🎉 I'll take care of your customers from now on. Tell me anytime if something should change.",
+        "Ho gaya! 🎉 Ab customers ko main handle karungi. Kuch badalna ho to bas mujhe bata dijiye.",
+    )
 
 
 @dataclass(frozen=True)
 class Gap:
     key: str
-    ask: str  # to the owner
+    ask_en: str  # to the owner
+    ask_hi: str
     customer_question: str  # how customers ask it (the saved Q&A's question)
     missing: Callable[[UUID], Awaitable[bool]]
+
+    @property
+    def ask(self) -> str:
+        return fixed(self.ask_en, self.ask_hi)
 
 
 async def _no_delivery(business_id: UUID) -> bool:
@@ -57,13 +75,26 @@ async def _no_eggless(business_id: UUID) -> bool:
 GAPS = [
     Gap(
         "delivery",
+        "Where do you deliver, and what do you charge? (Or pickup only?)",
         "Delivery kahan tak karte hain aur charge kitna hai? (ya sirf pickup?)",
         "Do you deliver? What are the delivery charges?",
         _no_delivery,
     ),
-    Gap("payments", "Payment kaise lete hain — UPI, card, cash on delivery?", "How can I pay?", _no_payments),
-    Gap("eggless", "Eggless cakes milte hain? Extra charge?", "Do you have eggless cakes?", _no_eggless),
-    Gap("hours", "Shop ki timing kya hai?", "What are your timings?", _no_hours),
+    Gap(
+        "payments",
+        "How do customers pay — UPI, card, cash on delivery?",
+        "Payment kaise lete hain — UPI, card, cash on delivery?",
+        "How can I pay?",
+        _no_payments,
+    ),
+    Gap(
+        "eggless",
+        "Do you make eggless cakes? Any extra charge?",
+        "Eggless cakes milte hain? Extra charge?",
+        "Do you have eggless cakes?",
+        _no_eggless,
+    ),
+    Gap("hours", "What are your shop timings?", "Shop ki timing kya hai?", "What are your timings?", _no_hours),
 ]
 
 

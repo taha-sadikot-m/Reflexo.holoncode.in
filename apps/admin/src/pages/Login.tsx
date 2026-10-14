@@ -59,7 +59,7 @@ export function Login() {
             )}
           </Button>
         </form>
-        <p className="mt-6 text-center text-xs text-stone">Bol do. Baaki hum.</p>
+        <p className="mt-6 text-center text-xs text-stone">Tell it once. It handles the rest.</p>
       </div>
     </div>
   );

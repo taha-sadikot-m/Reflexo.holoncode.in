@@ -38,6 +38,7 @@ import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.admin import seeding
 from reflexo.common import ports
+from reflexo.common.config import get_settings
 from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.ids import new_id
@@ -399,9 +400,14 @@ async def suite_language(shop: EvalShop, cases: list[dict[str, Any]], run: str) 
         obs = await conversation(shop, f"eval-{run}-{c['id']}", [c["message"]])
         if obs.error:
             return CaseResult(c["id"], False, obs.error, obs.seconds or 0, _obs(obs))
-        want = c["expected_lang"]
-        ok = obs.language == want and script_matches(obs.reply, want)
-        why = f"declared {obs.language}, script {'ok' if script_matches(obs.reply, want) else 'wrong'}"
+        # English-only platform: every reply is English whatever the customer wrote; "auto": mirror the customer
+        policy = get_settings().language_policy
+        want = c["expected_lang"] if policy == "auto" else policy
+        words_ok = want != "en" or agent.detect_language(obs.reply, "en") == "en"  # no Hinglish in an English reply
+        ok = obs.language == want and script_matches(obs.reply, want) and words_ok
+        why = f"want {want}: declared {obs.language}, script {'ok' if script_matches(obs.reply, want) else 'wrong'}" + (
+            "" if words_ok else ", Hinglish words"
+        )
         return CaseResult(c["id"], ok, why, obs.seconds or 0, _obs(obs))
 
     return await _bounded(cases, one, PIPELINE_CONCURRENCY)

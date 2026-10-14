@@ -27,6 +27,7 @@ from reflexo.common.config import Settings, get_settings
 from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import Database, ServiceReason
 from reflexo.common.ids import new_id
+from reflexo.common.language import default_language
 from reflexo.common.logging import get_logger
 
 log = get_logger(__name__)
@@ -144,7 +145,7 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
         id=bid,
         name=seed["name"],
         slug=seed["slug"],
-        lang=seed.get("default_language", "hi-Latn"),
+        lang=default_language(seed.get("default_language")),
         status=status,
         settings=_j(seed.get("settings", {}) | {"order_number_prefix": seed["order_number_prefix"]}),
     )

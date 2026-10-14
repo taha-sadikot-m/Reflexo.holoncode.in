@@ -53,9 +53,13 @@ class MediaSigner:
         return hmac.new(secret, f"{media_id}:{exp}".encode(), hashlib.sha256).hexdigest()
 
     def url_for(self, media_object_id: UUID) -> str:
-        s = get_settings()
-        exp = int(time.time()) + s.media_url_ttl_s
-        return f"{s.public_base_url}/media/{media_object_id}?exp={exp}&sig={self._sig(media_object_id, exp)}"
+        """Absolute signed URL, for providers (WhatsApp fetches it from outside)."""
+        return f"{get_settings().public_base_url}{self.path_for(media_object_id)}"
+
+    def path_for(self, media_object_id: UUID) -> str:
+        """Same-origin signed path, for our own web app (works whatever the public host is)."""
+        exp = int(time.time()) + get_settings().media_url_ttl_s
+        return f"/media/{media_object_id}?exp={exp}&sig={self._sig(media_object_id, exp)}"
 
     def valid(self, media_id: UUID, exp: int, sig: str) -> bool:
         return exp >= int(time.time()) and hmac.compare_digest(sig, self._sig(media_id, exp))

@@ -24,7 +24,7 @@ import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner
 from reflexo.agent.capabilities import CAPABILITIES, describe_order
-from reflexo.agent.language import detect as detect_language
+from reflexo.agent.language import reply_language
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
 from reflexo.common.contracts import QuestionAnswerPort, WorkflowPort
@@ -560,7 +560,7 @@ async def start_automation_builder(ctx: ToolContext, args: AutomationBuilderArgs
         member_id=ctx.member_id,
         description=args.description,
         reply_conversation_id=ctx.conversation_id,
-        language=detect_language(args.description, default="hi-Latn"),
+        language=reply_language(args.description, default="hi-Latn"),
     )
     return {
         "started": True,
@@ -604,7 +604,7 @@ async def onboarding_finish(ctx: ToolContext, args: NoArgs, s: AsyncSession) -> 
     if not session or session["state"] != "preview":
         raise ToolError("NOT_APPLICABLE", "not at the preview step", guidance="Continue the current onboarding step.")
     await owner.onboarding.go_live(ctx.business_id)
-    return {"live": True, "say": owner.onboarding.LIVE}
+    return {"live": True, "say": owner.onboarding.live()}
 
 
 # ---------------------------------------------------------------- terminal

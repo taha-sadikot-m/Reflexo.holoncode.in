@@ -1,7 +1,7 @@
 // Calling the business from the browser: the same voice agent that answers WhatsApp calls, joined by microphone
 // over LiveKit. The server creates the call (session, room, agent dispatch) and hands us a one-room token.
 import { Room, RoomEvent, Track, type RemoteTrack } from "livekit-client";
-import { Mic, MicOff, PhoneOff, Store } from "lucide-react";
+import { MessageCircle, Mic, MicOff, PhoneOff, Store } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError } from "../lib/api";
@@ -121,10 +121,48 @@ function Elapsed({ since }: { since: number | null }) {
   return <span className="tabular">{`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`}</span>;
 }
 
-/** The in-call screen, laid over the customer's phone. */
+/** The in-call screen, laid over the customer's phone. Like WhatsApp, it can shrink to a bar so the chat stays
+ * usable during the call — to send a photo or type an address the agent then talks about. */
 export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>; shop: string }) {
-  if (call.state === "idle") return null;
+  const [minimized, setMinimized] = useState(false);
   const done = call.state === "ended" || call.state === "failed";
+  const { reset } = call;
+  useEffect(() => {
+    if (call.state === "idle") setMinimized(false);
+    // a call that ends while the chat is open: back to the chat (the recap arrives there)
+    else if (minimized && done && !call.error) reset();
+  }, [call.state, call.error, minimized, done, reset]);
+  if (call.state === "idle") return null;
+  const last = call.captions.at(-1);
+  if (minimized && !done)
+    return (
+      <div className="absolute inset-x-0 top-0 z-10 flex h-[56px] items-center gap-2 bg-[#1daa61] px-3 text-white shadow-md">
+        <button onClick={() => setMinimized(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" title="Back to the call">
+          <span className="relative flex h-2.5 w-2.5 shrink-0">
+            <span className={cx("absolute inline-flex h-full w-full rounded-full bg-white opacity-75", call.speaking && "animate-ping")} />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[13px] font-semibold">
+              On call · {call.state === "live" ? <Elapsed since={call.startedAt} /> : "connecting…"} · tap to return
+            </span>
+            <span className="block truncate text-[11.5px] text-white/85">
+              {last ? `${last.who === "you" ? "You: " : ""}${last.text}` : "Send a photo or type here — the call hears about it"}
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={call.toggleMute}
+          className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", call.muted ? "bg-white text-[#1daa61]" : "bg-white/20")}
+          title={call.muted ? "Unmute" : "Mute"}
+        >
+          {call.muted ? <MicOff size={16} /> : <Mic size={16} />}
+        </button>
+        <button onClick={call.hangUp} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ea4335]" title="Hang up">
+          <PhoneOff size={16} />
+        </button>
+      </div>
+    );
   const status =
     call.state === "starting"
       ? "Calling…"
@@ -164,32 +202,71 @@ export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>
             </div>
           ))
         ) : call.state === "live" ? (
-          <div className="text-white/60">Speak in Hindi, English or Hinglish — ask for a cake, a price, a delivery slot…</div>
+          <div className="text-white/60">Speak naturally — ask for a cake, a price, a delivery slot…</div>
         ) : (
           <div className="text-white/60">Connecting the AI employee…</div>
         )}
       </div>
-      <div className="mt-auto flex items-center gap-6">
+      <div className="mt-auto flex items-end gap-7">
         {done ? (
           <button onClick={call.reset} className="rounded-full bg-white/15 px-6 py-3 text-[14px] font-semibold ring-1 ring-white/20 hover:bg-white/20">
             Back to chat
           </button>
         ) : (
           <>
-            <button
+            <CallButton label="Chat" onClick={() => setMinimized(true)} title="Open the chat during the call — send a photo or type">
+              <MessageCircle size={22} />
+            </CallButton>
+            <CallButton
+              label={call.muted ? "Unmute" : "Mute"}
               onClick={call.toggleMute}
               disabled={call.state !== "live" && call.state !== "ringing"}
-              className={cx("flex h-14 w-14 items-center justify-center rounded-full transition disabled:opacity-40", call.muted ? "bg-white text-[#0b1418]" : "bg-white/15")}
-              title={call.muted ? "Unmute" : "Mute"}
+              active={call.muted}
             >
               {call.muted ? <MicOff size={22} /> : <Mic size={22} />}
-            </button>
-            <button onClick={call.hangUp} className="flex h-16 w-16 items-center justify-center rounded-full bg-[#ea4335] shadow-lg transition hover:bg-[#d33426]" title="Hang up">
-              <PhoneOff size={26} />
-            </button>
+            </CallButton>
+            <CallButton label="End" onClick={call.hangUp} danger>
+              <PhoneOff size={24} />
+            </CallButton>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function CallButton({
+  label,
+  onClick,
+  disabled,
+  active,
+  danger,
+  title,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  danger?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        title={title ?? label}
+        className={cx(
+          "flex items-center justify-center rounded-full transition disabled:opacity-40",
+          danger ? "h-16 w-16 bg-[#ea4335] shadow-lg hover:bg-[#d33426]" : "h-14 w-14",
+          !danger && (active ? "bg-white text-[#0b1418]" : "bg-white/15 hover:bg-white/20"),
+        )}
+      >
+        {children}
+      </button>
+      <span className="text-[11px] text-white/70">{label}</span>
     </div>
   );
 }

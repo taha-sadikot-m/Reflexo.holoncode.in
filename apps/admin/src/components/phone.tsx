@@ -49,6 +49,20 @@ export function payloadOptions(p: Record<string, any>): Option[] {
   return (action.sections ?? []).flatMap((s: any) => (s.rows ?? []).map((r: any) => ({ id: r.id, title: r.title })));
 }
 
+/** Our own media (/media/<id>?exp&sig) is served by this origin: load it here, whatever public host signed it. */
+export function ownMedia(url: string | undefined): string | undefined {
+  if (!url) return url;
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.pathname.startsWith("/media/") ? u.pathname + u.search : url;
+  } catch {
+    return url;
+  }
+}
+
+// the gateway's text for a message that is only a file ("[image]"): the file itself is shown instead
+const FILE_PLACEHOLDER = /^\[(image|photo|document|file|video|audio|sticker)\]$/i;
+
 function linkOf(p: Record<string, any>): string | null {
   const url = p.interactive?.action?.parameters?.url;
   return typeof url === "string" ? url : null;
@@ -61,7 +75,7 @@ export function Bubble({ item, onTap, disabled, tapped }: { item: SimThreadItem;
         <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-[#d9fdd3] px-3 py-1.5 text-[13px] text-[#111b21] shadow-sm">
           {(item.media ?? []).map((m) =>
             m.kind === "image" ? (
-              <img key={m.url} src={m.url} alt="" className="-mx-1.5 mb-1 mt-0.5 max-h-52 w-[calc(100%+12px)] rounded-xl object-cover" />
+              <img key={m.url} src={ownMedia(m.url)} alt="Photo" className="-mx-1.5 mb-1 mt-0.5 max-h-52 w-[calc(100%+12px)] rounded-xl object-cover" />
             ) : (
               <div key={m.url} className="mb-1 flex items-center gap-2 rounded-lg bg-black/5 px-2 py-1.5">
                 <FileText size={16} className="text-[#54656f]" /> {m.filename ?? "file"}
@@ -72,7 +86,7 @@ export function Bubble({ item, onTap, disabled, tapped }: { item: SimThreadItem;
             <span className="inline-flex items-center gap-1 italic">
               <CornerDownLeft size={12} /> {item.option}
             </span>
-          ) : (
+          ) : item.media?.length && FILE_PLACEHOLDER.test((item.text ?? "").trim()) ? null : (
             <span className="whitespace-pre-wrap break-words">{item.text}</span>
           )}
           <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-[#667781]">
@@ -84,7 +98,7 @@ export function Bubble({ item, onTap, disabled, tapped }: { item: SimThreadItem;
   }
   const p = item.payload ?? {};
   const options = payloadOptions(p);
-  const image = p.type === "image" ? (p.image?.link as string | undefined) : undefined;
+  const image = p.type === "image" ? ownMedia(p.image?.link as string | undefined) : undefined;
   const text = payloadText(p);
   const link = linkOf(p);
   return (
@@ -159,6 +173,7 @@ export function Device({
   draft: controlledDraft,
   onDraft,
   onAttach,
+  expectReply = true,
   className,
   height = "h-[640px]",
 }: {
@@ -179,6 +194,8 @@ export function Device({
   onDraft?: (v: string) => void;
   /** a photo/PDF picked on this phone, with the typed text as its caption */
   onAttach?: (file: File, caption: string) => Promise<void>;
+  /** false while the customer is on a call: what they send goes to the call, not to a chat reply */
+  expectReply?: boolean;
   className?: string;
   height?: string;
 }) {
@@ -189,7 +206,7 @@ export function Device({
   const picker = useRef<HTMLInputElement>(null);
   const [attaching, setAttaching] = useState(false);
   const count = thread?.items.length ?? 0;
-  const typing = awaitingReply(thread);
+  const typing = expectReply && awaitingReply(thread);
   useEffect(() => {
     // scroll the chat only (scrollIntoView also scrolls the page), and return nothing (a returned value is a cleanup)
     const el = scroller.current;

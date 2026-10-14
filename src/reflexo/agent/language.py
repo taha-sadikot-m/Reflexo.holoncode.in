@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import re
 
+from reflexo.common.language import default_language as default_language
+from reflexo.common.language import fixed as fixed
+
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 # Hindi words in Roman script that are not also English words ("do", "to", "me", "us", "main" are left out)
 _HINDI = frozenset(
@@ -39,6 +42,38 @@ _ENGLISH = frozenset(
     """.split()
 )
 _MARGIN = 1  # one function word more on one side is enough to call it
+
+
+def reply_language(text: str | None, default: str = "hi-Latn") -> str:
+    """The language to answer `text` in: the platform's fixed language, or (policy "auto") the one detected."""
+    from reflexo.common.config import get_settings
+
+    policy = get_settings().language_policy
+    return policy if policy != "auto" else detect(text, default)
+
+
+_RULE_MIRROR = {
+    "customer": "Reply in the language AND script of the customer's LATEST message (see \"language of the latest "
+    'message"), not of earlier messages, your own earlier replies or the examples below: English → English only (no '
+    "Hindi words); Hindi in Devanagari → Devanagari; Hinglish (Hindi in Roman letters) → Hinglish. Set `language` to "
+    "what you actually wrote (en / hi / hi-Latn).",
+    "owner": "Reply in the owner's language and script (English, Hindi, or Hinglish in Roman letters), matching "
+    "their latest message.",
+    "caller": "Mirror the caller's language: Hinglish → Hinglish (Roman Hindi), Hindi → Hindi, English → English.",
+}
+_RULE_ENGLISH = {
+    "customer": "Always reply in clear, simple English — even when the customer writes in Hindi or Hinglish (you "
+    "understand them; you answer in English). No Hindi words. Set `language` to en.",
+    "owner": "Always reply in clear, simple English — even when the owner writes in Hindi or Hinglish. No Hindi words.",
+    "caller": "Always speak English — simple and clear — even if the caller speaks Hindi or Hinglish. No Hindi words.",
+}
+
+
+def language_rule(audience: str) -> str:
+    """The prompt's LANGUAGE rule for `audience` (customer | owner | caller) under the platform's policy."""
+    from reflexo.common.config import get_settings
+
+    return (_RULE_MIRROR if get_settings().language_policy == "auto" else _RULE_ENGLISH)[audience]
 
 
 def detect(text: str | None, default: str = "hi-Latn") -> str:

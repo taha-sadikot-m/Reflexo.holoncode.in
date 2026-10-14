@@ -158,7 +158,9 @@ async def build_context(
         channel=conv.channel.replace("_", " "),
         persona_name=p.name or str(settings.get("name")),
         persona_tone=p.tone,
-        persona_formality="use 'aap' (formal)" if p.formality == "aap" else f"formality {p.formality}",
+        persona_formality=(
+            lang.fixed("polite", "use 'aap' (formal)") if p.formality == "aap" else f"formality {p.formality}"
+        ),
         persona_emoji=p.emoji,
         job_description=conv.job_description or "Help customers with products, prices, delivery and orders.",
     )
@@ -178,7 +180,7 @@ async def build_context(
     customer = conv.customer
     facts = "; ".join(f"{f.get('key')}: {f.get('value')}" for f in (customer.facts if customer else [])) or "none"
     default_language = customer.language if customer and customer.language else settings.get("default_language")
-    language_guess = lang.detect(inbound_text, default=str(default_language or "hi-Latn"))
+    language_guess = lang.reply_language(inbound_text, default=str(default_language or "hi-Latn"))
     now_local = to_business_tz(utcnow(), tz)
     order_view = {**order.tool_view(), "status_meaning": STATUS_MEANING.get(order.status)} if order else None
     open_order_block = (
@@ -340,12 +342,7 @@ async def _empty() -> list[Any]:
 
 def holding_text(settings: dict[str, Any], language: str) -> str:
     messages = settings.get("holding_messages") or {}
-    return str(
-        messages.get(language)
-        or messages.get("hi-Latn")
-        or messages.get("en")
-        or "Ek minute, main check karke batati hoon 🙏"
-    )
+    return str(messages.get(language) or messages.get("en") or "One minute, let me check and get back to you 🙏")
 
 
 def customer_id_of(ctx: PreparedContext) -> UUID | None:

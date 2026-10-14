@@ -361,7 +361,9 @@ async def test_twice_wrong_falls_back_to_owner(
     handle = await turn_for(registry, db, pnid, "919811100004", "truffle 1kg price?")
     await desk(registry).run_turn(handle)
     assert await turn_status(db, handle.ref.turn_id) == ("completed", "fallback")
-    assert await outbound_texts(db, handle.ref.conversation_id) == [SEED["settings"]["holding_messages"]["hi-Latn"]]
+    assert await outbound_texts(db, handle.ref.conversation_id) == [
+        SEED["settings"]["holding_messages"]["en"]
+    ]  # English-only platform
     async with db.tenant_session(bid) as s:
         q = (
             await s.execute(
@@ -410,7 +412,8 @@ async def test_refund_is_handed_off(registry: Registry, db: Database, fake: agen
     await desk(registry).run_turn(handle)
     assert await turn_status(db, handle.ref.turn_id) == ("completed", "handoff")
     texts = await outbound_texts(db, handle.ref.conversation_id)
-    assert texts == ["Main abhi team ko bata rahi hoon 🙏 Woh aapse jaldi baat karenge."]  # no refund promise
+    # no refund promise; our own words follow the platform language (English), not what the model declared
+    assert texts == ["I'm letting the team know right away 🙏 They'll get back to you shortly."]
     async with db.service_session(ServiceReason.ADMIN) as s:
         flagged = (
             await s.execute(
@@ -560,7 +563,14 @@ async def test_crash_resumes_from_checkpoint(registry: Registry, db: Database, f
     assert breakdown["resumed"] is True
 
 
-async def test_holding_reply_and_fallback_entrypoints(registry: Registry, db: Database) -> None:
+@pytest.mark.parametrize(("policy", "expected"), [("en", "en"), ("auto", "hi")])
+async def test_holding_reply_and_fallback_entrypoints(
+    registry: Registry, db: Database, monkeypatch: pytest.MonkeyPatch, policy: str, expected: str
+) -> None:
+    """A Hindi message: English-only platform answers in English; policy "auto" in Devanagari."""
+    from reflexo.common.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "language_policy", policy)
     bid, pnid = await make_bakery(db)
     handle = await turn_for(registry, db, pnid, "919811100013", "मुझे एक केक चाहिए")
     runner = desk(registry)
@@ -568,8 +578,8 @@ async def test_holding_reply_and_fallback_entrypoints(registry: Registry, db: Da
     await runner.send_holding_reply(bid, handle.ref.conversation_id, handle.ref.turn_id)  # idempotent
     await runner.run_fallback(handle.ref, "test")
     texts = await outbound_texts(db, handle.ref.conversation_id)
-    hindi = SEED["settings"]["holding_messages"]["hi"]
-    assert texts == [hindi, hindi]  # one holding reply + one fallback reply, in Devanagari
+    holding = SEED["settings"]["holding_messages"][expected]
+    assert texts == [holding, holding]  # one holding reply + one fallback reply, in the policy's language
 
 
 async def test_side_effect_tool_runs_once(registry: Registry, db: Database) -> None:

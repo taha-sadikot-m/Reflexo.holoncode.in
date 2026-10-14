@@ -8,7 +8,7 @@ import {
   CheckCheck,
   CreditCard,
   FileImage,
-  Languages,
+  LayoutDashboard,
   MessageCircle,
   MessageSquare,
   Mic,
@@ -67,7 +67,7 @@ function Nav() {
   );
 }
 
-/** The hero's phone: a real-looking Hinglish order, as the customer sees it on WhatsApp. */
+/** The hero's phone: a real-looking order, as the customer sees it on WhatsApp. */
 function HeroPhone() {
   const bubble = "max-w-[82%] rounded-2xl px-3 py-2 text-[12.5px] leading-snug shadow-sm";
   return (
@@ -85,19 +85,19 @@ function HeroPhone() {
           </div>
           <div className="space-y-2 px-3 py-3">
             <div className="flex justify-end">
-              <div className={cx(bubble, "rounded-br-md bg-[#d9fdd3] text-[#111]")}>1 kg chocolate truffle chahiye kal shaam, Kothrud 🎂</div>
+              <div className={cx(bubble, "rounded-br-md bg-[#d9fdd3] text-[#111]")}>Need a 1 kg chocolate truffle tomorrow evening, Kothrud 🎂</div>
             </div>
             <div className="flex justify-start">
               <div className={cx(bubble, "rounded-bl-md bg-white text-[#111]")}>
-                Ji zaroor! <b>Chocolate Truffle 1 kg</b> — ₹1,050 + ₹50 delivery. Kal 4–8 pm, Kothrud. Confirm karoon?
+                Sure! <b>Chocolate Truffle 1 kg</b> — ₹1,050 + ₹50 delivery. Tomorrow 4–8 pm, Kothrud. Shall I confirm?
                 <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-black/5 pt-1.5 text-center text-[12px] font-semibold text-[#027eb5]">
-                  <span>Haan, confirm</span>
+                  <span>Yes, confirm</span>
                   <span>Change</span>
                 </div>
               </div>
             </div>
             <div className="flex justify-end">
-              <div className={cx(bubble, "rounded-br-md bg-[#d9fdd3] text-[#111]")}>Haan, confirm. UPI se pay karunga</div>
+              <div className={cx(bubble, "rounded-br-md bg-[#d9fdd3] text-[#111]")}>Yes, confirm. I'll pay by UPI</div>
             </div>
             <div className="flex justify-start">
               <div className={cx(bubble, "rounded-bl-md bg-white text-[#111]")}>
@@ -121,7 +121,7 @@ function HeroPhone() {
           </span>
           <div className="leading-tight">
             <div className="text-[12.5px] font-semibold text-ink">Call answered</div>
-            <div className="text-[11px] text-stone">in Hindi · photo matched to a cake</div>
+            <div className="text-[11px] text-stone">photo matched to a cake mid-call</div>
           </div>
         </div>
       </div>
@@ -153,10 +153,10 @@ function Hero() {
             <br />
             AI employee.
             <br />
-            <span className="text-gradient">Bol do. Baaki hum.</span>
+            <span className="text-gradient">Tell it once. It handles the rest.</span>
           </h1>
           <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-white/75">
-            It answers every customer on WhatsApp, Instagram and phone calls — in Hinglish, Hindi or English — takes orders and payments, follows your
+            It answers every customer on WhatsApp, Instagram and phone calls, takes orders and payments, follows your
             rules, and when it isn't sure, it asks you and learns.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -267,11 +267,11 @@ function HowItWorks() {
 
 const FEATURES: { icon: LucideIcon; title: string; text: string; tone: string }[] = [
   { icon: MessageCircle, title: "Sells in chat", text: "Shows products, answers questions, takes the order with every detail, sends a Razorpay link and confirms when paid.", tone: "bg-[#e7f8ee] text-[#128c4a]" },
-  { icon: Mic, title: "Answers phone calls", text: "Picks up WhatsApp calls with a natural voice in Hindi or English. Send a photo mid-call and it finds the matching cake.", tone: "bg-signal-l text-signal" },
+  { icon: Mic, title: "Answers phone calls", text: "Picks up WhatsApp calls with a natural voice. Send a photo mid-call and it finds the matching cake.", tone: "bg-signal-l text-signal" },
   { icon: Brain, title: "Learns from you", text: "Unsure? It asks you with Yes / No buttons, does exactly what you decide, then offers to remember it as a rule.", tone: "bg-blossom text-marigold-d" },
   { icon: Workflow, title: "Follows your procedures", text: "“Remind customers a day before delivery.” Describe it once in words — it becomes a reliable automation.", tone: "bg-sky-l text-sky" },
   { icon: ShieldCheck, title: "Never makes things up", text: "Every price, policy and promise is checked against your own data before it is sent. No invented discounts. Ever.", tone: "bg-verdant-l text-verdant" },
-  { icon: Languages, title: "Speaks like your customers", text: "Hinglish, Hindi and English — it replies in the language and script the customer used, with your shop's tone.", tone: "bg-[#fdeaf3] text-[#c2185b]" },
+  { icon: LayoutDashboard, title: "Your back office, live", text: "Orders, payments, every chat and call, and everything it learned — in one dashboard, updated as it happens.", tone: "bg-[#fdeaf3] text-[#c2185b]" },
 ];
 
 function Features() {
@@ -297,7 +297,7 @@ function Features() {
 
 function Learning() {
   const steps = [
-    { who: "Customer", text: "“Mera order cancel kar do, plans change ho gaye.”", tone: "bg-white text-ink" },
+    { who: "Customer", text: "“Please cancel my order, my plans changed.”", tone: "bg-white text-ink" },
     { who: "AI → Owner", text: "Taha wants to cancel MB-1042 (₹1,100, paid, delivery Thursday). I suggest cancelling.", tone: "bg-signal-l text-ink", buttons: ["Yes, cancel", "No"] },
     { who: "Owner taps “Always”", text: "“Cancel myself when delivery is more than 24 h away and it's confirmed.”", tone: "bg-blossom text-ink", buttons: ["Always", "Only for Taha", "Just this once"] },
     { who: "Next customer", text: "Cancelled straight away. The owner gets a short note citing their own rule.", tone: "bg-verdant-l text-ink" },
@@ -346,7 +346,7 @@ function Proof() {
   const stats = [
     { value: "164", label: "test conversations on every build" },
     { value: "100%", label: "of invented prices and discounts blocked" },
-    { value: "40/40", label: "right tool for the job — 60% in Hinglish" },
+    { value: "40/40", label: "right tool for the job, every time" },
     { value: "< 10 s", label: "typical reply, 95% of the time" },
   ];
   return (
@@ -357,7 +357,7 @@ function Proof() {
             <div className="text-[13px] font-semibold uppercase tracking-wider text-signal">Measured, not claimed</div>
             <h2 className="mt-2 font-display text-[32px] font-bold leading-tight tracking-tight text-ink">Trust you can check.</h2>
             <p className="mt-4 text-[15.5px] leading-relaxed text-dusk">
-              Every build is tested with real customer conversations in Hinglish, Hindi and English, and every reply passes a guard that checks
+              Every build is tested with real customer conversations, and every reply passes a guard that checks
               prices, links and promises against your data before it is sent.
             </p>
             <div className="mt-6 flex items-center gap-2 text-[14px] font-medium text-verdant">

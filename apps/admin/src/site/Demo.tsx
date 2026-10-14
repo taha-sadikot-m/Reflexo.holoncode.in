@@ -77,7 +77,7 @@ function Intro({ onStart, starting, error }: { onStart: (name: string) => void; 
   };
   const points: [LucideIcon, string, string][] = [
     [MessageCircle, "Be the customer", "Chat on a WhatsApp-style phone — order, pay, change your mind."],
-    [Phone, "Call the shop", "Talk to the AI from your browser in Hindi, English or Hinglish."],
+    [Phone, "Call the shop", "Talk to the AI from your browser, like a real phone call."],
     [Brain, "Be the owner", "See what it asks you, decide with one tap, and watch it learn."],
     [LayoutDashboard, "Open the dashboard", "Orders, chats, calls and everything it learned — your shop's back office."],
   ];
@@ -160,7 +160,7 @@ const MISSIONS: Mission[] = [
     title: "Ask like a real customer",
     what: "Answers come from Meera's own menu and policies — never invented.",
     tries: [
-      { who: "customer", text: "Eggless cakes milte hain? Price?", send: "Eggless cakes milte hain? Price kya hai?" },
+      { who: "customer", text: "Eggless cakes? Price?", send: "Do you make eggless cakes? How much do they cost?" },
       { who: "customer", text: "Do you deliver to Baner?", send: "Do you deliver to Baner? What is the delivery charge?" },
     ],
   },
@@ -169,28 +169,28 @@ const MISSIONS: Mission[] = [
     title: "Order and pay",
     what: "It collects every detail, confirms, sends a payment link and confirms when paid.",
     tries: [
-      { who: "customer", text: "1 kg chocolate truffle, kal shaam", send: "1 kg chocolate truffle cake chahiye kal shaam 6 baje, Kothrud delivery" },
+      { who: "customer", text: "1 kg chocolate truffle, tomorrow", send: "I need a 1 kg chocolate truffle cake tomorrow evening, delivered to Kothrud" },
       { who: "customer", text: "Then tap the buttons and “Pay (test)”" },
     ],
   },
   {
     icon: Phone,
     title: "Call the shop",
-    what: "Tap the phone icon on the customer's chat and talk. Mid-call, send a cake photo with 📎 — it finds the match while you talk.",
+    what: "Tap the phone icon on the customer's chat and talk. Mid-call, tap Chat and send a cake photo with 📎 — it finds the match while you talk.",
     tries: [{ who: "call", text: "Start a call" }],
   },
   {
     icon: Brain,
     title: "Watch it ask the owner — and learn",
     what: "After paying, ask to cancel. A paid order is Meera's call and she never wrote a rule for it, so the AI asks her phone. Decide, then tap “Always” — next time it knows.",
-    tries: [{ who: "customer", text: "Cancel my order", send: "Mera order cancel kar do please, plans change ho gaye" }],
+    tries: [{ who: "customer", text: "Cancel my order", send: "Please cancel my order, my plans have changed" }],
   },
   {
     icon: BookOpenCheck,
     title: "Be the owner",
     what: "Change the business in plain words. It reads back what it understood, and /undo reverts it.",
     tries: [
-      { who: "owner", text: "1 kg truffle is now ₹999", send: "Chocolate truffle 1 kg ka price ab 999 kar do" },
+      { who: "owner", text: "1 kg truffle is now ₹999", send: "Change the price of the 1 kg chocolate truffle to 999" },
       { who: "owner", text: "/undo", send: "/undo" },
     ],
   },

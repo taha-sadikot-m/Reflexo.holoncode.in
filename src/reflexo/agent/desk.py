@@ -165,7 +165,8 @@ class CustomerDesk:
             action = "fallback"
         elif gate and gate.get("rewritten_action"):
             action = str(gate["rewritten_action"])
-        language = output.language if output else prepared.language_guess
+        # our own words (holding, hand-off, still-checking) follow the platform policy, not what the model declared
+        language = lang.reply_language(None, output.language if output else prepared.language_guess)
         settings = prepared.settings
 
         blocks: list[Any] = []
@@ -386,7 +387,8 @@ class CustomerDesk:
         async with get_db().tenant_session(business_id) as s:
             recent = await gateway.recent_messages(s, conversation_id, limit=3)
             last_in = next((m.text for m in reversed(recent) if m.direction == "inbound"), "")
-            text_ = holding_text(settings, lang.detect(last_in, str(settings.get("default_language") or "hi-Latn")))
+            language = lang.reply_language(last_in, str(settings.get("default_language") or "hi-Latn"))
+            text_ = holding_text(settings, language)
             await gateway.outbound().enqueue(
                 s,
                 business_id=business_id,
@@ -410,7 +412,7 @@ class CustomerDesk:
             if conv is None or conv.customer is None:
                 return
             raw = "\n".join(m.text for m in msgs if m.text)[:500] or "(message without text)"
-            language = lang.detect(raw, str(settings.get("default_language") or "hi-Latn"))
+            language = lang.reply_language(raw, str(settings.get("default_language") or "hi-Latn"))
             await gateway.outbound().enqueue(
                 s,
                 business_id=ref.business_id,

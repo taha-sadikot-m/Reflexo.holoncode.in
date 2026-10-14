@@ -204,7 +204,7 @@ async def test_photo_mid_call_is_described_matched_and_spoken_about(
         await asyncio.sleep(0.2)
     loop.stop.set()
     await runner
-    assert session.said == ["Photo mil gayi, ek second dekhti hoon."]
+    assert session.said == ["Got the photo, one second."]  # English-only platform
     [item] = voice_agent.chat_ctx.items
     assert "Red velvet cake with cream cheese frosting" in item and "Red Velvet Cake (offering_id" in item
     assert 110000 in ctx.allowed_paise  # the voice gate may now say the matched price
