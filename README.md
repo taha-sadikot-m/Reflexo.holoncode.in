@@ -16,24 +16,100 @@ real payments and real phone calls, so its autonomy can be tested rather than im
 
 ---
 
-## The core loop, implemented
+## What is hard to copy
+
+Plenty of products can answer a chat. Two things here took most of the engineering and are what make the employee
+genuinely useful: **a phone call and a chat that behave as one live conversation**, and **procedures the owner
+writes in plain words that are checked before they run and then run reliably for days**.
+
+### 1. Voice and chat as one conversation, in real time
+
+A customer calls the shop on WhatsApp (or from a browser). While they are talking, they can send a photo, an
+address or their location in the chat, and the voice agent reacts to it **during the call**.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Customer
+    participant V as Voice agent
+    participant Ch as WhatsApp chat
+    participant O as Owner on Telegram
+    C->>V: calls the shop (agent is live before the call is accepted)
+    V-->>C: greets, takes the request
+    C->>Ch: sends a cake photo, still on the call
+    Ch->>V: in-call event with the photo
+    V->>V: describes the photo, matches it to the catalogue
+    V-->>C: That looks like our Chocolate Truffle, 950 rupees for 1 kg
+    C->>V: Can you print my photo on it for Saturday?
+    V->>O: asks the owner, with the photo and the details
+    V-->>C: I have asked the owner, the price comes to your WhatsApp
+    V->>Ch: puts the product card in the chat
+    C->>V: hangs up
+    V->>Ch: recap that states only what actually happened
+```
+
+What makes this work, and work safely:
+
+| | |
+|---|---|
+| **One brain** | The voice agent uses the same tools, rules, decision function and grounding as chat. Voice is a channel, not a second bot that can drift |
+| **The chat feeds the call** | Photos are described and matched to the catalogue while the caller talks; typed text counts as speech (addresses, spellings); a shared location becomes the delivery address and gets a delivery quote |
+| **The call feeds the chat** | The agent can put a product card, an order summary or a payment link into the chat mid-call, or ask for a photo and wait for it |
+| **No invented prices, even spoken** | Every spoken sentence passes a price gate before text-to-speech; a sentence with an unverified amount is replaced |
+| **Promises are reconciled** | When the call ends, everything the agent said it would do is checked against what actually happened; anything unbacked becomes an owner question, and the recap states only facts |
+| **Nothing falls between call and chat** | A message sent as the caller hangs up goes back to the chat AI; routing locks the call so it is answered exactly once |
+| **Real infrastructure** | WhatsApp calls over WebRTC (Meta's SDP rules; the call is accepted only once the agent's audio is live, so the caller never hears silence), browser calls over LiveKit with captions; measured ready-to-talk time on the live site: 4 to 6 seconds |
+
+### 2. Procedures written in words, tested before they run, run reliably
+
+The owner types something like *"remind customers a day before delivery"* or *"no more than 8 cake orders per
+day, offer the next free date"*. That becomes a working procedure, through a pipeline that never lets an unchecked
+plan run:
 
 ```mermaid
 flowchart LR
-    G([Goal<br/>a request on any channel]) --> U[Understand<br/>who is asking, what they mean,<br/>this business's context and rules]
-    U --> P[Plan<br/>tools, typed actions,<br/>or a procedure compiled to data]
-    P --> D{Allowed?<br/>decide&#40;&#41;: invariants,<br/>owner rules, risk class}
-    D -->|yes| E[Execute<br/>idempotent tools,<br/>durable workflows]
-    D -->|uncovered| H[Ask a human<br/>exact proposal + evidence,<br/>one tap to decide]
-    H --> E
-    E --> O[Observe<br/>structured results,<br/>provider webhooks]
-    O -->|failed / new info| A[Adapt<br/>repair, retry, supersede,<br/>fall back]
+    S["Owner, in words<br/>no more than 8 cake<br/>orders per day"] --> B["Builder<br/>drafts a typed definition"]
+    B --> V{"Validator<br/>schema · conditions · references"}
+    V -- "exact errors" --> B
+    V -- "valid" --> R["Read-back<br/>every trigger, wait, limit<br/>and message in plain words"]
+    R --> Y{"Owner<br/>replies YES code"}
+    Y -- "change it" --> B
+    Y -- "yes" --> A["Active<br/>alongside the AI or in charge"]
+    A --> RUN["Durable run on Temporal<br/>waits · timers · approvals<br/>counters · payment links"]
+    RUN --> EV["Every run visible<br/>steps, waits, outcome"]
+```
+
+| | |
+|---|---|
+| **Plans are data, not prompts** | A definition is typed: 12 triggers (message received, order confirming, payment captured, a schedule, ...) and 15 step types (send, wait, wait for an event, approval, branch, counter limit, payment link, classify, generate, update order, notify owner, deny, ...). Conditions are CEL expressions; nothing is ever `eval`'d |
+| **Checked before they exist** | The validator checks the schema, the conditions and every reference; its exact errors go back to the builder for up to two repair rounds |
+| **Understood before they run** | A deterministic read-back states every limit, wait and message in the owner's words; nothing runs until the owner confirms with a code |
+| **Guards act in real time** | A guard runs inside order confirmation: when Saturday is full it declines with the reason, offers the next free dates, and releases the slot if an order is cancelled or a payment link expires |
+| **Run reliably for days** | Each run is a Temporal workflow: a reminder scheduled for tomorrow survives restarts and deploys; approvals wait for the owner; counters are exact |
+| **Easy to test** | A demo time scale (one day becomes one minute) lets a multi-day procedure run in front of you; runs can be paused, resumed and fast-forwarded past a wait; new procedures start in observe mode beside the AI before taking charge; an eval suite checks that owner descriptions become valid procedures (8 of 8), and integration tests run them on a real Temporal server |
+| **The AI knows about them** | The customer-facing AI sees the procedures that apply, so it never contradicts the owner's own automation |
+
+---
+
+## The core loop, implemented
+
+```mermaid
+flowchart TB
+    G(["1 · Goal<br/>a request on any channel"]) --> U["2 · Understand<br/>who is asking, what they mean,<br/>this business's context and rules"]
+    U --> P["3 · Plan<br/>tools, typed actions, or a<br/>procedure compiled to data"]
+    P --> D{"4 · Allowed?<br/>decide(): invariants,<br/>owner rules, risk class"}
+    D -- "yes" --> E["5 · Execute<br/>idempotent tools,<br/>durable workflows"]
+    D -- "not covered" --> H["Ask a human<br/>exact proposal + evidence,<br/>one tap to decide"]
+    D -- "forbidden" --> X["Decline<br/>with the reason"]
+    H -- "owner decides" --> E
+    E --> O["6 · Observe<br/>structured results,<br/>provider webhooks"]
+    O -- "failed or new info" --> A["7 · Adapt<br/>repair, retry,<br/>supersede, fall back"]
     A --> P
-    O --> V[Verify<br/>deterministic checks<br/>against records]
-    V -->|not proven| A
-    V --> C([Complete + evidence<br/>confirmation, trace,<br/>undoable change])
-    C --> L[Learn<br/>decision becomes a rule<br/>with scope, provenance, undo]
-    L -.-> D
+    O --> V{"8 · Verified<br/>against records?"}
+    V -- "no" --> A
+    V -- "yes" --> C(["9 · Complete + evidence<br/>confirmation, trace,<br/>undoable change"])
+    C --> L["10 · Learn<br/>the decision becomes a rule<br/>with scope, provenance, undo"]
+    L -. "next time" .-> D
 ```
 
 A concrete run, from the live demo: a customer writes *"Please cancel my order, my plans have changed."*
@@ -203,27 +279,50 @@ plain language on the phone they already use. Every change is read back before i
 ## Architecture in one picture
 
 ```mermaid
-flowchart LR
-    subgraph Channels
-      WA[WhatsApp chat + calls]
-      TG[Telegram]
-      IG[Instagram / Messenger]
-      WEB[Browser: demo + owner app]
+flowchart TB
+    subgraph CH["Channels"]
+        direction LR
+        WA["WhatsApp<br/>chat + calls"]
+        TG["Telegram"]
+        IG["Instagram /<br/>Messenger"]
+        WEB["Browser<br/>demo + owner app"]
     end
-    WA & TG & IG -->|signed webhooks| API
-    WEB -->|HTTPS| API
-    API[api · FastAPI] -->|inbox first| PG[(Postgres 16 + pgvector<br/>state · queues · row-level security)]
-    PG <-->|SKIP LOCKED claims,<br/>LISTEN/NOTIFY| W[worker<br/>understand · plan · act]
-    W --> DESK[LangGraph desks<br/>customer · owner · builder]
-    DESK --> DEC[decide&#40;&#41;<br/>rules · risk · approval]
-    DESK --> GATE[verify:<br/>deterministic gate]
-    GATE --> W
-    W -->|send| Channels
-    TW[temporal-worker<br/>procedures · imports · approvals] <--> T[Temporal]
+    subgraph CORE["Reflexo core"]
+        direction TB
+        API["api · FastAPI<br/>verify, store first, acknowledge"]
+        PG[("Postgres 16 + pgvector<br/>state · queues · row-level security")]
+        W["worker<br/>understand · plan · act"]
+        DESK["LangGraph desks<br/>customer · owner · builder"]
+        DEC{"decide()<br/>rules · risk · approval"}
+        GATE["Output gate<br/>verify against records"]
+        TW["temporal-worker<br/>procedures · imports · approvals"]
+        T["Temporal"]
+    end
+    subgraph VOICE["Voice"]
+        direction TB
+        BR["voice-bridge<br/>WhatsApp WebRTC"]
+        LK["LiveKit Cloud"]
+        VA["voice-agent<br/>same tools, same rules"]
+    end
+    OWN["Owner's phone<br/>exact proposal, one tap"]
+    OUT["Done, with evidence<br/>reply on the same channel · trace"]
+    CH -- "signed webhooks · HTTPS" --> API
+    API -- "inbox first" --> PG
+    PG -- "claim jobs · LISTEN/NOTIFY" --> W
+    W --> DESK
+    DESK -- "action requests" --> DEC
+    DEC -- "not covered" --> OWN
+    OWN -- "decision" --> DEC
+    DEC -- "allowed" --> GATE
+    DESK -- "replies" --> GATE
+    GATE -- "verified" --> OUT
     TW <--> PG
-    WA -. call audio .-> BR[voice-bridge] --> LK[LiveKit]
-    WEB -. browser call .-> LK
-    LK <--> VA[voice-agent<br/>same tools, same rules]
+    TW <--> T
+    WA -. "call audio" .-> BR
+    WEB -. "browser call" .-> LK
+    BR --> LK
+    LK <--> VA
+    VA --> PG
 ```
 
 One Python codebase (a modular monolith with enforced module boundaries) running as six processes. Full detail:

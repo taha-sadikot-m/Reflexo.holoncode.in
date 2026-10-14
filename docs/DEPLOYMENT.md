@@ -6,22 +6,39 @@
 
 ```mermaid
 flowchart TB
-    U[Visitors and owners<br/>browser] -->|HTTPS 443| CADDY
-    P[WhatsApp, Telegram, Razorpay webhooks] -->|HTTPS 443| CADDY
-    subgraph EC2[AWS EC2 m6i.large · eu-north-1 · Docker Compose]
-      CADDY[Caddy<br/>Let's Encrypt, redirects] --> API[api]
-      API --- PG[(Postgres 16 + pgvector<br/>127.0.0.1 only)]
-      W[worker] --- PG
-      TW[temporal-worker] --- PG
-      VA[voice-agent] --- PG
-      BR[voice-bridge<br/>host network] --- PG
-      REDIS[(Redis<br/>127.0.0.1 only)] --- W
+    U["Browsers and provider webhooks<br/>visitors · owners · WhatsApp · Telegram · Razorpay"]
+    subgraph EC2["EC2 · eu-north-1"]
+        direction TB
+        CADDY["Caddy<br/>HTTPS · Let's Encrypt · redirects"]
+        subgraph APP["Docker Compose"]
+            direction LR
+            API["api"]
+            W["worker"]
+            TW["temporal-worker"]
+            VA["voice-agent"]
+            BR["voice-bridge<br/>host network"]
+        end
+        subgraph DATA["127.0.0.1 only"]
+            direction LR
+            PG[("Postgres 16<br/>+ pgvector")]
+            R[("Redis")]
+        end
     end
-    TW <-->|gRPC 7233| T[Temporal server<br/>separate instance]
-    VA <-->|WebRTC| LK[LiveKit Cloud]
-    U -. browser calls .-> LK
-    BR <-->|WebRTC| META[WhatsApp calls]
-    W --> AI[Gemini · Deepgram · Razorpay · Meta · Telegram APIs]
+    subgraph EXT["External services"]
+        direction LR
+        AI["Gemini · Deepgram · Razorpay<br/>Meta · Telegram APIs"]
+        T["Temporal server"]
+        LK["LiveKit Cloud"]
+        META["WhatsApp calls"]
+    end
+    U -- "HTTPS 443" --> CADDY
+    CADDY --> API
+    APP --- DATA
+    W --> AI
+    TW -- "gRPC 7233" --> T
+    VA <-- "WebRTC" --> LK
+    BR <-- "WebRTC" --> META
+    U -. "browser calls" .-> LK
 ```
 
 | Component | Where | Why there |

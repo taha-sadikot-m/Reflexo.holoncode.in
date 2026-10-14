@@ -101,7 +101,7 @@ No business flow is coded. The system has **capabilities** (typed actions such a
 
 ```mermaid
 flowchart LR
-    R[Customer asks for an action] --> DEC{decide&#40;&#41;<br/>invariants, then the owner's rules,<br/>then the default for the risk class}
+    R[Customer asks for an action] --> DEC{"decide()<br/>invariants, then the owner's rules,<br/>then the default for the risk class"}
     DEC -->|allowed| DO[Do it, tell the customer,<br/>note to the owner citing the rule]
     DEC -->|not allowed| NO[Decline with the reason]
     DEC -->|nothing covers it| P[Propose the exact action to the owner<br/>with buttons and a short brief]
