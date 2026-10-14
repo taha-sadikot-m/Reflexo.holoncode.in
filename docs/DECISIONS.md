@@ -108,7 +108,7 @@ boundary makes it a property of the system.
 
 ## Architecture
 
-### D8a. Rebuild on a new architecture, harvest what was proven
+### D8. Rebuild on a new architecture, harvest what was proven
 
 **Context.** An earlier Reflexo codebase ([reflexo_code](https://github.com/taha-sadikot-m/reflexo_code)) worked in
 places (Meta webhook parsing, the WhatsApp call bridge, payload limits per channel) but grew around shortcuts:
@@ -126,7 +126,7 @@ away hard-won provider details such as WhatsApp's WebRTC rules).
 **Consequences.** The proven parts arrived with their tests and with the edge cases they had already survived;
 everything around them follows one design.
 
-### D8. A modular monolith
+### D9. A modular monolith
 
 **Decision.** One codebase, many processes, strict module boundaries (`<module>.api` only, checked in CI), ports
 to break cycles.
@@ -137,7 +137,7 @@ at this team size).
 **Consequences.** Refactoring across modules is cheap; any module can later become a service along its existing
 API.
 
-### D9. Postgres is both the source of truth and the queue
+### D10. Postgres is both the source of truth and the queue
 
 **Decision.** Webhooks go into `inbox_events` first. Workers claim rows with `FOR UPDATE SKIP LOCKED` and are woken
 by `LISTEN/NOTIFY`. Redis holds only disposable data (wake-ups, rate limits, live signals, caches); every Redis use
@@ -149,7 +149,7 @@ or duplicated work on the boundary.
 **Consequences.** Enqueueing is part of the same transaction as the data change, so nothing is half-done. The
 throughput ceiling is far above what a POC needs.
 
-### D10. Temporal for everything that waits
+### D11. Temporal for everything that waits
 
 **Decision.** Imports, automation runs (waits, timers, approvals, counters), onboarding previews and automation
 building are Temporal workflows. Waits run on a demo time scale (one day = 60 s) for live demos.
@@ -159,7 +159,7 @@ building are Temporal workflows. Waits run on a demo time scale (one day = 60 s)
 **Consequences.** A reminder scheduled for tomorrow survives restarts and deploys. Temporal is one more piece of
 infrastructure; the deployment reuses an existing Temporal server.
 
-### D11. Row-level security for multi-tenancy
+### D12. Row-level security for multi-tenancy
 
 **Decision.** Every tenant table has a `business_id` and a Postgres RLS policy; every transaction sets the tenant.
 The app role has forced RLS; a separate service role handles steps before the tenant is known.
@@ -169,7 +169,7 @@ The app role has forced RLS; a separate service role handles steps before the te
 **Consequences.** Isolation holds even if application code is wrong. Tests assert every tenant table has a policy
 and that the app role without a tenant sees nothing.
 
-### D12. Owner identity requires a verified binding
+### D13. Owner identity requires a verified binding
 
 **Decision.** A sender is treated as the owner only through a verified binding for that channel and id; owner web
 sessions are locked to their business server-side, use their own cookie, and cannot reach engineering endpoints.
@@ -180,7 +180,7 @@ sessions are locked to their business server-side, use their own cookie, and can
 
 ## Deployment
 
-### D13. One VM with Docker Compose, not a managed platform
+### D14. One VM with Docker Compose, not a managed platform
 
 **Decision.** One EC2 instance runs the app with Docker Compose; Caddy provides HTTPS with automatic certificates.
 The production image builds the web app in a separate stage; migrations run when the API starts.
@@ -191,7 +191,7 @@ two-week proof of concept.
 **Consequences.** Deploy is `git archive` to the server plus one compose command. The compose files are written
 so the database can move to a managed service by changing environment variables only.
 
-### D14. The database lives next to the app (measured)
+### D15. The database lives next to the app (measured)
 
 **Context.** A managed Postgres (Neon) was available in Singapore; the server runs in Stockholm.
 
@@ -212,7 +212,7 @@ change, made only when it is in the same region as the app.
 **What it surfaced.** Drivers used directly (asyncpg `LISTEN`, psycopg for the LangGraph saver) needed the TLS
 setting in libpq form; one shared helper (`plain_dsn`) now builds those connection strings.
 
-### D15. Instance size and cost
+### D16. Instance size and cost
 
 **Decision.** `m6i.large` (2 vCPU, 8 GB) with a 30 GB disk. With the database and Temporal elsewhere, the app uses
 about 1.5 GB at rest; voice calls need steady CPU, so burstable `t` instances were ruled out (CPU credits run out
@@ -221,7 +221,7 @@ mid-call), and ARM instances were ruled out because the image is built and teste
 **Cost.** Roughly $35 to $45 for two weeks running continuously, including disk and the public IP; stopped, only
 the disk and IP are paid.
 
-### D16. Safe defaults for a public deployment
+### D17. Safe defaults for a public deployment
 
 - Settings refuse to start outside development with weak secrets (shorter than 16 characters).
 - Secrets live only in the server's `.env` (owner-only permissions), never in logs, git or the image; private
