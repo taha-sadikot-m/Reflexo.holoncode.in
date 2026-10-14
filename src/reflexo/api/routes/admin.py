@@ -46,6 +46,9 @@ def session(request: Request) -> admin.Session:
     s = admin.verify_session(request.cookies.get(admin.OWNER_COOKIE if surface == "app" else admin.COOKIE))
     if s is None:
         raise problem(401, "UNAUTHENTICATED", "login required")
+    # deny by default: a reviewer may read and sign out; no other request reaches a handler
+    if s.read_only and request.method not in ("GET", "HEAD", "OPTIONS") and not request.url.path.endswith("/logout"):
+        raise problem(403, "READ_ONLY", "reviewer access is read-only")
     return s
 
 
@@ -76,13 +79,16 @@ OperatorMutating = Annotated[admin.Session, Depends(operator_mutating)]
 
 async def visible_businesses(s: admin.Session) -> list[dict[str, Any]]:
     every = await admin.businesses()
+    if s.read_only:
+        allowed = admin.reviewer_slugs()
+        return [b for b in every if b["slug"] in allowed]
     return every if s.is_operator else [b for b in every if b["id"] == s.business_id]
 
 
 async def business(business_id: Annotated[UUID, Query()], s: Authed) -> UUID:
     if s.business_id is not None and str(business_id) != s.business_id:
         raise problem(404, "NOT_FOUND", "unknown business")
-    if str(business_id) not in {b["id"] for b in await admin.businesses()}:
+    if str(business_id) not in {b["id"] for b in await visible_businesses(s)}:
         raise problem(404, "NOT_FOUND", "unknown business")
     return business_id
 
@@ -100,10 +106,13 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict[s
     client = request.client.host if request.client else "unknown"
     if admin.login_throttled(client):
         raise problem(429, "RATE_LIMITED", "too many attempts; try again in a few minutes")
-    if not admin.check_credentials(body.username, body.password):
+    if admin.check_credentials(body.username, body.password):
+        token, s = admin.issue_session(body.username)
+    elif admin.check_reviewer(body.username, body.password):
+        token, s = admin.issue_session(body.username, read_only=True)
+    else:
         admin.record_login_failure(client)
         raise problem(401, "INVALID_CREDENTIALS", "wrong username or password")
-    token, s = admin.issue_session(body.username)
     settings = get_settings()
     response.set_cookie(
         admin.COOKIE,
@@ -114,7 +123,7 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict[s
         samesite="strict",
         path="/admin",
     )
-    return {"user": s.user, "csrf": s.csrf, "expires_at": s.expires_at}
+    return {"user": s.user, "csrf": s.csrf, "expires_at": s.expires_at, "read_only": s.read_only}
 
 
 @router.post("/logout")
@@ -130,6 +139,7 @@ async def me(s: Authed) -> dict[str, Any]:
         "user": s.user,
         "role": "operator" if s.is_operator else "owner",
         "business_id": s.business_id,
+        "read_only": s.read_only,
         "csrf": s.csrf,
         "expires_at": s.expires_at,
         "env": settings.env,

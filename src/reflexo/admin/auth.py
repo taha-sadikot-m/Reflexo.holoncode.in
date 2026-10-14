@@ -5,7 +5,8 @@ it; logout clears the cookie. Login attempts are throttled per client address.
 
 Two kinds of session share the format: the operator's (`b` absent: every business, engineering tools) and a shop
 owner's (`b` = their business id: that business only, no engineering tools). Owners use their own cookie, so an
-operator and an owner can be signed in side by side in one browser.
+operator and an owner can be signed in side by side in one browser. A reviewer is an operator session with `ro` set:
+it sees the console for the showcase businesses only, and every mutating request is refused.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ class Session:
     csrf: str
     expires_at: int
     business_id: str | None = None  # set: an owner session locked to this business
+    read_only: bool = False  # a reviewer: looks at everything allowed, changes nothing
 
     @property
     def is_operator(self) -> bool:
@@ -47,16 +49,21 @@ def _sign(payload: bytes) -> str:
     return hmac.new(key, payload, hashlib.sha256).hexdigest()
 
 
-def issue(user: str, *, business_id: str | None = None, hours: int | None = None) -> tuple[str, Session]:
+def issue(
+    user: str, *, business_id: str | None = None, hours: int | None = None, read_only: bool = False
+) -> tuple[str, Session]:
     s = Session(
         user=user,
         csrf=secrets.token_urlsafe(24),
         expires_at=int(time.time()) + (hours or get_settings().admin_session_hours) * 3600,
         business_id=business_id,
+        read_only=read_only,
     )
     data: dict[str, object] = {"u": s.user, "exp": s.expires_at, "csrf": s.csrf}
     if business_id is not None:
         data["b"] = business_id
+    if read_only:
+        data["ro"] = 1
     payload = base64.urlsafe_b64encode(json.dumps(data).encode())
     return f"{payload.decode()}.{_sign(payload)}", s
 
@@ -75,7 +82,11 @@ def verify(token: str | None) -> Session | None:
         return None
     b = data.get("b")
     return Session(
-        user=str(data["u"]), csrf=str(data["csrf"]), expires_at=int(data["exp"]), business_id=str(b) if b else None
+        user=str(data["u"]),
+        csrf=str(data["csrf"]),
+        expires_at=int(data["exp"]),
+        business_id=str(b) if b else None,
+        read_only=bool(data.get("ro")),
     )
 
 
@@ -96,3 +107,18 @@ def check_credentials(user: str, password: str) -> bool:
     user_ok = hmac.compare_digest(user.encode(), s.admin_user.encode())
     pass_ok = hmac.compare_digest(password.encode(), s.admin_password.get_secret_value().encode())
     return user_ok and pass_ok
+
+
+def check_reviewer(user: str, password: str) -> bool:
+    """The read-only reviewer login; disabled unless both a user and a password are configured."""
+    s = get_settings()
+    expected = s.reviewer_password.get_secret_value()
+    if not s.reviewer_user or not expected:
+        return False
+    user_ok = hmac.compare_digest(user.encode(), s.reviewer_user.encode())
+    pass_ok = hmac.compare_digest(password.encode(), expected.encode())
+    return user_ok and pass_ok
+
+
+def reviewer_slugs() -> frozenset[str]:
+    return frozenset(x.strip() for x in get_settings().reviewer_businesses.split(",") if x.strip())

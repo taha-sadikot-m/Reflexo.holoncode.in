@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Clock3,
   ExternalLink,
+  Eye,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -164,7 +165,7 @@ export function Layout() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium text-ink">{me?.user}</div>
-              <div className="text-[11px] uppercase tracking-wide text-stone">{operator ? me?.env : "Owner"}</div>
+              <div className="text-[11px] uppercase tracking-wide text-stone">{me?.read_only ? "Reviewer" : operator ? me?.env : "Owner"}</div>
             </div>
             <button onClick={() => void logout()} className="rounded-md p-1.5 text-stone hover:bg-bone hover:text-ink" title="Sign out">
               <LogOut size={15} />
@@ -200,6 +201,14 @@ export function Layout() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            {me?.read_only && (
+              <span
+                className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-bone px-2.5 py-1 text-[12px] font-medium text-dusk ring-1 ring-inset ring-sand"
+                title="Reviewer access: every page is visible, nothing can be changed. Try the AI itself at /demo."
+              >
+                <Eye size={13} /> Read-only reviewer
+              </span>
+            )}
             {operator && scale < 1 && (
               <span
                 className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-blossom px-2.5 py-1 text-[12px] font-medium text-saffron ring-1 ring-inset ring-[#fde3b8]"

@@ -5,7 +5,16 @@ Admin API, X-ray stream, Simulation Lab scenarios, chaos endpoints, evals. Spec:
 
 from reflexo.admin import accounts, chaos, demo, evals, scenarios, sim, workspace
 from reflexo.admin.actions import demo_reset, reply_as_team, set_takeover
-from reflexo.admin.auth import COOKIE, CSRF_HEADER, OWNER_COOKIE, SURFACE_HEADER, Session, check_credentials
+from reflexo.admin.auth import (
+    COOKIE,
+    CSRF_HEADER,
+    OWNER_COOKIE,
+    SURFACE_HEADER,
+    Session,
+    check_credentials,
+    check_reviewer,
+    reviewer_slugs,
+)
 from reflexo.admin.auth import issue as issue_session
 from reflexo.admin.auth import record_failure as record_login_failure
 from reflexo.admin.auth import throttled as login_throttled
@@ -24,6 +33,7 @@ __all__ = [
     "businesses",
     "chaos",
     "check_credentials",
+    "check_reviewer",
     "conversation_thread",
     "conversations",
     "demo",
@@ -35,6 +45,7 @@ __all__ = [
     "recent_chaos",
     "record_login_failure",
     "reply_as_team",
+    "reviewer_slugs",
     "scenarios",
     "set_takeover",
     "sim",

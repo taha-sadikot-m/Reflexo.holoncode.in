@@ -72,6 +72,7 @@ export interface Me {
   user: string;
   role: "operator" | "owner";
   business_id: string | null;
+  read_only: boolean;
   csrf: string;
   expires_at: number;
   env: string;

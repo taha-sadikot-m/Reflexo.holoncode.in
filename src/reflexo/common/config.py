@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_password: SecretStr = SecretStr("admin-dev-password")
     admin_session_secret: SecretStr = SecretStr("dev-admin-session-secret")
+    # read-only reviewer login for the ops console (empty disables it); sees only these business slugs
+    reviewer_user: str = ""
+    reviewer_password: SecretStr = SecretStr("")
+    reviewer_businesses: str = ""
     admin_session_hours: int = 8
 
     # public demo (/demo): every visitor gets a private copy of the demo shop, deleted after demo_sandbox_hours

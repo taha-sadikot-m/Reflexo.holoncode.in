@@ -375,3 +375,47 @@ def test_password_hashes_are_salted_and_verify() -> None:
     assert one != two and one.startswith("scrypt$")
     assert admin.accounts.verify_password("secret-pass", one) and not admin.accounts.verify_password("wrong", one)
     assert not admin.accounts.verify_password("secret-pass", "garbage")
+
+
+async def test_reviewer_is_read_only_and_sees_only_showcase_businesses(
+    client: httpx.AsyncClient, db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from reflexo.common.config import get_settings
+
+    shown, hidden = await make_shop(db), await make_shop(db)
+    monkeypatch.setenv("REFLEXO_REVIEWER_USER", "reviewer")
+    monkeypatch.setenv("REFLEXO_REVIEWER_PASSWORD", "public-review-pass")
+    monkeypatch.setenv("REFLEXO_REVIEWER_BUSINESSES", f"shop-{shown.business_id}")
+    get_settings.cache_clear()
+    try:
+        resp = await client.post("/admin/api/login", json={"username": "reviewer", "password": "public-review-pass"})
+        assert resp.status_code == 200 and resp.json()["read_only"] is True
+        csrf = resp.json()["csrf"]
+        me = (await client.get("/admin/api/me")).json()
+        assert me["role"] == "operator" and me["read_only"] is True
+
+        # it sees the showcase business and nothing else, even by asking for another id directly
+        ids = {b["id"] for b in (await client.get("/admin/api/businesses")).json()}
+        assert ids == {str(shown.business_id)}
+        orders = "/admin/api/orders"
+        assert (await client.get(orders, params={"business_id": str(shown.business_id)})).status_code == 200
+        assert (await client.get(orders, params={"business_id": str(hidden.business_id)})).status_code == 404
+        assert (await client.get("/admin/api/health")).status_code == 200
+
+        # every change is refused before any handler runs, even with a valid CSRF token
+        headers = {"X-CSRF-Token": csrf}
+        for path in ("/admin/api/chaos/kill_worker", "/admin/api/evals/run", "/admin/api/demo-reset"):
+            r = await client.post(path, params={"business_id": str(shown.business_id)}, headers=headers)
+            assert r.status_code == 403 and r.json()["code"] == "READ_ONLY", path
+        assert (await client.post("/admin/api/logout", headers=headers)).status_code == 200
+
+        # the operator login is unaffected
+        await login(client)
+        assert (await client.get("/admin/api/me")).json()["read_only"] is False
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_reviewer_login_disabled_without_configuration(client: httpx.AsyncClient, db: Database) -> None:
+    resp = await client.post("/admin/api/login", json={"username": "", "password": ""})
+    assert resp.status_code == 401
