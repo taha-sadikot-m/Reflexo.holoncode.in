@@ -134,7 +134,7 @@ async def me(s: Authed) -> dict[str, Any]:
         "expires_at": s.expires_at,
         "env": settings.env,
         "demo_time_scale": settings.demo_time_scale,
-        "links": {"jaeger": "/jaeger", "temporal": "/temporal"},
+        "links": {"jaeger": settings.jaeger_ui_url, "temporal": settings.temporal_ui_url},
     }
 
 

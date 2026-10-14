@@ -211,9 +211,9 @@ export function Layout() {
             {operator ? (
               <>
                 {[
-                  ["Temporal", me?.links.temporal ?? "/temporal"],
-                  ["Jaeger", me?.links.jaeger ?? "/jaeger"],
-                ].map(([label, href]) => (
+                  ["Temporal", me?.links.temporal ?? ""],
+                  ["Jaeger", me?.links.jaeger ?? ""],
+                ].filter(([, href]) => href).map(([label, href]) => (
                   <a
                     key={label}
                     href={href}

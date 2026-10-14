@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     # Observability
     otel_exporter_otlp_endpoint: str | None = "http://localhost:4317"
+    # links shown in the ops console; empty hides the link (nothing is served at a guessed path)
+    temporal_ui_url: str = ""
+    jaeger_ui_url: str = ""
     otel_sampling_ratio: float = 1.0
 
     # Demo controls

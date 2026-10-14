@@ -233,9 +233,11 @@ export function Xray() {
                       Open conversation
                     </Link>
                   )}
-                  <a className="flex items-center gap-1 text-xs font-semibold text-signal hover:underline" href={`${me?.links.jaeger ?? "/jaeger"}/trace/${traceId}`} target="_blank" rel="noreferrer">
-                    Open in Jaeger <ExternalLink size={12} />
-                  </a>
+                  {me?.links.jaeger && (
+                    <a className="flex items-center gap-1 text-xs font-semibold text-signal hover:underline" href={`${me.links.jaeger}/trace/${traceId}`} target="_blank" rel="noreferrer">
+                      Open in Jaeger <ExternalLink size={12} />
+                    </a>
+                  )}
                 </>
               }
             >
