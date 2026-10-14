@@ -21,3 +21,6 @@ data/
 
 # eval reports are per-run outputs (eval_runs + the admin Evals page hold the evidence)
 evals/reports/
+
+# private keys (SSH to servers): never in git or in an image
+*.pem
