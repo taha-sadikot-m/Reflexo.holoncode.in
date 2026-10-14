@@ -126,7 +126,7 @@ async def test_demo_sentence_builds_three_rules_and_yes_activates(
     )
     await start(registry, db, shop, DEMO_SENTENCE)
 
-    text = await last_owner_text(db, shop, "Samajh gayi — ye 3 rules lagaungi")
+    text = await last_owner_text(db, shop, "Samajh gayi, ye 3 rules lagaungi")
     assert "maximum <b>8 cake</b> orders" in text and "2 ghante tak customer ke reply" in text  # Telegram HTML
     assert "delivery se ek din pehle 10:00 baje" in text and "template 'order_update'" in text
     assert "⏱ Demo mode: 1 din = 60 sec." in text
@@ -152,7 +152,7 @@ async def test_invalid_draft_is_repaired_with_the_validator_feedback(
     bad["steps"][0]["next"] = "nowhere"
     prompts = builder_returns(fake, [bad], [automations.demo.COD_CONFIRMATION])
     await start(registry, db, shop, "COD orders confirm karwa lena")
-    await last_owner_text(db, shop, "Samajh gayi — ye 1 rule lagaungi")
+    await last_owner_text(db, shop, "Samajh gayi, ye 1 rule lagaungi")
     assert len(prompts) == 2 and "IT FAILED VALIDATION" in prompts[1] and "unknown step 'nowhere'" in prompts[1]
 
 

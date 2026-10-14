@@ -193,7 +193,7 @@ class AutomationBuildWorkflow:
             msg = (
                 "Ye rule theek se samajh nahi paayi 🙏 Thoda aur detail mein batayiye?"
                 if hi
-                else "I couldn't turn that into a working rule — could you say it in a bit more detail?"
+                else "I couldn't turn that into a working rule. Could you say it in a bit more detail?"
             )
             await workflow.execute_activity(
                 build_finish, args=[inp, [], msg], start_to_close_timeout=timedelta(seconds=10), retry_policy=RETRY

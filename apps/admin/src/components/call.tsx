@@ -88,7 +88,7 @@ export function useWebCall(businessId: string, actor: number, name?: string) {
         e instanceof ApiError
           ? e.message
           : e instanceof DOMException && e.name === "NotAllowedError"
-            ? "Microphone permission was blocked — allow it in the address bar and call again."
+            ? "Microphone permission was blocked. Allow it in the address bar and call again."
             : "The call could not connect. Please try again.";
       finish(msg);
     }
@@ -122,7 +122,7 @@ function Elapsed({ since }: { since: number | null }) {
 }
 
 /** The in-call screen, laid over the customer's phone. Like WhatsApp, it can shrink to a bar so the chat stays
- * usable during the call — to send a photo or type an address the agent then talks about. */
+ * usable during the call - to send a photo or type an address the agent then talks about. */
 export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>; shop: string }) {
   const [minimized, setMinimized] = useState(false);
   const done = call.state === "ended" || call.state === "failed";
@@ -147,7 +147,7 @@ export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>
               On call · {call.state === "live" ? <Elapsed since={call.startedAt} /> : "connecting…"} · tap to return
             </span>
             <span className="block truncate text-[11.5px] text-white/85">
-              {last ? `${last.who === "you" ? "You: " : ""}${last.text}` : "Send a photo or type here — the call hears about it"}
+              {last ? `${last.who === "you" ? "You: " : ""}${last.text}` : "Send a photo or type here. The call hears about it"}
             </span>
           </span>
         </button>
@@ -193,7 +193,7 @@ export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>
         {call.error ? (
           <div className="text-[#ffb4a8]">{call.error}</div>
         ) : done ? (
-          <div className="text-white/75">The call recap arrives in the chat — and anything promised is on the owner's phone.</div>
+          <div className="text-white/75">The call recap arrives in the chat, and anything promised is on the owner's phone.</div>
         ) : call.captions.length ? (
           call.captions.slice(-3).map((c) => (
             <div key={c.id} className={c.who === "shop" ? "text-white" : "text-white/55"}>
@@ -202,7 +202,7 @@ export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>
             </div>
           ))
         ) : call.state === "live" ? (
-          <div className="text-white/60">Speak naturally — ask for a cake, a price, a delivery slot…</div>
+          <div className="text-white/60">Speak naturally. Ask for a cake, a price, a delivery slot…</div>
         ) : (
           <div className="text-white/60">Connecting the AI employee…</div>
         )}
@@ -214,7 +214,7 @@ export function CallScreen({ call, shop }: { call: ReturnType<typeof useWebCall>
           </button>
         ) : (
           <>
-            <CallButton label="Chat" onClick={() => setMinimized(true)} title="Open the chat during the call — send a photo or type">
+            <CallButton label="Chat" onClick={() => setMinimized(true)} title="Open the chat during the call: send a photo or type">
               <MessageCircle size={22} />
             </CallButton>
             <CallButton

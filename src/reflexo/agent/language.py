@@ -62,18 +62,23 @@ _RULE_MIRROR = {
     "caller": "Mirror the caller's language: Hinglish → Hinglish (Roman Hindi), Hindi → Hindi, English → English.",
 }
 _RULE_ENGLISH = {
-    "customer": "Always reply in clear, simple English — even when the customer writes in Hindi or Hinglish (you "
+    "customer": "Always reply in clear, simple English, even when the customer writes in Hindi or Hinglish (you "
     "understand them; you answer in English). No Hindi words. Set `language` to en.",
-    "owner": "Always reply in clear, simple English — even when the owner writes in Hindi or Hinglish. No Hindi words.",
-    "caller": "Always speak English — simple and clear — even if the caller speaks Hindi or Hinglish. No Hindi words.",
+    "owner": "Always reply in clear, simple English, even when the owner writes in Hindi or Hinglish. No Hindi words.",
+    "caller": "Always speak simple, clear English, even if the caller speaks Hindi or Hinglish. No Hindi words.",
 }
 
 
+# house style for everything the AI writes or says (outgoing text is also normalised: gateway.plain_punctuation)
+_STYLE = " Never use the long em-dash; write a comma, colon or full stop instead."
+
+
 def language_rule(audience: str) -> str:
-    """The prompt's LANGUAGE rule for `audience` (customer | owner | caller) under the platform's policy."""
+    """The prompt's LANGUAGE rule for `audience` (customer | owner | caller) under the platform's policy, with the
+    house writing style."""
     from reflexo.common.config import get_settings
 
-    return (_RULE_MIRROR if get_settings().language_policy == "auto" else _RULE_ENGLISH)[audience]
+    return (_RULE_MIRROR if get_settings().language_policy == "auto" else _RULE_ENGLISH)[audience] + _STYLE
 
 
 def detect(text: str | None, default: str = "hi-Latn") -> str:

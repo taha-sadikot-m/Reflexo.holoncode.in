@@ -127,7 +127,7 @@ async def test_yes_in_next_turn_confirms_the_open_order(
         link_id = last["data"]["reference"]["id"]
         return reply(
             "send",
-            "Here is your payment link — your order is confirmed once paid.",
+            "Here is your payment link. Your order is confirmed once paid.",
             topic="order_status",
             language="en",
             refs=[{"type": "order", "id": str(order.order_id)}],

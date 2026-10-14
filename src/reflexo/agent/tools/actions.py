@@ -17,7 +17,7 @@ ACTION_DESKS = {"customer", "voice"}
 REASON_DESC = "Why the customer wants this, in their words"
 NOTE_DESC = (
     "For the shop owner, as a colleague would write it (2–3 short lines, their language): who, what they want, "
-    "the relevant facts and what you suggest — e.g. 'Taha wants to cancel MB-1028 (500 g Truffle, Thu 15 Oct), "
+    "the relevant facts and what you suggest, e.g. 'Taha wants to cancel MB-1028 (500 g Truffle, Thu 15 Oct), "
     "placed 10 min ago, not prepared yet. I suggest cancelling.' Used only if the owner has to decide."
 )
 
@@ -87,7 +87,7 @@ ACTION_TOOLS = ["order_cancel", "order_change", "refund_request"]
 
 class AskOwnerArgs(BaseModel):
     question: str = Field(
-        description="What the owner must answer or decide, short and clear — e.g. 'Price for this design as a 1 kg "
+        description="What the owner must answer or decide, short and clear, e.g. 'Price for this design as a 1 kg "
         "chocolate cake (photo in chat), pickup Fri 16 Oct?'",
         max_length=500,
     )

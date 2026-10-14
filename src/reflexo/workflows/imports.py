@@ -26,7 +26,7 @@ def _owner_message(err: ActivityError) -> str:
     cause = err.cause
     if isinstance(cause, ApplicationError) and cause.type == "ImportFailed":
         return f"Couldn't import this file: {cause.message}"
-    return "Sorry, something went wrong reading this file — please send it again."
+    return "Sorry, something went wrong reading this file. Please send it again."
 
 
 @workflow.defn(name="ImportWorkflow")
@@ -77,11 +77,11 @@ class ImportWorkflow:
         try:
             await workflow.wait_condition(lambda: self._decision is not None, timeout=REVIEW_TIMEOUT)
         except TimeoutError:
-            await self._finish(inp, "cancelled", "The import review expired — nothing was changed.")
+            await self._finish(inp, "cancelled", "The import review expired. Nothing was changed.")
             return {"status": "expired"}
         assert self._decision is not None
         if not self._decision.get("approve"):
-            await self._finish(inp, "cancelled", "Cancelled — nothing changed.")
+            await self._finish(inp, "cancelled", "Cancelled. Nothing changed.")
             return {"status": "cancelled"}
         try:
             await workflow.execute_activity(

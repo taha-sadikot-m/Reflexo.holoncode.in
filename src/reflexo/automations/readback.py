@@ -216,9 +216,9 @@ def readback(defs: list[AutomationDefinition], lang: Lang = "hi-Latn", demo_time
     hi = lang == "hi-Latn"
     n = len(defs)
     head = (
-        f"Samajh gayi — ye {n} rule{'s' if n > 1 else ''} lagaungi:"
+        f"Samajh gayi, ye {n} rule{'s' if n > 1 else ''} lagaungi:"
         if hi
-        else f"Got it — I'll set up {n} rule{'s' if n > 1 else ''}:"
+        else f"Got it, I'll set up {n} rule{'s' if n > 1 else ''}:"
     )
     lines = [head, *[f"{i}) {describe(d, lang)}" for i, d in enumerate(defs, 1)]]
     if demo_time_scale < 1:

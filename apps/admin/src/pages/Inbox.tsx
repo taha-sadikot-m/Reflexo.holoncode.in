@@ -29,7 +29,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { StatusBadge, fmtWhen, inr } from "../components/bits";
 import { ChannelIcon, LINKED, channelLabel } from "../components/channel";
 import { Badge, Button, Card, Empty, ErrorNote, Segmented, Skeleton, cx } from "../components/ui";
-import { WaText } from "../components/phone";
+import { WaText, plain } from "../components/phone";
 import { api, type CallRow, type ConversationItem, type CustomerView, type Thread, type ThreadMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { fmtTime } from "../lib/stages";
@@ -38,7 +38,7 @@ import { useXrayStream } from "../lib/stream";
 const TICKS: Record<string, { icon: LucideIcon; tone: string; title: string }> = {
   queued: { icon: Clock3, tone: "text-stone", title: "Queued" },
   sending: { icon: Clock3, tone: "text-stone", title: "Sending" },
-  unconfirmed: { icon: AlertTriangle, tone: "text-sun", title: "Outcome unknown — retrying safely" },
+  unconfirmed: { icon: AlertTriangle, tone: "text-sun", title: "Outcome unknown, retrying safely" },
   sent: { icon: Check, tone: "text-stone", title: "Sent" },
   delivered: { icon: CheckCheck, tone: "text-stone", title: "Delivered" },
   read: { icon: CheckCheck, tone: "text-sky", title: "Read" },
@@ -160,7 +160,7 @@ function CallCard({ c }: { c: CallRow }) {
                 <span className={cx("mr-1.5 text-[11px] font-semibold uppercase", t.role === "agent" ? "text-signal" : "text-dusk")}>
                   {t.role === "agent" ? "AI" : "Caller"}
                 </span>
-                <span className="text-soot">{t.text}</span>
+                <span className="text-soot">{plain(t.text ?? "")}</span>
               </div>
             ))}
           </div>
@@ -197,7 +197,7 @@ function CustomerPanel({ customerId, businessId }: { customerId: string; busines
         <div className="min-w-0">
           <div className="truncate text-[14px] font-semibold text-ink">{c.name ?? "Unknown"}</div>
           <div className="text-xs text-stone">
-            {c.phone ?? "—"}
+            {c.phone ?? "-"}
             {c.language ? ` · ${c.language}` : ""}
           </div>
         </div>
@@ -213,7 +213,7 @@ function CustomerPanel({ customerId, businessId }: { customerId: string; busines
             </li>
           ))}
         </ul>
-        {c.merged_from.length > 0 && <div className="mt-1.5 text-xs text-stone">One customer across channels — histories merged.</div>}
+        {c.merged_from.length > 0 && <div className="mt-1.5 text-xs text-stone">One customer across channels, histories merged.</div>}
       </div>
       <div>
         <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone">Orders · {c.orders.length}</div>
@@ -276,8 +276,8 @@ function ThreadView({ id, businessId, calls }: { id: string; businessId: string;
     onSuccess: refresh,
   });
   // a block body: scrollIntoView returns a Promise in current Chromium, and an effect must return nothing or a cleanup
-  // function — returning the Promise made React call it on unmount and blanked the panel ("c is not a function")
-  // (and scroll the message list only — scrollIntoView also moved the whole page)
+  // function - returning the Promise made React call it on unmount and blanked the panel ("c is not a function")
+  // (and scroll the message list only - scrollIntoView also moved the whole page)
   useEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -304,8 +304,8 @@ function ThreadView({ id, businessId, calls }: { id: string; businessId: string;
   };
 
   return (
-    <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex items-center gap-3 border-b border-sand px-5 py-3.5">
         <ChannelIcon channel={t.channel} size="lg" />
         <div className="min-w-0 flex-1">
@@ -339,7 +339,7 @@ function ThreadView({ id, businessId, calls }: { id: string; businessId: string;
       </div>
       {humanActive && (
         <div className="flex items-center gap-2 border-b border-[#f6e1ae] bg-sun-l px-5 py-2 text-[12.5px] text-[#8a4b00]">
-          <Hand size={13} /> A person is handling this chat — the AI stays quiet until {fmtTime(t.human_active_until)}.
+          <Hand size={13} /> A person is handling this chat. The AI stays quiet until {fmtTime(t.human_active_until)}.
         </div>
       )}
       {t.customer?.facts.length ? (
@@ -351,7 +351,7 @@ function ThreadView({ id, businessId, calls }: { id: string; businessId: string;
           ))}
         </div>
       ) : null}
-      <div ref={scroller} className="flex-1 space-y-2.5 overflow-auto bg-parchment/60 px-5 py-4">
+      <div ref={scroller} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-parchment/60 px-5 py-4">
         {timeline.map((e) => (e.kind === "call" ? <CallCard key={e.c.id} c={e.c} /> : <Bubble key={e.m.id} m={e.m} />))}
       </div>
       <div className="border-t border-sand p-3">
@@ -360,7 +360,7 @@ function ThreadView({ id, businessId, calls }: { id: string; businessId: string;
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Reply as the team — this pauses the AI for this chat"
+            placeholder="Reply as the team (this pauses the AI for this chat)"
             className="h-9 flex-1 rounded-md bg-white px-3 text-[13.5px] text-ink shadow-sm ring-1 ring-inset ring-sand placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-signal/50"
           />
           <Button type="submit" disabled={reply.isPending || !text.trim()} className="h-9">
@@ -467,7 +467,7 @@ export function Inbox() {
           </label>
         </div>
         <ErrorNote error={list.error} />
-        <ul className="min-h-0 flex-1 divide-y divide-sand overflow-auto">
+        <ul className="min-h-0 flex-1 divide-y divide-sand overflow-y-auto overscroll-contain">
           {!list.data && (
             <li className="p-4">
               <Skeleton lines={6} />
@@ -498,7 +498,7 @@ export function Inbox() {
                   </div>
                   <div className="mt-0.5 truncate text-[12.5px] text-dusk">
                     {c.last_direction === "outbound" && <span className="text-stone">You: </span>}
-                    {c.last_text}
+                    {plain(c.last_text ?? "")}
                   </div>
                   {(c.needs_attention || c.human_active || c.simulated) && (
                     <div className="mt-1.5 flex gap-1">
@@ -521,8 +521,8 @@ export function Inbox() {
         {selected && business ? (
           <ThreadView id={selected} businessId={business.id} calls={callsByConv.get(selected) ?? []} />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <Empty icon={UserRound} hint="Every channel in one place — chats, calls and the customer behind them.">
+          <div className="flex flex-1 items-center justify-center">
+            <Empty icon={UserRound} hint="Every channel in one place: chats, calls and the customer behind them.">
               Select a conversation
             </Empty>
           </div>

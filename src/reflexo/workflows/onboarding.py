@@ -71,7 +71,7 @@ async def preview(inp: dict[str, Any]) -> list[dict[str, str]]:
     cards = await knowledge.search_catalog(business_id, "cake", k=8)
     profile = await knowledge.profile_block(business_id)
     prompt = (
-        f"Write {PREVIEW_QUESTIONS} short, realistic messages customers would send this shop on WhatsApp — "
+        f"Write {PREVIEW_QUESTIONS} short, realistic messages customers would send this shop on WhatsApp: "
         + fixed("in English", "a mix of Hinglish and English")
         + ": prices of specific items, eggless/custom options, delivery, payment, timings.\n"
         f"Items: {', '.join(c.name for c in cards) or 'see profile'}\nProfile:\n{profile.text[:1500]}"
@@ -90,8 +90,8 @@ async def preview(inp: dict[str, Any]) -> list[dict[str, str]]:
     body = fixed("Here's how I'd answer 👇", "Aise jawab dungi 👇") + "\n\n"
     body += "\n\n".join(f"❓ {p['q']}\n💬 {p['a']}" for p in pairs)
     body += fixed(
-        "\n\nTell me if anything is wrong — otherwise reply 'ok' and I'll go live.",
-        "\n\nKuch galat ho to batayiye — warna 'theek hai' likhiye aur main live ho jaungi.",
+        "\n\nTell me if anything is wrong. Otherwise reply 'ok' and I'll go live.",
+        "\n\nKuch galat ho to batayiye, warna 'theek hai' likhiye aur main live ho jaungi.",
     )
     await _say(business_id, conversation_id, f"onb:{inp.get('import_run_id') or inp['preview_id']}:preview", body)
     await emit("onboarding", PipelineEventStatus.OK, business_id=business_id, step="preview", questions=len(pairs))
@@ -100,8 +100,8 @@ async def preview(inp: dict[str, Any]) -> list[dict[str, str]]:
 
 def preview_failed_text() -> str:
     return fixed(
-        "I couldn't prepare the preview just now 🙏 — reply 'preview' to try again, or 'go live' to go live now.",
-        "Preview abhi nahi ban paya 🙏 — 'preview' likhiye to dobara try karti hoon, "
+        "I couldn't prepare the preview just now 🙏 Reply 'preview' to try again, or 'go live' to go live now.",
+        "Preview abhi nahi ban paya 🙏 'preview' likhiye to dobara try karti hoon, "
         "ya 'live karo' to seedha live ho jaungi.",
     )
 

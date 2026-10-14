@@ -42,9 +42,9 @@ _DECIDE_BARE = re.compile(rf"^\s*({_YES}|{_NO})\s*[.!👍✅]*\s*$", re.IGNORECA
 I_WILL_TELL = "later"  # option id of "Main batati hoon": not an answer
 HELP = (
     "Commands:\n"
-    "• `1234 <answer>` — answer customer question 1234 (or reply to the question message)\n"
-    "• `/undo` — undo the last change\n"
-    "• `/pause` / `/resume` — stop / restart AI replies to customers\n"
+    "• `1234 <answer>`: answer customer question 1234 (or reply to the question message)\n"
+    "• `/undo`: undo the last change\n"
+    "• `/pause` / `/resume`: stop / restart AI replies to customers\n"
     "Anything else: just tell me what you need."
 )
 
@@ -193,12 +193,12 @@ class OwnerCommands:
         sent = f"Sending your answer to {who}" if result.relayed else "Saved"
         if result.scope_uncertain:  # kept private until the owner says it applies to everyone
             await say(
-                f"✅ {sent}. Saved for {who} only for now — should it apply to everyone?",
+                f"✅ {sent}. Saved for {who} only for now. Should it apply to everyone?",
                 buttons=[(f"oqs:{q['id']}:g", "Everyone"), (f"oqs:{q['id']}:c", f"Only {who}"[:20])],
             )
             return
         where = {"global": "for everyone", "customer": f"for {who} only", "temporary": "for today"}[result.scope]
-        await say(f"✅ {sent}. Saved {where} — next time I'll answer this myself. (/undo to remove)")
+        await say(f"✅ {sent}. Saved {where}. Next time I'll answer this myself. (/undo to remove)")
 
     async def _decide(
         self,
@@ -280,19 +280,19 @@ async def execute_decision(
     if decision.already_decided:
         return "Already done ✅" if a.status == "approved" else f"That was already {a.status}."
     if decision.expired:
-        return "That confirmation expired — tell me again and I'll redo the read-back."
+        return "That confirmation expired. Tell me again and I'll redo the read-back."
     subject = a.subject
     if subject.get("workflow_id"):  # the workflow waits for this decision and applies/reports itself
         delivered = await registry.require(WorkflowPort).signal(  # type: ignore[type-abstract]
             str(subject["workflow_id"]), "approval_decided", {"approve": approve, "approval_id": str(a.id)}
         )
-        return "" if delivered else "That review has already ended — send it again if you still want it."
+        return "" if delivered else "That review has already ended. Send it again if you still want it."
     if a.kind == "tool_call":  # an action the agent proposed (ADR-015): the agent carries out the decision
         return await registry.require(ProposalPort).decided(  # type: ignore[type-abstract]
             business_id, a.id, approve, member_id
         )
     if not approve:
-        return "Cancelled — nothing changed."
+        return "Cancelled. Nothing changed."
     try:
         if a.kind == "change_confirmation" and subject.get("change_set_id"):
             await knowledge.apply(business_id, UUID(subject["change_set_id"]))

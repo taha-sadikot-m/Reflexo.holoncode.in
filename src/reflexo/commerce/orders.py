@@ -604,7 +604,7 @@ async def open_order(business_id: UUID, customer_id: UUID) -> OrderView | None:
 
 
 def summary_lines(v: OrderView) -> list[str]:
-    return [f"{ln.quantity} × {ln.name} — {format_inr(ln.line_total_paise)}" for ln in v.lines]
+    return [f"{ln.quantity} × {ln.name}: {format_inr(ln.line_total_paise)}" for ln in v.lines]
 
 
 async def situation(business_id: UUID, order_id: UUID) -> dict[str, Any]:

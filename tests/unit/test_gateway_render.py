@@ -60,7 +60,7 @@ class FakeHydrator:
 
     async def order_summary(self, business_id: UUID, order_id: UUID) -> OrderSummaryView:
         return OrderSummaryView(
-            order_id=order_id, order_number="MB-0012", lines=["1 × Chocolate Truffle 1 kg — ₹950"], total_display="₹950"
+            order_id=order_id, order_number="MB-0012", lines=["1 × Chocolate Truffle 1 kg: ₹950"], total_display="₹950"
         )
 
 

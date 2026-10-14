@@ -264,7 +264,7 @@ async def test_uncertain_scope_is_kept_private_until_the_owner_taps(
     [qa] = await q(db, "SELECT scope, customer_id FROM qa_entries WHERE id = :i", i=row.qa_entry_id)
     assert (str(qa.scope), qa.customer_id) == ("customer", question.customer_id)  # never leaks while unsure
     scope_msg = (await owner_messages(db, shop))[-1]
-    assert "should it apply to everyone?" in scope_msg["text"]
+    assert "Should it apply to everyone?" in scope_msg["text"]
     assert scope_msg["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == f"o:oqs:{question.id}:g"
 
     await owner_says(registry, db, shop, callback=f"oqs:{question.id}:g")

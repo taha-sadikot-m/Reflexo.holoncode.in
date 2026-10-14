@@ -79,7 +79,7 @@ class AgentOutput(BaseModel):
         default=None,
         max_length=600,
         description="Only for ask_owner / handoff: 2–3 short lines for the shop owner, written as a colleague "
-        "would — who, what they need, the relevant facts, what you suggest. No transcript.",
+        "would: who, what they need, the relevant facts, what you suggest. No transcript.",
     )
     customer_facts: list[MemoryFact] = Field(default_factory=list)
     flags: OutputFlags = Field(default_factory=OutputFlags)

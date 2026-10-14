@@ -24,8 +24,8 @@ STATES = ("sources_requested", "extracting", "gap_questions", "preview", "live")
 
 def welcome() -> str:
     return fixed(
-        "Hello! Send me your menu or price list — a photo, PDF or Excel — or just type it here. 📄",
-        "Namaste! Apna menu ya price list bhejiye — photo, PDF ya Excel — ya type kar dijiye. 📄",
+        "Hello! Send me your menu or price list as a photo, PDF or Excel file, or just type it here. 📄",
+        "Namaste! Apna menu ya price list bhejiye (photo, PDF ya Excel), ya type kar dijiye. 📄",
     )
 
 
@@ -82,8 +82,8 @@ GAPS = [
     ),
     Gap(
         "payments",
-        "How do customers pay — UPI, card, cash on delivery?",
-        "Payment kaise lete hain — UPI, card, cash on delivery?",
+        "How do customers pay: UPI, card or cash on delivery?",
+        "Payment kaise lete hain: UPI, card ya cash on delivery?",
         "How can I pay?",
         _no_payments,
     ),

@@ -43,7 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   });
   const [businessId, setBusinessIdState] = useState<string | null>(() => localStorage.getItem(BUSINESS_KEY));
   const businesses = bizQuery.data ?? [];
-  // the remembered business, else the demo business (Meera's Bakes), else the first one — never a test business
+  // the remembered business, else the demo business (Meera's Bakes), else the first one - never a test business
   const business =
     businesses.find((b) => b.id === businessId) ??
     businesses.find((b) => b.slug === DEFAULT_SLUG) ??

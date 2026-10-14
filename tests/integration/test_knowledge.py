@@ -305,7 +305,7 @@ async def test_change_set_preview_apply_undo(registry: Registry, db: Database) -
     assert pv.lines == [
         "✏️ Chocolate Truffle Cake 1 kg price: ₹950 → ₹1,000",
         "➕ Mango Cake",
-        "➕ Mango Cake 1 kg — ₹900",
+        "➕ Mango Cake 1 kg: ₹900",
     ]
     assert "Mango Cake" not in {c.name for c in await knowledge.search_catalog(bid, "mango cake")}  # drafts: no-op
 

@@ -42,7 +42,7 @@ const SCOPE_LEARNED: Record<string, string> = {
 const LEARN_RULE: Record<string, string> = {
   g: "Learned a rule for every customer",
   c: "Learned a rule for this customer",
-  once: "Just this once — will ask again next time",
+  once: "Just this once, will ask again next time",
 };
 
 function entries(owner: OwnerWorkspace | undefined, proposals: PlaybookProposal[] | undefined): Entry[] {
@@ -73,7 +73,7 @@ function entries(owner: OwnerWorkspace | undefined, proposals: PlaybookProposal[
       key: `p:${p.id}`,
       at: p.created_at,
       kind: "decision",
-      title: `${p.owner_initiated ? "Owner asked to" : `${p.customer ?? "A customer"} wants`}: ${p.label.toLowerCase()} — ${p.summary ?? ""}`,
+      title: `${p.owner_initiated ? "Owner asked to" : `${p.customer ?? "A customer"} wants`}: ${p.label.toLowerCase()} · ${p.summary ?? ""}`,
       detail: p.reason ? `Reason: “${p.reason}”` : null,
       customer: p.customer,
       conversationId: p.conversation_id,
@@ -95,7 +95,7 @@ function entries(owner: OwnerWorkspace | undefined, proposals: PlaybookProposal[
       key: `a:${a.id}`,
       at: a.created_at,
       kind: "approval",
-      title: `${APPROVAL_LABEL[a.kind] ?? a.kind.replace(/_/g, " ")}${a.summary ? ` — ${a.summary}` : ""}`,
+      title: `${APPROVAL_LABEL[a.kind] ?? a.kind.replace(/_/g, " ")}${a.summary ? ` · ${a.summary}` : ""}`,
       waiting,
       code: a.code,
       outcome: waiting

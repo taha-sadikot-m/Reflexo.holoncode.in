@@ -109,7 +109,7 @@ export function Overview() {
                       </Link>
                       <div className="max-w-[220px] truncate text-xs text-stone">{o.items}</div>
                     </td>
-                    <td className={cx(td, "text-dusk")}>{o.customer ?? "—"}</td>
+                    <td className={cx(td, "text-dusk")}>{o.customer ?? "-"}</td>
                     <td className={cx(td, "tabular text-right font-medium text-ink")}>{inr(o.total_rupees)}</td>
                     <td className={td}>
                       <StatusBadge status={o.status} />
@@ -241,7 +241,7 @@ export function Overview() {
                     ))}
                   </ul>
                 ) : (
-                  <div className="text-[13px] text-ember">No live worker — start the worker processes.</div>
+                  <div className="text-[13px] text-ember">No live worker. Start the worker processes.</div>
                 )}
               </div>
               <div className="grid grid-cols-4 gap-2 border-t border-sand pt-3">

@@ -7,6 +7,7 @@ atomically with the turn. Idempotent: the same `idempotency_base` never creates 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -46,6 +47,34 @@ AUTHOR_BY_ORIGIN = {
 }
 
 
+_DASH = re.compile(r"[ \t]*\u2014[ \t]*")
+
+
+def plain_punctuation(text: str) -> str:
+    """House style for everything we send: the long em-dash becomes a comma ("a, b"); one opening a line is
+    dropped. En-dashes in ranges ("4-8 pm" with an en-dash) stay."""
+    if "\u2014" not in text:
+        return text
+    lines = []
+    for line in text.split("\n"):
+        line = _DASH.sub(", ", line)
+        line = re.sub(r"^\s*,\s*", "", line)
+        line = re.sub(r",\s*([,.!?:;])", r"\1", line)
+        lines.append(line.rstrip(", "))
+    return "\n".join(lines)
+
+
+def plain_blocks(value: Any) -> Any:
+    """`plain_punctuation` on every string in a block (texts, captions, button and list titles)."""
+    if isinstance(value, str):
+        return plain_punctuation(value)
+    if isinstance(value, list):
+        return [plain_blocks(v) for v in value]
+    if isinstance(value, dict):
+        return {k: plain_blocks(v) for k, v in value.items()}
+    return value
+
+
 @dataclass(frozen=True)
 class EnqueueResult:
     message_id: UUID | None
@@ -73,7 +102,9 @@ class Outbound:
         turn_id: UUID | None = None,
         call_session_id: UUID | None = None,
     ) -> EnqueueResult:
-        parsed: list[ContentBlock] = BLOCKS.validate_python(blocks)
+        # house style on everything we send, whoever wrote it (the model, a workflow, the team): no em-dashes
+        plain = [plain_blocks(b.model_dump() if hasattr(b, "model_dump") else b) for b in blocks]
+        parsed: list[ContentBlock] = BLOCKS.validate_python(plain)
         existing = (
             await s.execute(
                 text("SELECT message_id FROM outbound_messages WHERE idempotency_key = :k"),

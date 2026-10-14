@@ -25,7 +25,7 @@ class OwnerFile:
     def line(self, tz_fmt: str) -> str:
         name = f' "{self.filename}"' if self.filename else ""
         desc = self.description or "not described yet"
-        return f"[file:{self.id}] {self.kind}{name} — {desc} — {self.received_via}, {tz_fmt}"
+        return f"[file:{self.id}] {self.kind}{name} - {desc} - {self.received_via}, {tz_fmt}"
 
 
 async def search_files(

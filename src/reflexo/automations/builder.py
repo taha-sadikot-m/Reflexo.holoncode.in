@@ -66,7 +66,7 @@ async def draft(
     examples = "\n".join(json.dumps(x, ensure_ascii=False) for x in demo.ALL)
     parts = [
         "You compile a shop owner's instruction into automation definitions (JSON). Return "
-        f'{{"automations": [...]}} with 1–{MAX_AUTOMATIONS} definitions — one per distinct rule in the instruction.',
+        f'{{"automations": [...]}} with 1–{MAX_AUTOMATIONS} definitions, one per distinct rule in the instruction.',
         CATALOGUE,
         f"BUSINESS: categories {categories}; order detail fields {fields}; channels whatsapp, telegram; "
         f"approved WhatsApp templates {APPROVED_TEMPLATES}.",
@@ -77,7 +77,7 @@ async def draft(
         parts.append(
             "YOUR PREVIOUS DRAFT:\n"
             + json.dumps(previous, ensure_ascii=False)
-            + "\nIT FAILED VALIDATION — fix exactly these problems and return the full corrected list:\n- "
+            + "\nIT FAILED VALIDATION: fix exactly these problems and return the full corrected list:\n- "
             + "\n- ".join(feedback)
         )
     model = ports.registry.require(ModelGatewayPort)  # type: ignore[type-abstract]

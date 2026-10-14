@@ -32,8 +32,8 @@ interface ResetResult {
 }
 
 const MODES = {
-  onboarding: "Meera starts onboarding with an empty catalogue — the demo builds it from a menu photo.",
-  full: "Meera is live with the full catalogue — for rehearsing later segments on their own.",
+  onboarding: "Meera starts onboarding with an empty catalogue, and the demo builds it from a menu photo.",
+  full: "Meera is live with the full catalogue, for rehearsing later segments on their own.",
 } as const;
 
 export function Settings() {
@@ -87,7 +87,7 @@ export function Settings() {
               <div className="rounded-lg bg-verdant-l px-3 py-2 text-sm">
                 Done in {last.seconds}s · {last.workflows_terminated} workflow{last.workflows_terminated === 1 ? "" : "s"} stopped ·{" "}
                 {Object.keys(last.businesses).join(", ")}
-                {last.workflows_unreachable && <div className="text-ember">Some workflows could not be stopped — is the Temporal worker running?</div>}
+                {last.workflows_unreachable && <div className="text-ember">Some workflows could not be stopped. Is the Temporal worker running?</div>}
                 <div className="text-xs text-dusk">Workers pick up the new connections within 30 s.</div>
               </div>
             )}

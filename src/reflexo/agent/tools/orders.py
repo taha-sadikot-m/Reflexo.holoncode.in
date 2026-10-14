@@ -67,8 +67,8 @@ async def _open_order_id(ctx: ToolContext, value: str) -> UUID:
 # What each status means to the customer — the model describes the order from this, never from its own guess
 # (live: "your order is confirmed!" while it was awaiting payment).
 STATUS_MEANING = {
-    "draft": "not placed yet — still being put together with the customer",
-    "awaiting_payment": "not confirmed yet — it confirms automatically when the payment arrives",
+    "draft": "not placed yet, still being put together with the customer",
+    "awaiting_payment": "not confirmed yet, it confirms automatically when the payment arrives",
     "confirmed": "confirmed",
     "preparing": "confirmed and being prepared",
     "out_for_delivery": "on its way to the customer",

@@ -133,7 +133,7 @@ export function History() {
   return (
     <div className="space-y-5">
       <PageHeader title="History">
-        Every change to what the AI knows, as one undoable step — and where it came from: the owner's words, an imported menu or price list, or a
+        Every change to what the AI knows, as one undoable step, and where it came from: the owner's words, an imported menu or price list, or a
         decision it learned from. Undo here is the owner's <Mono>/undo</Mono>, refused if the data changed since.
       </PageHeader>
       <Segmented<View>

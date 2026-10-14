@@ -86,10 +86,10 @@ export function PageHeader({ title, children, actions }: { title: string; childr
 }
 
 export const inr = (rupees: number | null | undefined) =>
-  rupees == null ? "—" : `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  rupees == null ? "-" : `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 export function fmtWhen(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
   const s = (Date.now() - d.getTime()) / 1000;
   if (Math.abs(s) < 60) return s >= 0 ? "just now" : "in <1 min";
@@ -101,7 +101,7 @@ export function fmtWhen(iso: string | null | undefined): string {
 }
 
 export function fmtDate(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }) : "—";
+  return iso ? new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }) : "-";
 }
 
 export function Json({ value, className }: { value: unknown; className?: string }) {
@@ -116,13 +116,13 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-medium uppercase tracking-wide text-stone">{label}</div>
-      <div className="mt-0.5 break-words text-[13.5px] text-ink">{children ?? "—"}</div>
+      <div className="mt-0.5 break-words text-[13.5px] text-ink">{children ?? "-"}</div>
     </div>
   );
 }
 
 const PAYMENT_METHOD: Record<string, string> = { razorpay_link: "Online", cod: "Cash on delivery" };
-export const paymentLabel = (m: string | null | undefined) => (m ? (PAYMENT_METHOD[m] ?? m.replace(/_/g, " ")) : "—");
+export const paymentLabel = (m: string | null | undefined) => (m ? (PAYMENT_METHOD[m] ?? m.replace(/_/g, " ")) : "-");
 
 /** "order.cancelled" → "Order cancelled", "payment.link_created" → "Payment link created". */
 export function eventLabel(type: string): string {

@@ -18,14 +18,15 @@ export function Card({
   flush?: boolean;
 }) {
   return (
-    <section className={cx("rounded-xl bg-white shadow-card", className)}>
+    // a flex column: in a fixed-height layout (the Inbox) the body fills the card and its lists can scroll
+    <section className={cx("flex flex-col rounded-xl bg-white shadow-card", className)}>
       {(title || actions) && (
         <header className="flex min-h-12 items-center justify-between gap-3 border-b border-sand px-5 py-3">
           <h2 className="text-[13px] font-semibold tracking-tight text-ink">{title}</h2>
           <div className="flex items-center gap-2">{actions}</div>
         </header>
       )}
-      <div className={flush ? "" : "p-5"}>{children}</div>
+      <div className={flush ? "flex min-h-0 flex-1 flex-col" : "min-h-0 flex-1 p-5"}>{children}</div>
     </section>
   );
 }

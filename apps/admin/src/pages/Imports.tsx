@@ -54,7 +54,7 @@ function ImportCard({ r }: { r: ImportRow }) {
                   <td className="py-1 pr-2" title={JSON.stringify(i.extracted)}>
                     {name(i.extracted)}
                   </td>
-                  <td className={cx("py-1 font-mono", (i.confidence ?? 1) < 0.7 && "text-sun")}>{i.confidence != null ? Number(i.confidence).toFixed(2) : "—"}</td>
+                  <td className={cx("py-1 font-mono", (i.confidence ?? 1) < 0.7 && "text-sun")}>{i.confidence != null ? Number(i.confidence).toFixed(2) : "-"}</td>
                   <td className="py-1 text-sun">{i.issues?.join(", ")}</td>
                   <td className="py-1">{i.resolution}</td>
                 </tr>

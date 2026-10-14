@@ -266,7 +266,7 @@ export function Automations() {
   });
   return (
     <div className="space-y-5">
-      <PageHeader title="Automations">Procedures the owner described in their own words — each compiled to a checked definition, read back, and run durably.</PageHeader>
+      <PageHeader title="Automations">Procedures the owner described in their own words, each compiled to a checked definition, read back, and run durably.</PageHeader>
       <ErrorNote error={list.error} />
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
         <Card>
@@ -297,7 +297,7 @@ export function Automations() {
               ))}
             </ul>
           ) : (
-            <Empty>No automations yet — the owner creates them by describing a procedure on WhatsApp.</Empty>
+            <Empty>No automations yet. The owner creates them by describing a procedure on WhatsApp.</Empty>
           )}
         </Card>
         <Card>{selected ? <Detail id={selected} bid={bid} /> : <Empty>Pick an automation.</Empty>}</Card>

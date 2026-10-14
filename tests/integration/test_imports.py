@@ -163,8 +163,8 @@ async def test_excel_import_reviewed_and_applied(registry: Registry, db: Databas
     summary = await owner_message_with(db, shop, "prices_oct.xlsx")
     body = summary["text"]
     assert "prices_oct.xlsx" in body and "3" not in body.split("\n")[0][:5]
-    assert "Chocolate Truffle Cake 1 kg price: ₹950 → ₹999" in body and "Lemon Tart — ₹380" in body
-    assert "Custom Photo Cake — price not found" in body
+    assert "Chocolate Truffle Cake 1 kg price: ₹950 → ₹999" in body and "Lemon Tart: ₹380" in body
+    assert "Custom Photo Cake: price not found" in body
     assert await price_of(db, shop, "Chocolate Truffle Cake", "1 kg") == 95000  # nothing applied yet
 
     code = re.search(r"YES (\d{4})", body).group(1)  # type: ignore[union-attr]

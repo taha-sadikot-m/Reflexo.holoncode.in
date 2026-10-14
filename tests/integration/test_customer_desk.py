@@ -191,7 +191,7 @@ def find_card(attempt: agent.Attempt, name: str) -> dict[str, Any] | None:
             if c["name"] == name:
                 return dict(c)
     prompt = "\n".join(m.content or "" for m in attempt.messages)
-    m = re.search(rf"\[offering:([0-9a-f-]+)\] {re.escape(name)} — (.+)", prompt)
+    m = re.search(rf"\[offering:([0-9a-f-]+)\] {re.escape(name)}: (.+)", prompt)
     if m is None:
         return None
     variants = [
@@ -308,7 +308,7 @@ async def test_tool_call_then_grounded_reply(registry: Registry, db: Database, f
         quote = tool_results(a)[-1]["data"]
         return reply(
             "send",
-            f"Haan, Karve Nagar mein delivery hoti hai — {quote['fee']}, {quote['free_above']} se upar free.",
+            f"Haan, Karve Nagar mein delivery hoti hai, {quote['fee']}, {quote['free_above']} se upar free.",
             topic="delivery_shipping",
             refs=[{"type": "delivery_zone", "id": quote["zone_id"]}],
         )

@@ -193,7 +193,7 @@ def section_text(lp: LoadedProfile, section: str) -> str:
             + (f" ({e.note})" if e.note else "")
             for e in p.hours.exceptions
         ]
-        return "Opening hours — " + "; ".join(lines)
+        return "Opening hours: " + "; ".join(lines)
     if section == "delivery":
         d = p.delivery
         zones = []

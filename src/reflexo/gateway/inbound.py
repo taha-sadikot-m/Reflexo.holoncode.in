@@ -417,8 +417,8 @@ class GatewayInbound:
         async with get_db().tenant_session(conn.business_id) as s:
             outcome = await identity.consume_link_code(s, conn.business_id, match.group(1), customer_id)
             reply = {
-                "linked": "Done! ✅ I'll continue here on WhatsApp — I have your earlier chat with me.",
-                "already_linked": "You're all set — we're already connected here. 🙂",
+                "linked": "Done! ✅ I'll continue here on WhatsApp, with your earlier chat.",
+                "already_linked": "You're all set. We're already connected here. 🙂",
                 "expired": "That code has expired. Please ask for a new one in the original chat.",
                 "unknown": "I couldn't recognise that code. Please check and try again.",
             }[outcome.status]
@@ -497,7 +497,7 @@ class GatewayInbound:
         await notifier.notify(
             conn.business_id,
             "human_waiting",
-            f"✋ {who} wrote while a person is handling this chat — the AI is staying quiet.{said}",
+            f"✋ {who} wrote while a person is handling this chat. The AI is staying quiet.{said}",
             dedupe_key=f"human_waiting:{conversation_id}:{row.human_active_until.isoformat()}",
             priority=PriorityClass.P1,
             buttons=[(f"ai:{conversation_id}", "🤖 Let AI handle"), (f"chat:{conversation_id}", "💬 Show chat")],

@@ -5,13 +5,16 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 
 import type { SimThread, SimThreadItem } from "../lib/api";
 import { fmtTime } from "../lib/stages";
+import { plain } from "../lib/text";
 import { ErrorNote, cx } from "./ui";
 
 export type Option = { id: string; title: string };
 
+export { plain } from "../lib/text";
+
 /** WhatsApp's own formatting: *bold* and _italic_. */
 export function WaText({ text }: { text: string }) {
-  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
+  const parts = plain(text).split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
   return (
     <>
       {parts.map((part, i) =>
@@ -87,7 +90,7 @@ export function Bubble({ item, onTap, disabled, tapped }: { item: SimThreadItem;
               <CornerDownLeft size={12} /> {item.option}
             </span>
           ) : item.media?.length && FILE_PLACEHOLDER.test((item.text ?? "").trim()) ? null : (
-            <span className="whitespace-pre-wrap break-words">{item.text}</span>
+            <span className="whitespace-pre-wrap break-words">{plain(item.text ?? "")}</span>
           )}
           <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-[#667781]">
             {fmtTime(item.at)} <CheckCheck size={12} className="text-[#53bdeb]" />
@@ -168,7 +171,7 @@ export function Device({
   actions,
   overlay,
   avatar,
-  emptyHint = "No messages yet — say hi",
+  emptyHint = "No messages yet. Say hi",
   placeholder = "Message",
   draft: controlledDraft,
   onDraft,

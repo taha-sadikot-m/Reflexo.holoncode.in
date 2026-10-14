@@ -67,7 +67,7 @@ function Catalogue({ items }: { items: KnowledgeView["catalogue"] }) {
                 <div className="font-medium text-ink">{o.name}</div>
                 {o.description && <div className="max-w-[320px] truncate text-xs text-stone">{o.description}</div>}
               </td>
-              <td className={cx(td, "capitalize text-dusk")}>{o.category ?? "—"}</td>
+              <td className={cx(td, "capitalize text-dusk")}>{o.category ?? "-"}</td>
               <td className={td}>
                 {o.price_on_request ? (
                   <Badge tone="warn">Price on request</Badge>
@@ -83,7 +83,7 @@ function Catalogue({ items }: { items: KnowledgeView["catalogue"] }) {
                   </div>
                 )}
               </td>
-              <td className={cx(td, "max-w-[220px] truncate text-xs text-stone")}>{o.aliases.join(", ") || "—"}</td>
+              <td className={cx(td, "max-w-[220px] truncate text-xs text-stone")}>{o.aliases.join(", ") || "-"}</td>
               <td className={td}>
                 <Badge tone={o.status === "active" ? "good" : "neutral"} dot>
                   {o.status === "active" ? "On sale" : "Hidden"}
@@ -187,7 +187,7 @@ function Profile({ p }: { p: Record<string, any> }) {
             </div>
           ))}
           <div className="text-xs text-stone">
-            Order at least {p.delivery?.notice_hours ?? "—"} h ahead{p.delivery?.pickup_available ? " · pickup available" : ""}
+            Order at least {p.delivery?.notice_hours ?? "-"} h ahead{p.delivery?.pickup_available ? " · pickup available" : ""}
           </div>
         </div>
         <div>
@@ -222,7 +222,7 @@ export function Knowledge() {
   const k = q.data;
   return (
     <div className="space-y-5">
-      <PageHeader title="Knowledge">What the AI answers from right now — every price, answer and policy comes from here and nowhere else.</PageHeader>
+      <PageHeader title="Knowledge">What the AI answers from right now. Every price, answer and policy comes from here and nowhere else.</PageHeader>
       <Segmented<View>
         value={view}
         onChange={(v) => setParams(v === "catalogue" ? {} : { view: v }, { replace: true })}

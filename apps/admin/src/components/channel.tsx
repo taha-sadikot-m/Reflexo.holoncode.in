@@ -18,7 +18,7 @@ const CHANNELS: Record<string, { icon: LucideIcon; label: string; tone: string }
 };
 
 export const channelLabel = (channel: string | null | undefined) =>
-  CHANNELS[channel ?? ""]?.label ?? (channel ? channel.replace(/_/g, " ") : "—");
+  CHANNELS[channel ?? ""]?.label ?? (channel ? channel.replace(/_/g, " ") : "-");
 
 export function ChannelIcon({ channel, size = "md", className }: { channel: string | null | undefined; size?: "sm" | "md" | "lg"; className?: string }) {
   const c = CHANNELS[channel ?? ""] ?? { icon: MessageSquare, label: channel ?? "", tone: "bg-bone text-dusk" };

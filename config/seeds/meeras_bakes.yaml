@@ -1,4 +1,4 @@
-# Meera's Bakes — home baker in Pune (POC_00 §3). Main demo story.
+# Meera's Bakes: home baker in Pune (POC_00 §3). Main demo story.
 # Identity values that differ per environment come from .env (REFLEXO_SEED_*), referenced by *_setting keys.
 slug: meeras-bakes
 name: "Meera's Bakes"
@@ -18,7 +18,7 @@ settings:
 profile:
   identity:
     name: "Meera's Bakes"
-    description: "Home bakery in Kothrud, Pune — fresh cakes, brownies and cookies, made to order."
+    description: "Home bakery in Kothrud, Pune: fresh cakes, brownies and cookies, made to order."
     category: "home bakery"
     owner_name: "Meera"
   contact:

@@ -202,7 +202,7 @@ class Renderer:
         if first.image_url:
             parts.append(IRImage(first.image_url))
         options = [
-            Option(id=f"product:{v.offering_id}", title=f"{v.name} — {v.lines[0].price_display}" if v.lines else v.name)
+            Option(id=f"product:{v.offering_id}", title=f"{v.name}: {v.lines[0].price_display}" if v.lines else v.name)
             for v in views
         ]
         self._text.append("\n".join(o.title for o in options))

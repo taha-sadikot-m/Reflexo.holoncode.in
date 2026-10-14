@@ -172,7 +172,7 @@ async def test_a_promise_with_no_record_becomes_a_question_and_the_recap_states_
     asked = await q(db, "SELECT question FROM owner_questions WHERE conversation_id = :c", c=call["conv"])
     assert [a.question for a in asked] == ["Price of the chocolate drip cake in the photo, 1 kg, pickup Fri 16 Oct"]
     told = json.dumps(await owner_messages(db, shop), ensure_ascii=False)
-    assert "they are waiting for your answer" in told and str(call["media"]) in told
+    assert "They are waiting for your answer" in told and str(call["media"]) in told
     recaps = [t for t in await outbound_texts(db, call["conv"]) if t.startswith("📞 Call summary")]
     assert len(recaps) == 1
     [stored] = await q(db, "SELECT summary FROM call_sessions WHERE id = :c", c=call["call"])

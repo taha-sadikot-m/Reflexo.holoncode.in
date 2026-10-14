@@ -78,8 +78,8 @@ def _cards_block(cards: list[dict[str, Any]]) -> str:
         extra = f" · eggless {c['eggless']}" if c.get("eggless") else ""
         status = "" if c["in_stock"] else " [OUT OF STOCK]"
         price = variants or "PRICE ON REQUEST"
-        lines.append(f"[offering:{c['offering_id']}] {c['name']} — {price}{extra}{status}")
-    return "\n".join(lines) or "(none matched — use catalog_search if products are asked about)"
+        lines.append(f"[offering:{c['offering_id']}] {c['name']}: {price}{extra}{status}")
+    return "\n".join(lines) or "(none matched, use catalog_search if products are asked about)"
 
 
 async def prepare(ref: TurnRef) -> PreparedContext:
@@ -171,7 +171,7 @@ async def build_context(
             "# BUSINESS (profile sections are referenced as profile:<section>; delivery zones as delivery_zone:<id>)",
             profile.text,
             "# DELIVERY ZONES\n" + "\n".join(f"delivery_zone:{z.id} = {z.label}" for z in biz_profile.delivery.zones),
-            f"# CHANNEL\n{conv.channel} — capabilities: {conv.capabilities}",
+            f"# CHANNEL\n{conv.channel}, capabilities: {conv.capabilities}",
             "# Q&A (owner's answers)\n" + (qa_lines or "(use knowledge_lookup)"),
         ]
     )
@@ -184,13 +184,13 @@ async def build_context(
     now_local = to_business_tz(utcnow(), tz)
     order_view = {**order.tool_view(), "status_meaning": STATUS_MEANING.get(order.status)} if order else None
     open_order_block = (
-        "# OPEN ORDER (in progress — use this order_id with the order tools; reference it as order:<order_id>)\n"
+        "# OPEN ORDER (in progress, use this order_id with the order tools; reference it as order:<order_id>)\n"
         + json.dumps(order_view, ensure_ascii=False)
         if order_view
         else ""
     )
     placed_block = (
-        "# THIS CUSTOMER'S ORDERS (placed and still live — use the order_id with order_status / order actions)\n"
+        "# THIS CUSTOMER'S ORDERS (placed and still live, use the order_id with order_status / order actions)\n"
         + "\n".join(
             f"- order_id {o.order_id} · {o.order_number} · {o.status} ({STATUS_MEANING.get(o.status, o.status)}) · "
             + ", ".join(f"{ln.quantity} × {ln.name}" for ln in o.lines)
@@ -221,7 +221,7 @@ async def build_context(
         else None
     )
     relay_block = (
-        "# THE OWNER ANSWERED — pass it on now\n"
+        "# THE OWNER ANSWERED: pass it on now\n"
         f'The customer asked: "{relay["question"]}"\nThe owner\'s answer (saved as qa:{relay["qa_id"]}): '
         f'"{relay["answer"]}"\nTell the customer this answer in their language, naturally and briefly '
         f"(action=send, reference qa:{relay['qa_id']}). Continue the conversation if they asked more."
@@ -231,7 +231,7 @@ async def build_context(
     waiting_block = (
         f'# WAITING ON THE OWNER\nAsked at {open_question["asked"]}: "{open_question["question"]}". This covers only '
         "that question: if the customer asks about it again, say you are still checking with the team (action=send) "
-        "and do not ask the owner again. Anything else in their message — a new order, another question — you "
+        "and do not ask the owner again. Anything else in their message (a new order, another question) you "
         "handle now as usual."
         if open_question
         else ""
@@ -250,7 +250,7 @@ async def build_context(
             *([waiting_block] if waiting_block else []),
             *([relay_block] if relay_block else []),
             *(shop_blocks or []),
-            "# NOW — new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
+            "# NOW: new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
             f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
             "Reply by calling `reply`.",
         ]
@@ -312,7 +312,7 @@ async def _shop_blocks(ref: TurnRef, customer_id: UUID | None) -> list[str]:
         how += [f"- {line}" for line in await procedures.describe(ref.business_id)]
     if how:
         blocks.append(
-            "# HOW THIS SHOP WORKS (the owner's own rules — act by them, never contradict them)\n" + "\n".join(how)
+            "# HOW THIS SHOP WORKS (the owner's own rules, act by them, never contradict them)\n" + "\n".join(how)
         )
 
     if proposal_id := ref.hints.get("proposal_id"):
@@ -320,7 +320,7 @@ async def _shop_blocks(ref: TurnRef, customer_id: UUID | None) -> list[str]:
         if a is not None:
             blocks.append(decided_block(a, await approvals.outcome(ref.business_id, a.id)))
     open_items = [
-        f"- You asked the owner: {a.preview.get('label', 'an action').lower()} {a.preview.get('summary', '')} — no "
+        f"- You asked the owner: {a.preview.get('label', 'an action').lower()} {a.preview.get('summary', '')}, no "
         "answer yet. If the customer asks, the shop is deciding and you will update them; never say it is done."
         for a in await approvals.open_for(ref.business_id, kind="tool_call", conversation_id=ref.conversation_id)
         if str(a.id) != str(proposal_id)

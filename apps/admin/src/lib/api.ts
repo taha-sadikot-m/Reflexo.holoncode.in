@@ -1,3 +1,5 @@
+import { plainDeep } from "./text";
+
 // Admin API client: cookie session (sent automatically), CSRF header on mutations, problem+json errors.
 
 export class ApiError extends Error {
@@ -44,7 +46,7 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
     }
     throw new ApiError(resp.status, code, detail);
   }
-  return (await resp.json()) as T;
+  return plainDeep((await resp.json()) as T); // house style on screen (see lib/text)
 }
 
 export const api = {

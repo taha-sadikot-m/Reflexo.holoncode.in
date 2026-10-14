@@ -63,7 +63,7 @@ export function OwnerFiles({ items }: { items: OwnerWorkspace["files"] }) {
             <div className="truncate text-[13.5px] font-medium text-ink">{f.filename}</div>
             {f.description && <div className="line-clamp-2 text-xs text-dusk">{f.description}</div>}
             <div className="mt-0.5 text-[11.5px] text-stone">
-              {f.kind} · {size(f.size_bytes)} · {f.received_via ? channelLabel(f.received_via) : "—"} · {fmtWhen(f.created_at)}
+              {f.kind} · {size(f.size_bytes)} · {f.received_via ? channelLabel(f.received_via) : "-"} · {fmtWhen(f.created_at)}
               {f.imports > 0 && (
                 <>
                   {" · "}

@@ -330,5 +330,7 @@ def sign_simulator(raw_body: bytes) -> str:
 __all__ += ["sign_simulator"]
 
 
-__all__ += ["SIM_MEDIA_PREFIX", "store_simulated_upload"]  # photos/files from simulated phones
+from reflexo.gateway.outbound import plain_punctuation  # noqa: E402
+
+__all__ += ["SIM_MEDIA_PREFIX", "plain_punctuation", "store_simulated_upload"]  # simulated phones; house style
 __all__ += ["answer_in_chat", "hand_back_to_ai"]  # the chat AI answers what waited (after a call / a takeover)

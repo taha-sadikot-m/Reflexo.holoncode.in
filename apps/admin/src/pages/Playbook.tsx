@@ -76,7 +76,7 @@ export function Playbook() {
   return (
     <div className="space-y-5">
       <PageHeader title="Rules">
-        What the AI may do on its own, must decline, or must ask about first — each rule read back word for word, with where it came from.
+        What the AI may do on its own, must decline, or must ask about first, each rule read back word for word, with where it came from.
         Undo works exactly like the owner's /undo.
       </PageHeader>
       <ErrorNote error={q.error ?? undo.error} />
@@ -99,7 +99,7 @@ export function Playbook() {
       ) : (
         <Card>
           <Empty icon={BookOpenCheck} hint="A rule appears when the owner taps “Always” after deciding, or teaches one in their own words.">
-            No active rules — the AI asks the owner whenever it is unsure
+            No active rules. The AI asks the owner whenever it is unsure
           </Empty>
         </Card>
       )}

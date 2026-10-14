@@ -345,7 +345,7 @@ class ReflexoVoiceAgent(Agent):
         try:
             return str(await asyncio.wait_for(waiter, timeout=max(10, min(timeout_s, 120))))
         except TimeoutError:
-            return "timeout: no photo arrived — carry on with the call"
+            return "timeout: no photo arrived, carry on with the call"
 
     async def _send_blocks(self, blocks: list[dict[str, Any]], key: str) -> None:
         if self.ctx.conversation_id is None:

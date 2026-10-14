@@ -73,8 +73,8 @@ function Detail({ id, bid }: { id: string; bid: string }) {
 
       {o.cancelled && (
         <div className="rounded-lg border border-[#f8cdd6] bg-ember-l px-3 py-2.5 text-[13px] text-[#a41034]">
-          Cancelled {fmtWhen(o.cancelled.at)} by {o.cancelled.by ?? "—"}
-          {o.cancelled.reason && <span className="text-[#a41034]/80"> — “{o.cancelled.reason}”</span>}
+          Cancelled {fmtWhen(o.cancelled.at)} by {o.cancelled.by ?? "-"}
+          {o.cancelled.reason && <span className="text-[#a41034]/80">: “{o.cancelled.reason}”</span>}
         </div>
       )}
 
@@ -230,7 +230,7 @@ export function Orders() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Orders">Every order the AI took — its payment, delivery and what happened to it, including what the owner decided.</PageHeader>
+      <PageHeader title="Orders">Every order the AI took: its payment, delivery and what happened to it, including what the owner decided.</PageHeader>
       <Capacity rows={cap.data ?? []} />
       <Segmented
         value={status}
@@ -279,7 +279,7 @@ export function Orders() {
                         </div>
                         <div className="max-w-[260px] truncate text-xs text-stone">{o.items}</div>
                       </td>
-                      <td className={cx(td, "text-dusk")}>{o.customer ?? "—"}</td>
+                      <td className={cx(td, "text-dusk")}>{o.customer ?? "-"}</td>
                       <td className={cx(td, "tabular text-right font-medium text-ink")}>{inr(o.total_rupees)}</td>
                       <td className={td}>
                         <div className="text-[12.5px] text-dusk">{paymentLabel(o.payment_method)}</div>

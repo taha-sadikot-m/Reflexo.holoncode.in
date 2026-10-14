@@ -77,9 +77,9 @@ export const CHANNEL_ICON: Record<string, string> = {
 };
 
 export const fmtMs = (ms: number | null | undefined) =>
-  ms === null || ms === undefined ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
+  ms === null || ms === undefined ? "-" : ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
 
-export const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—");
+export const fmtTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "-");
 
 /** What a trace was about, in words: the customer's message if there is one, else what the system did. */
 export function traceLabel(t: { snippet?: string | null; outcome: string | null; last_stage: string }): string {

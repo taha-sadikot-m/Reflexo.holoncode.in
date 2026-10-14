@@ -66,9 +66,11 @@ async def create(client: str) -> Sandbox:
     async with _lock:  # the limits are read-then-act; one creation at a time keeps them exact on this replica
         wait = _created.wait(client)
         if wait is not None:
-            raise DemoUnavailable("You've opened several demo shops in the last hour — reuse your current one.", wait)
+            raise DemoUnavailable(
+                "You've opened several demo shops in the last hour. Please reuse your current one.", wait
+            )
         if await _created_today() >= settings.demo_daily_cap:
-            raise DemoUnavailable("Today's live demos are fully booked — please try again tomorrow.")
+            raise DemoUnavailable("Today's live demos are fully booked. Please try again tomorrow.")
         await expire()
         suffix = secrets.token_hex(4)
         business_id = await seeding.load_sandbox(get_db(), suffix)

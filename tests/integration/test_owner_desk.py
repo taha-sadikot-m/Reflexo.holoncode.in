@@ -156,7 +156,7 @@ async def test_ambiguous_size_and_cancel(registry: Registry, db: Database, fake:
 
     def after_error(a: agent.Attempt) -> agent.FakeReply:
         seen["error"] = tool_results(a)[-1]["error"]
-        return say_owner("Which size — 500 g or 1 kg?")
+        return say_owner("Which size: 500 g or 1 kg?")
 
     fake.script(
         PRIMARY,
@@ -287,7 +287,7 @@ async def test_one_timeline_across_channels_with_recent_files(
     await owner_turn(registry, db, shop, "jo sheet bheji usse prices update karo")
     assert "[WhatsApp]" in seen["prompt"] and "naya price sheet bhej rahi hoon" in seen["prompt"]
     assert re.search(
-        r"\[file:[0-9a-f-]{36}\] spreadsheet \"prices_oct.xlsx\" — Excel: 3 rows — Item, Price — whatsapp",
+        r"\[file:[0-9a-f-]{36}\] spreadsheet \"prices_oct.xlsx\" - Excel: 3 rows — Item, Price - whatsapp",
         seen["prompt"],
     )
     assert "[Telegram]" in seen["prompt"]
@@ -385,7 +385,9 @@ async def test_adding_an_existing_product_updates_its_price(
         ),
     )
     await owner_turn(registry, db, shop, "Custom Photo Cake :- price 1500")
-    assert "✏️ Custom Photo Cake base price: — → ₹1,500" in (await owner_messages(db, shop))[-1]["text"]  # edit, not ➕
+    assert (
+        "✏️ Custom Photo Cake base price: none → ₹1,500" in (await owner_messages(db, shop))[-1]["text"]
+    )  # edit, not ➕
     await owner_says(registry, db, shop, "haan")
     rows = await q(
         db, "SELECT base_price_paise FROM offerings WHERE business_id = :b AND name = 'Custom Photo Cake'", b=shop.bid

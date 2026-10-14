@@ -117,7 +117,7 @@ class PlaybookRule(BaseModel):
         when = joiner.join(c.words(lang) for c in self.conditions)
         if lang == "en":
             verb = {"allow": "I do it myself", "deny": "I say no", "propose": "I ask you first"}[self.effect]
-            return f"{capability_label}: {verb}" + (f" when {when}" if when else " — always")
+            return f"{capability_label}: {verb}" + (f" when {when}" if when else ", always")
         verb = {"allow": "main khud kar deti hoon", "deny": "main mana kar deti hoon",
                 "propose": "main pehle aapse poochti hoon"}[self.effect]  # fmt: skip
         return f"{capability_label}: " + (f"jab {when}, " if when else "hamesha ") + verb

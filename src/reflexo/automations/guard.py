@@ -36,7 +36,7 @@ log = get_logger(__name__)
 
 def fail_closed() -> str:
     return fixed(
-        "I can't confirm that right now — I'll try again in a minute 🙏",
+        "I can't confirm that right now. I'll try again in a minute 🙏",
         "Abhi confirm nahi kar pa rahi, ek minute mein try karti hoon 🙏",
     )
 

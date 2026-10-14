@@ -76,7 +76,7 @@ async def keep_promises(ctx: VoiceCtx, promises: list[str]) -> int:
                 ctx.business_id,
                 ctx.conversation_id,
                 agent_api.OwnerQuestionDraft(question=promise[:500]),
-                brief=f"On the phone I told {who} we'd get back to them about this — they are waiting for your answer.",
+                brief=f"On the phone I told {who} we'd get back to them about this. They are waiting for your answer.",
                 facts_extra="📞 promised during a phone call",
             )
             kept += 1

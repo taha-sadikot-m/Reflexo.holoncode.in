@@ -123,13 +123,13 @@ def _sheet_rows(content: bytes, mime: str, filename: str | None) -> list[list[st
             if any(c.strip() for c in r)
         ]
     if name.endswith(".xls") and not name.endswith(".xlsx"):
-        raise ImportFailed("This is an old .xls file — please send it as .xlsx or CSV.")
+        raise ImportFailed("This is an old .xls file. Please send it as .xlsx or CSV.")
     from openpyxl import load_workbook
 
     try:
         wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     except Exception as exc:
-        raise ImportFailed("I couldn't open this Excel file — is it password-protected?") from exc
+        raise ImportFailed("I couldn't open this Excel file. Is it password-protected?") from exc
     for ws in wb.worksheets:  # first sheet with ≥ 2 non-empty columns
         rows = [
             ["" if v is None else str(v).strip() for v in row]
@@ -317,7 +317,7 @@ async def prepare(
                 "price_out_of_range": "price looks wrong",
                 "possible_duplicate": "listed twice",
             }[blocking[0]]
-            needs.append(f"{item.name} — {reason}")
+            needs.append(f"{item.name}: {reason}")
         else:
             status, target = await _apply_item(cs, business_id, item)
         stats["needs_review" if status == "needs_input" else status] += 1

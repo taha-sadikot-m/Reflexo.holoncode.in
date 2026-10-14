@@ -179,7 +179,7 @@ class ProposalService:
             return "Already saved ✅"
         if scope == "o":
             await approvals.record_outcome(business_id, approval_id, {**decision, "learned": "once"})
-            return "Okay — I'll ask you again next time. 👍"
+            return "Okay, I'll ask you again next time. 👍"
         cap = CAPABILITIES[str(a.subject["capability"])]
         customer_id = UUID(a.subject["customer_id"]) if scope == "c" else None
         who = f" (only for {a.subject.get('customer_name', 'this customer')})" if customer_id else ""
@@ -222,7 +222,7 @@ def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str
     if a.subject.get("owner_initiated"):
         why = f" (reason: “{a.subject['reason']}”)" if a.subject.get("reason") else ""
         return (
-            "# THE SHOP DECIDED — tell the customer now\n"
+            "# THE SHOP DECIDED: tell the customer now\n"
             f"The shop itself did this: {str(a.preview.get('summary', '')).lower()}{why}; status now "
             f"{outcome.get('status')}. Tell the customer kindly in their language, briefly (action=send).{cite}"
         )
@@ -239,7 +239,7 @@ def decided_block(a: approvals.Approval, decision: dict[str, Any] | None) -> str
         )
         result = f"The owner agreed and it is done (status: {outcome.get('status')}).{refund}"
     return (
-        "# THE SHOP DECIDED — tell the customer now\n"
+        "# THE SHOP DECIDED: tell the customer now\n"
         f"They had asked for: {asked} (their reason: “{a.subject.get('reason', '')}”). {result}\n"
         f"Say it in their language, briefly (action=send). Do not ask the shop again.{cite}"
     )

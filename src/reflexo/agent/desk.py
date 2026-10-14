@@ -318,7 +318,7 @@ class CustomerDesk:
         if question and draft:
             qid, code = question
             head = (
-                f'❓ *Question {code}* — {name} wrote: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
+                f'❓ *Question {code}* from {name}: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
                 if action == "fallback"
                 else None
             )

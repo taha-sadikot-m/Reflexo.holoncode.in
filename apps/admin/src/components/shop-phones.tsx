@@ -104,7 +104,7 @@ export function CustomerPhone({ phones, shopName, label, className }: { phones: 
         }}
         emptyHint={
           <>
-            Say hi to {shopName} — or tap a suggestion.
+            Say hi to {shopName}, or tap a suggestion.
             <br />
             Tap <Phone size={11} className="inline" /> above to call.
           </>
@@ -163,7 +163,7 @@ export function OwnerPhone({
         placeholder="Message your AI employee"
         emptyHint={
           emptyHint ??
-          "When the AI isn't sure, it asks you here — with buttons. You can also tell it to change prices, timings or rules, or send a photo of a new menu."
+          "When the AI isn't sure, it asks you here, with buttons. You can also tell it to change prices, timings or rules, or send a photo of a new menu."
         }
         height="h-[620px]"
       />

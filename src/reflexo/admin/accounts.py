@@ -136,15 +136,15 @@ async def signup(
     async with _lock:
         wait = _signups.wait(client)
         if wait is not None:
-            raise SignupRefused("Too many sign-ups from here — try again later.", status=429, retry_after_s=wait)
+            raise SignupRefused("Too many sign-ups from here. Please try again later.", status=429, retry_after_s=wait)
         if await _signups_today() >= settings.signup_daily_cap:
-            raise SignupRefused("Today's sign-ups are full — please try again tomorrow.", status=503)
+            raise SignupRefused("Today's sign-ups are full. Please try again tomorrow.", status=503)
         async with get_db().service_session(ServiceReason.ACCOUNTS) as s:
             taken = (
                 await s.execute(text("SELECT 1 FROM owner_accounts WHERE email = :e"), {"e": email})
             ).scalar_one_or_none()
         if taken:
-            raise SignupRefused("An account with this email already exists — log in instead.", status=409)
+            raise SignupRefused("An account with this email already exists. Please log in instead.", status=409)
         business_id = await seeding.create_business(
             get_db(), _seed(business_name, owner_name, category, area, secrets.token_hex(4)), full=False
         )

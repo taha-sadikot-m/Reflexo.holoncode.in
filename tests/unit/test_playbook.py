@@ -63,4 +63,4 @@ def test_readback_says_exactly_what_the_rule_does() -> None:
     )
     assert rule.readback("Order cancel karna", "hi-Latn").startswith("Order cancel karna: jab order ka status")
     always = rule.model_copy(update={"conditions": [], "effect": "propose"})
-    assert always.readback("Cancelling an order") == "Cancelling an order: I ask you first — always"
+    assert always.readback("Cancelling an order") == "Cancelling an order: I ask you first, always"

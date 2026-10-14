@@ -108,7 +108,7 @@ def test_cel_functions_and_templates() -> None:
 def test_readback_states_every_limit_wait_and_message() -> None:
     defs = [validator.parse(x)[0] for x in (demo.DAILY_CAKE_LIMIT, demo.COD_CONFIRMATION, demo.DELIVERY_REMINDER)]
     text = readback.readback([d for d in defs if d], "hi-Latn", demo_time_scale=60 / 86400)
-    assert text.startswith("Samajh gayi — ye 3 rules lagaungi:")
+    assert text.startswith("Samajh gayi, ye 3 rules lagaungi:")
     assert "maximum *8 cake* orders" in text and "9th order" in text and "agle available dates" in text
     assert "2 ghante tak customer ke reply ka intezaar" in text and "na aaye to: aapko bataungi" in text
     assert "delivery se ek din pehle 10:00 baje" in text and "template 'order_update'" in text

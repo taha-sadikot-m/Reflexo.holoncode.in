@@ -135,7 +135,7 @@ export function Lab() {
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight text-ink">Simulation Lab</h1>
           <p className="max-w-3xl text-sm text-dusk">
-            Simulated customers and a simulated owner talk to the real pipeline through signed provider payloads — only the last hop to WhatsApp is
+            Simulated customers and a simulated owner talk to the real pipeline through signed provider payloads. Only the last hop to WhatsApp is
             swapped. Nothing here reaches a real phone.
           </p>
         </div>

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Reflexo brand system — Indigo + Marigold: deep indigo ink, a violet primary, warm marigold accents and a soft
+/* Reflexo brand system - Indigo + Marigold: deep indigo ink, a violet primary, warm marigold accents and a soft
    warm-white canvas; Sora for headlines, Inter for text. The token names are shared by the site and the app; their
    values define the look, so every page follows from here. */
 @theme {
@@ -9,19 +9,19 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
   /* text */
-  --color-ink: #1a1446; /* headings — deep indigo */
+  --color-ink: #1a1446; /* headings - deep indigo */
   --color-soot: #26214a; /* body text */
   --color-dusk: #585374; /* secondary text */
   --color-stone: #948fab; /* muted text, placeholders */
 
   /* surfaces & lines */
-  --color-parchment: #f8f6f2; /* canvas — warm white */
+  --color-parchment: #f8f6f2; /* canvas - warm white */
   --color-bone: #f1eee9; /* subtle fill, hover */
   --color-sand: #e7e2da; /* borders, dividers */
-  --color-indigo: #ffffff; /* (legacy dark surface) — white in the light theme */
+  --color-indigo: #ffffff; /* (legacy dark surface) - white in the light theme */
   --color-twilight: #e7e2da; /* (legacy dark line) */
 
-  /* primary — Reflexo violet */
+  /* primary - Reflexo violet */
   --color-signal: #6c4ff5;
   --color-signal-d: #5236e0;
   --color-signal-l: #f0ecff;
@@ -39,7 +39,7 @@
   --color-sky: #0570de;
   --color-sky-l: #e6f0fd;
 
-  /* warm brand accent — marigold */
+  /* warm brand accent - marigold */
   --color-marigold: #ff9e1b;
   --color-marigold-d: #f08300;
   --color-saffron: #b45309;

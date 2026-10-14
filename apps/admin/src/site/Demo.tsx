@@ -1,6 +1,6 @@
 // The public live demo: a private copy of Meera's Bakes per visitor. The visitor is the customer (chat and voice
 // call) and the owner (the phone the AI asks and learns on), and can open the owner's dashboard for the same shop.
-// Everything here is the real product running on simulated phones — nothing is scripted.
+// Everything here is the real product running on simulated phones - nothing is scripted.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -76,10 +76,10 @@ function Intro({ onStart, starting, error }: { onStart: (name: string) => void; 
     onStart(name.trim());
   };
   const points: [LucideIcon, string, string][] = [
-    [MessageCircle, "Be the customer", "Chat on a WhatsApp-style phone — order, pay, change your mind."],
+    [MessageCircle, "Be the customer", "Chat on a WhatsApp-style phone: order, pay, change your mind."],
     [Phone, "Call the shop", "Talk to the AI from your browser, like a real phone call."],
     [Brain, "Be the owner", "See what it asks you, decide with one tap, and watch it learn."],
-    [LayoutDashboard, "Open the dashboard", "Orders, chats, calls and everything it learned — your shop's back office."],
+    [LayoutDashboard, "Open the dashboard", "Orders, chats, calls and everything it learned. Your shop's back office."],
   ];
   return (
     <div className="bg-hero relative min-h-full overflow-hidden text-white">
@@ -99,7 +99,7 @@ function Intro({ onStart, starting, error }: { onStart: (name: string) => void; 
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#25d366] opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-[#25d366]" />
             </span>
-            Live — the real product, not a recording
+            Live: the real product, not a recording
           </span>
           <h1 className="mt-6 font-display text-[40px] font-bold leading-[1.08] tracking-tight sm:text-[52px]">
             Meet Meera's
@@ -107,7 +107,7 @@ function Intro({ onStart, starting, error }: { onStart: (name: string) => void; 
             <span className="text-gradient">AI employee.</span>
           </h1>
           <p className="mt-5 max-w-xl text-[16.5px] leading-relaxed text-white/75">
-            Meera runs a home bakery in Pune. You get your own private copy of her shop — her menu, prices and policies — with an AI employee that is
+            Meera runs a home bakery in Pune. You get your own private copy of her shop (her menu, prices and policies) with an AI employee that is
             ready to work. Play both sides.
           </p>
           <form onSubmit={submit} className="mt-8 flex max-w-lg flex-col gap-3 sm:flex-row">
@@ -158,7 +158,7 @@ const MISSIONS: Mission[] = [
   {
     icon: MessageCircle,
     title: "Ask like a real customer",
-    what: "Answers come from Meera's own menu and policies — never invented.",
+    what: "Answers come from Meera's own menu and policies, never invented.",
     tries: [
       { who: "customer", text: "Eggless cakes? Price?", send: "Do you make eggless cakes? How much do they cost?" },
       { who: "customer", text: "Do you deliver to Baner?", send: "Do you deliver to Baner? What is the delivery charge?" },
@@ -176,13 +176,13 @@ const MISSIONS: Mission[] = [
   {
     icon: Phone,
     title: "Call the shop",
-    what: "Tap the phone icon on the customer's chat and talk. Mid-call, tap Chat and send a cake photo with 📎 — it finds the match while you talk.",
+    what: "Tap the phone icon on the customer's chat and talk. Mid-call, tap Chat and send a cake photo with 📎, and it finds the match while you talk.",
     tries: [{ who: "call", text: "Start a call" }],
   },
   {
     icon: Brain,
-    title: "Watch it ask the owner — and learn",
-    what: "After paying, ask to cancel. A paid order is Meera's call and she never wrote a rule for it, so the AI asks her phone. Decide, then tap “Always” — next time it knows.",
+    title: "Watch it ask the owner and learn",
+    what: "After paying, ask to cancel. A paid order is Meera's call and she never wrote a rule for it, so the AI asks her phone. Decide, then tap “Always”. Next time it knows.",
     tries: [{ who: "customer", text: "Cancel my order", send: "Please cancel my order, my plans have changed" }],
   },
   {
@@ -342,14 +342,14 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
       <main className="mx-auto grid max-w-[1380px] gap-6 px-5 py-6 xl:grid-cols-[minmax(0,1fr)_380px_380px]">
         <aside className="order-3 space-y-4 xl:order-1">
           <div>
-            <h1 className="font-display text-[22px] font-bold tracking-tight text-ink">Try it — both sides</h1>
+            <h1 className="font-display text-[22px] font-bold tracking-tight text-ink">Try it from both sides</h1>
             <p className="mt-1 text-[13.5px] text-dusk">Tap a suggestion or type your own. Everything is live: the AI, the payments (test mode) and the learning.</p>
           </div>
           <Guide onTry={onTry} done={done} />
           <UnderTheHood businessId={bid} />
         </aside>
-        <CustomerPhone className="order-1 xl:order-2" phones={phones} shopName={shop.name} label="The customer — you" />
-        <OwnerPhone className="order-2 xl:order-3" phones={phones} ownerName="Meera" label="The owner — Meera's phone" />
+        <CustomerPhone className="order-1 xl:order-2" phones={phones} shopName={shop.name} label="The customer: you" />
+        <OwnerPhone className="order-2 xl:order-3" phones={phones} ownerName="Meera" label="The owner: Meera's phone" />
       </main>
     </div>
   );

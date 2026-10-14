@@ -56,10 +56,10 @@ export function Setup() {
   const live = o?.business_status === "active";
   const tested = !!o && o.customer_chats > 0;
   const steps = [
-    { icon: FileImage, title: "Send your menu", text: "On your phone (right): a photo, PDF or Excel of your menu or price list — or just type it.", done: sent },
-    { icon: MessageCircleQuestion, title: "Answer a few questions", text: "Delivery, payments, timings — in plain words. Skip anything you like.", done: answered },
+    { icon: FileImage, title: "Send your menu", text: "On your phone (right): a photo, PDF or Excel of your menu or price list, or just type it.", done: sent },
+    { icon: MessageCircleQuestion, title: "Answer a few questions", text: "Delivery, payments and timings, in plain words. Skip anything you like.", done: answered },
     { icon: Rocket, title: "Approve and go live", text: "It shows you what it understood. Say yes and it starts answering customers.", done: live },
-    { icon: ShoppingBag, title: "Test it as a customer", text: "Chat or call your shop from the customer phone (left) — ask, order, pay.", done: tested },
+    { icon: ShoppingBag, title: "Test it as a customer", text: "Chat or call your shop from the customer phone (left): ask, order, pay.", done: tested },
   ];
   const current = steps.findIndex((s) => !s.done);
   return (
@@ -76,7 +76,7 @@ export function Setup() {
           <OwnerPhone
             phones={phones}
             ownerName={ownerName}
-            label={`You — ${ownerName}'s phone`}
+            label={`You: ${ownerName}'s phone`}
             emptyHint="Say hi, or send a photo of your menu with 📎 to get started."
           />
         </div>

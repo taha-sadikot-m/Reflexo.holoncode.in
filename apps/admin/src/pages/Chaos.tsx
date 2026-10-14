@@ -37,7 +37,7 @@ function useNow(intervalMs = 1000) {
 
 function CheckValue({ value }: { value: unknown }) {
   if (typeof value === "boolean") return <Badge tone={value ? "good" : "bad"}>{value ? "yes" : "no"}</Badge>;
-  if (value === null || value === undefined) return <Mono>—</Mono>;
+  if (value === null || value === undefined) return <Mono>-</Mono>;
   if (typeof value === "number") return <span className="font-mono text-xs font-semibold">{value}</span>;
   if (typeof value === "string") return <span className="text-xs">{value}</span>;
   if (typeof value === "object" && "passed" in value) {
@@ -234,7 +234,7 @@ export function Chaos() {
                       <Badge tone={r.outcome?.ok ? "good" : "bad"}>{r.outcome?.ok ? "verified" : "failed"}</Badge>
                     )}
                   </td>
-                  <td className={cx("py-1.5 text-right font-mono text-xs", !r.outcome && "text-stone")}>{r.outcome ? `${r.outcome.seconds} s` : "—"}</td>
+                  <td className={cx("py-1.5 text-right font-mono text-xs", !r.outcome && "text-stone")}>{r.outcome ? `${r.outcome.seconds} s` : "-"}</td>
                 </tr>
               ))}
             </tbody>

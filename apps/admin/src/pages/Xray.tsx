@@ -181,7 +181,7 @@ export function Xray() {
     <div className="grid h-full grid-cols-[380px_1fr] gap-5">
       <Card title="Traces" actions={<ModeBadge mode={mode} />} className="flex min-h-0 flex-col overflow-hidden">
         <ErrorNote error={list.error} />
-        {!traces.length && <Empty>No traces yet — send a message on any channel.</Empty>}
+        {!traces.length && <Empty>No traces yet. Send a message on any channel.</Empty>}
         <ul className="-mx-4 -my-4 max-h-[calc(100vh-180px)] divide-y divide-sand overflow-auto">
           {traces.map((t) => (
             <li key={t.trace_id}>
@@ -259,7 +259,7 @@ export function Xray() {
               )}
             </Card>
             <div className="grid grid-cols-2 gap-5">
-              <Card title="Stage">{selectedRow ? <StageCard row={selectedRow} /> : <Empty>—</Empty>}</Card>
+              <Card title="Stage">{selectedRow ? <StageCard row={selectedRow} /> : <Empty>-</Empty>}</Card>
               <Card title="Outbound parts">
                 {detail.data?.outbound.length ? (
                   <table className="w-full text-xs">
@@ -278,7 +278,7 @@ export function Xray() {
                           <td>
                             <Badge tone={p.status === "sent" ? "good" : p.status === "failed" ? "bad" : "neutral"}>{p.status}</Badge>
                           </td>
-                          <td className="font-mono">{p.provider_message_id ?? "—"}</td>
+                          <td className="font-mono">{p.provider_message_id ?? "-"}</td>
                           <td className="font-mono">{p.attempts}</td>
                         </tr>
                       ))}

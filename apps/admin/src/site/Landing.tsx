@@ -89,7 +89,7 @@ function HeroPhone() {
             </div>
             <div className="flex justify-start">
               <div className={cx(bubble, "rounded-bl-md bg-white text-[#111]")}>
-                Sure! <b>Chocolate Truffle 1 kg</b> — ₹1,050 + ₹50 delivery. Tomorrow 4–8 pm, Kothrud. Shall I confirm?
+                Sure! <b>Chocolate Truffle 1 kg</b>: ₹1,050 + ₹50 delivery. Tomorrow 4–8 pm, Kothrud. Shall I confirm?
                 <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-black/5 pt-1.5 text-center text-[12px] font-semibold text-[#027eb5]">
                   <span>Yes, confirm</span>
                   <span>Change</span>
@@ -167,7 +167,7 @@ function Hero() {
               href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-xl px-5 text-[15px] font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/10"
             >
-              Create yours — free
+              Create yours free
             </a>
           </div>
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[13px] text-white/60">
@@ -227,24 +227,24 @@ function HowItWorks() {
     {
       icon: FileImage,
       title: "Send your menu",
-      text: "A photo of your menu or price list is enough. It reads the items, sizes and prices and builds your catalogue — you approve it in one tap.",
+      text: "A photo of your menu or price list is enough. It reads the items, sizes and prices and builds your catalogue. You approve it in one tap.",
     },
     {
       icon: BookOpenCheck,
       title: "Tell it how you work",
-      text: "“Delivery ₹50 within 10 km.” “COD only under ₹1,000.” “Ask me before cancelling.” Plain words — it reads them back so you know it understood.",
+      text: "“Delivery ₹50 within 10 km.” “COD only under ₹1,000.” “Ask me before cancelling.” Plain words. It reads them back so you know it understood.",
     },
     {
       icon: Sparkles,
       title: "It works, and learns",
-      text: "It answers, sells and takes payments around the clock. When something is new, it asks you — and remembers your answer for next time.",
+      text: "It answers, sells and takes payments around the clock. When something is new, it asks you and remembers your answer for next time.",
     },
   ];
   return (
     <section id="how" className="bg-parchment py-24">
       <div className="mx-auto max-w-6xl px-5">
         <SectionTitle kicker="How it works" title="Hire it in five minutes. No training, no forms.">
-          Set up happens in a chat with your AI employee — the same way you'd brief a new person in the shop.
+          Set up happens in a chat with your AI employee, the same way you'd brief a new person in the shop.
         </SectionTitle>
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {steps.map((s, i) => (
@@ -269,9 +269,9 @@ const FEATURES: { icon: LucideIcon; title: string; text: string; tone: string }[
   { icon: MessageCircle, title: "Sells in chat", text: "Shows products, answers questions, takes the order with every detail, sends a Razorpay link and confirms when paid.", tone: "bg-[#e7f8ee] text-[#128c4a]" },
   { icon: Mic, title: "Answers phone calls", text: "Picks up WhatsApp calls with a natural voice. Send a photo mid-call and it finds the matching cake.", tone: "bg-signal-l text-signal" },
   { icon: Brain, title: "Learns from you", text: "Unsure? It asks you with Yes / No buttons, does exactly what you decide, then offers to remember it as a rule.", tone: "bg-blossom text-marigold-d" },
-  { icon: Workflow, title: "Follows your procedures", text: "“Remind customers a day before delivery.” Describe it once in words — it becomes a reliable automation.", tone: "bg-sky-l text-sky" },
+  { icon: Workflow, title: "Follows your procedures", text: "“Remind customers a day before delivery.” Describe it once in words and it becomes a reliable automation.", tone: "bg-sky-l text-sky" },
   { icon: ShieldCheck, title: "Never makes things up", text: "Every price, policy and promise is checked against your own data before it is sent. No invented discounts. Ever.", tone: "bg-verdant-l text-verdant" },
-  { icon: LayoutDashboard, title: "Your back office, live", text: "Orders, payments, every chat and call, and everything it learned — in one dashboard, updated as it happens.", tone: "bg-[#fdeaf3] text-[#c2185b]" },
+  { icon: LayoutDashboard, title: "Your back office, live", text: "Orders, payments, every chat and call, and everything it learned, in one dashboard, updated as it happens.", tone: "bg-[#fdeaf3] text-[#c2185b]" },
 ];
 
 function Features() {
@@ -312,7 +312,7 @@ function Learning() {
             We didn't hard-code your rules. <span className="text-gradient">It learns them from you.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-white/70">
-            Every shop works differently. Instead of guessing, it asks — once — and keeps your answer as a rule you can read, undo or change.
+            Every shop works differently. Instead of guessing, it asks once and keeps your answer as a rule you can read, undo or change.
           </p>
         </div>
         <div className="mt-14 grid gap-4 lg:grid-cols-4">
@@ -383,7 +383,7 @@ function FinalCta() {
     <section className="bg-parchment py-20">
       <div className="mx-auto max-w-5xl px-5">
         <div className="bg-brand relative overflow-hidden rounded-3xl px-8 py-14 text-center text-white shadow-glow sm:px-14">
-          <h2 className="font-display text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Talk to a live AI employee — right now.</h2>
+          <h2 className="font-display text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Talk to a live AI employee, right now.</h2>
           <p className="mx-auto mt-4 max-w-xl text-[16px] text-white/85">
             Chat with it or call it from your browser as a customer, and watch the owner's side as it asks, decides and learns.
           </p>

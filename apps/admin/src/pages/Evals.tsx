@@ -128,7 +128,7 @@ export function Evals() {
           </Button>
         }
       >
-        The demo build measured with real Gemini on the dedicated eval business — customer turns go through the deployed pipeline, exactly as on a phone.
+        The demo build measured with real Gemini on the dedicated eval business. Customer turns go through the deployed pipeline, exactly as on a phone.
       </PageHeader>
       <ErrorNote error={q.error ?? run.error} />
       {(d?.running || (d?.log.length ?? 0) > 0) && (
@@ -150,7 +150,7 @@ export function Evals() {
             ))}
           </ul>
         ) : (
-          <Empty>No eval runs yet — run `make eval` or press the button.</Empty>
+          <Empty>No eval runs yet. Run `make eval` or press the button.</Empty>
         )}
         {rows.length > 0 && <div className="mt-3 text-[11px] text-stone">Last run {fmtWhen(rows[0]?.created_at)}</div>}
       </Card>

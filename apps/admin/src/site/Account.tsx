@@ -15,7 +15,7 @@ async function post(path: string, body: unknown): Promise<void> {
   if (!resp.ok) {
     const problem = await resp.json().catch(() => ({}));
     const detail = typeof problem.detail === "string" ? problem.detail : Array.isArray(problem.detail) ? "Please check the form." : null;
-    throw new Error(detail ?? "Something went wrong — please try again.");
+    throw new Error(detail ?? "Something went wrong. Please try again.");
   }
 }
 
@@ -112,9 +112,9 @@ export function Signup() {
           </h2>
           <ul className="mt-8 space-y-4 text-[15px] text-white/80">
             {[
-              "Send a photo of your menu or price list — it builds your catalogue.",
-              "Answer a few questions in plain words — delivery, payments, timings.",
-              "Test it as a customer, by chat and by voice — then go live.",
+              "Send a photo of your menu or price list, and it builds your catalogue.",
+              "Answer a few questions in plain words: delivery, payments, timings.",
+              "Test it as a customer, by chat and by voice, then go live.",
             ].map((t) => (
               <li key={t} className="flex gap-3">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-marigold/20 text-marigold">
@@ -150,7 +150,7 @@ export function Signup() {
         <Submit busy={busy}>
           Create my AI employee <ArrowRight size={17} />
         </Submit>
-        <p className="text-center text-[12px] text-stone">Your shop starts on test phones in your dashboard — nothing reaches real customers until you connect WhatsApp.</p>
+        <p className="text-center text-[12px] text-stone">Your shop starts on test phones in your dashboard. Nothing reaches real customers until you connect WhatsApp.</p>
       </form>
     </Shell>
   );

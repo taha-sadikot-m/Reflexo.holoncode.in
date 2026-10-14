@@ -92,7 +92,7 @@ async def render_text(business_id: UUID, output: AgentOutput) -> str:
             card = await knowledge.get_card(business_id, UUID(str(data["offering_id"])))
             if card:
                 prices = ", ".join(f"{v.name} {v.price_display}" for v in card.variants if v.price_display)
-                parts.append(f"[card: {card.name} — {prices}]")
+                parts.append(f"[card: {card.name}: {prices}]")
         elif kind == "carousel":
             cards = await knowledge.cards_for(business_id, [UUID(str(i["offering_id"])) for i in data["items"]], [])
             parts.append("[cards: " + ", ".join(c.name for c in cards) + "]")

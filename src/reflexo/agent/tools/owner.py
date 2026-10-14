@@ -540,7 +540,7 @@ async def confirm_pending(ctx: ToolContext, args: ConfirmPendingArgs, s: AsyncSe
     )
     if outcome is None:
         raise ToolError("NOT_FOUND", f"nothing waiting with code {args.code}", guidance="Check PENDING for the code.")
-    return {"result": outcome or "Done — the result follows in a moment."}
+    return {"result": outcome or "Done. The result follows in a moment."}
 
 
 # ---------------------------------------------------------------- automations (POC_06 §4)
@@ -705,7 +705,7 @@ async def order_action(ctx: ToolContext, args: OrderActionArgs, s: AsyncSession)
             "customer_name": name,
         },
         summary,
-        [f"{cap.label}: {summary}" + (f" — reason: “{args.reason}”" if args.reason else ""), f"I'll tell {name}."],
+        [f"{cap.label}: {summary}" + (f", reason: “{args.reason}”" if args.reason else ""), f"I'll tell {name}."],
         kind="tool_call",
     )
 

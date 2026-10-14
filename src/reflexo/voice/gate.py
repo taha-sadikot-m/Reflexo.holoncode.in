@@ -10,6 +10,7 @@ import re
 from collections.abc import AsyncIterable, AsyncIterator
 from typing import Any
 
+import reflexo.gateway.api as gateway
 from reflexo.agent.api import extract_amounts
 from reflexo.common.logging import get_logger
 
@@ -45,7 +46,7 @@ async def gated(stream: AsyncIterable[Any], allowed_paise: set[int], language: s
 
     def release(sentence: str) -> str:
         if check_sentence(sentence, allowed_paise):
-            return sentence
+            return gateway.plain_punctuation(sentence)  # house style, as for every chat message
         log.warning("voice_gate_replaced_sentence", amounts=[a.raw for a in extract_amounts(sentence)])
         return safe_line(language) + " "
 

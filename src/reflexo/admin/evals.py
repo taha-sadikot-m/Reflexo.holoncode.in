@@ -624,7 +624,7 @@ def write_report(ref: str, suites: list[SuiteResult]) -> Path:
     REPORTS.mkdir(parents=True, exist_ok=True)
     path = REPORTS / f"{ref}.md"
     lines = [
-        f"# Eval report — build `{ref}`",
+        f"# Eval report, build `{ref}`",
         "",
         f"{datetime.now(UTC):%Y-%m-%d %H:%M UTC} · business `{EVAL_SLUG}` · real Gemini",
         "",
@@ -644,7 +644,7 @@ def write_report(ref: str, suites: list[SuiteResult]) -> Path:
         failed = [r for r in s.results if not r.passed]
         if failed:
             lines += ["", f"## {s.suite}: failed cases", ""]
-            lines += [f"- `{r.id}` — {r.detail}" for r in failed]
+            lines += [f"- `{r.id}`: {r.detail}" for r in failed]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 

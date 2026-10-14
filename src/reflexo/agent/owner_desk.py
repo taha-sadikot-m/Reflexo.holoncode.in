@@ -47,7 +47,7 @@ from reflexo.common.xray import emit
 log = get_logger(__name__)
 TIMELINE = 30
 CHANNEL_TAG = {"whatsapp": "WhatsApp", "telegram": "Telegram", "facebook_messenger": "Messenger"}
-FALLBACK_TEXT = "Sorry, I couldn't finish that just now — please try again in a moment."
+FALLBACK_TEXT = "Sorry, I couldn't finish that just now. Please try again in a moment."
 
 
 # ---------------------------------------------------------------- context
@@ -130,7 +130,7 @@ async def prepare_owner(ref: TurnRef) -> OwnerContext:
             + ("\n".join(f.line(to_business_tz(f.created_at, tz).strftime("%d %b %H:%M")) for f in files) or "(none)"),
             "# PENDING\n" + ("\n".join(pending) or "(nothing pending)"),
             *([_onboarding_block(onboarding)] if onboarding and onboarding["state"] != "live" else []),
-            "# NOW — new message(s) from the owner\n" + "\n".join(_fmt(conv.channel, m, tz) for m in inbound),
+            "# NOW: new message(s) from the owner\n" + "\n".join(_fmt(conv.channel, m, tz) for m in inbound),
             f"Current time: {now.strftime('%a %d %b %Y, %H:%M')} ({tz}); {dates}. Finish with `reply_owner`.",
         ]
     )
@@ -163,7 +163,7 @@ def _onboarding_block(session: dict[str, Any]) -> str:
         "preview": "The owner is reviewing sample answers. 'theek hai'/ok → onboarding_finish. A correction → "
         "knowledge_change (qa) with the right answer, then ask if everything else is fine.",
     }
-    return f"# ONBOARDING (state: {state}) — not live for customers yet\n{steps.get(state, '')}"
+    return f"# ONBOARDING (state: {state}), not live for customers yet\n{steps.get(state, '')}"
 
 
 # ---------------------------------------------------------------- graph

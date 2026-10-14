@@ -49,7 +49,7 @@ def summarize_spreadsheet(content: bytes, mime: str, filename: str | None = None
         rows = [r for r in csv.reader(io.StringIO(content.decode("utf-8-sig", errors="replace"))) if any(r)]
         return _summary("CSV", None, rows)
     if name.endswith(".xls") and not name.endswith(".xlsx"):
-        return "Excel (old .xls format) — ask for .xlsx or CSV to read it"
+        return "Excel (old .xls format). Ask for .xlsx or CSV to read it"
     from openpyxl import load_workbook
 
     try:
@@ -74,7 +74,7 @@ def _summary(fmt: str, sheet: str | None, rows: list[list[str]]) -> str:
         return f"{fmt}{where}: empty"
     header, body = [c for c in rows[0] if c], rows[1:]
     sample = "; ".join(" ".join(c for c in r if c)[:60] for r in body[:3])
-    return f"{fmt}{where}: {len(body)} rows — {', '.join(header)[:120]}" + (f"; {sample}" if sample else "")
+    return f"{fmt}{where}: {len(body)} rows: {', '.join(header)[:120]}" + (f"; {sample}" if sample else "")
 
 
 async def describe(model_gateway: ModelGateway, business_id: UUID, media_object_id: UUID, *, owner_file: bool) -> str:

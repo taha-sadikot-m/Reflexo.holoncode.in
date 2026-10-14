@@ -76,7 +76,7 @@ async def start(business_id: UUID, caller_wa_id: str, caller_name: str | None = 
     if not (settings.livekit_url and settings.livekit_api_key and settings.livekit_api_secret.get_secret_value()):
         raise WebCallUnavailable("voice is not configured")
     if await live_calls() >= settings.voice_max_concurrent_calls:
-        raise WebCallUnavailable("all lines are busy — try again in a minute")
+        raise WebCallUnavailable("all lines are busy, please try again in a minute")
     conn = await _whatsapp_connection(business_id)
     async with get_db().tenant_session(business_id) as s:
         who = await gateway.resolve_caller(s, conn, caller_wa_id, caller_name, simulated=True)

@@ -279,11 +279,11 @@ async def load(business_id: UUID, cs_id: UUID, s: AsyncSession | None = None) ->
 
 def _fmt(key: str, value: Any) -> str:
     if value is None:
-        return "—"
+        return "none"
     if key.endswith("_paise") and isinstance(value, int | float):
         return format_inr(int(value))
     if isinstance(value, list):
-        return ", ".join(str(v) for v in value) or "—"
+        return ", ".join(str(v) for v in value) or "none"
     if isinstance(value, dict):
         return json.dumps(value, ensure_ascii=False)
     return str(value)
@@ -346,7 +346,7 @@ async def preview(business_id: UUID, cs_id: UUID) -> ChangeSetPreview:
                 extra = ""
                 price = after.get("price_paise", after.get("base_price_paise"))
                 if price is not None:
-                    extra = f" — {_fmt('price_paise', price)}"
+                    extra = f": {_fmt('price_paise', price)}"
                 if i.entity_type == "qa":
                     extra = f" → {after.get('answer', '')}"
                 lines.append(f"➕ {'Q&A: ' if i.entity_type == 'qa' else ''}{label}{extra}")

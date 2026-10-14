@@ -132,7 +132,7 @@ def question_notice(
     how to answer — buttons for the options, "I'll reply" and "Show chat"."""
     note = f"\n{brief.strip()}" if brief and brief.strip() else ""
     mine = f"\nMy guess: {guess}" if guess else ""
-    top = head or f"❓ *Question {code}* — {question}{note}{mine}"
+    top = head or f"❓ *Question {code}*: {question}{note}{mine}"
     body = f"{top}\n\n{facts}\n\nReply: `{code} <answer>`"
     buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate((options or [])[:2])]
     buttons += [(f"oq:{qid}:later", "I'll reply"), (f"chat:{conversation_id}", "💬 Show chat")]

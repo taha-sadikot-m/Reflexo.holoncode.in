@@ -90,9 +90,7 @@ def _owner_text(v: OrderView, settings: dict[str, Any], headline: str) -> str:
     when = " ".join(x for x in (details.get("delivery_date"), details.get("delivery_slot")) if x)
     msg = f" '{details['message_on_cake']}'" if details.get("message_on_cake") else ""
     where = details.get("address") or ""
-    return (
-        f"🧁 {headline} {v.order_number} — {items}{eggless}{msg}. {when} {where}. {format_inr(v.total_paise)}".strip()
-    )
+    return f"🧁 {headline} {v.order_number}: {items}{eggless}{msg}. {when} {where}. {format_inr(v.total_paise)}".strip()
 
 
 async def _notify_owner(business_id: UUID, kind: str, body: str, dedupe: str, about: UUID | None = None) -> None:
@@ -259,7 +257,7 @@ async def _create_link(s: Any, business_id: UUID, v: OrderView, settings: dict[s
         link = await integrations.razorpay().create_payment_link(
             amount_paise=int(row.amount_paise),
             reference_id=str(link_id),
-            description=f"{settings.get('name')} — Order {v.order_number}",
+            description=f"{settings.get('name')} order {v.order_number}",
             expire_by=int(time.time()) + cfg.payment_link_ttl_h * 3600,
             customer_name=customer.display_name if customer else None,
             customer_contact=customer.phone_e164 if customer and customer.phone_e164 else None,
@@ -345,7 +343,7 @@ async def apply_paid(
                 {
                     "type": "text",
                     "text": f"Payment of {amount} received, but order {v.order_number} was cancelled. "
-                    "The shop will refund it — they'll be in touch 🙏",
+                    "The shop will refund it and be in touch 🙏",
                 }
             ],
             f"paid:{link_id}",
@@ -353,7 +351,7 @@ async def apply_paid(
         await _notify_owner(
             business_id,
             "refund_due",
-            f"💸 {amount} paid for cancelled order {v.order_number} — refund needed.",
+            f"💸 {amount} paid for cancelled order {v.order_number}, refund needed.",
             f"refund_due:{link_id}",
             v.conversation_id,
         )
@@ -469,7 +467,7 @@ async def cancel_order(
     if guard is not None:
         await guard.release(business_id, order_id, "order_cancelled")
     if notify_owner and by != "owner":  # the agent sends its own FYI citing the rule it acted on
-        refund = f" Paid {format_inr(int(paid))} — refund needed." if paid else ""
+        refund = f" Paid {format_inr(int(paid))}, refund needed." if paid else ""
         who = "the customer" if by == "customer" else by
         await _notify_owner(
             business_id,

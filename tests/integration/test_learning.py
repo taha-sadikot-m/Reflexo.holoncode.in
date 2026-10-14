@@ -107,7 +107,7 @@ def asks_to_cancel(order_id: UUID, say: dict[str, str]) -> Any:
 
 
 SAY = {
-    "done": "Done — your order is cancelled.",
+    "done": "Done. Your order is cancelled.",
     "asked_owner": "I've asked the shop, I'll update you shortly.",
     "declined": "Sorry, the shop can't cancel this one.",
 }
@@ -441,7 +441,7 @@ async def test_a_date_change_follows_the_same_learning_loop(
     order, conv = await placed_order(registry, db, fake, shop, wa)
     [d] = await q(db, "SELECT delivery_date + 1 AS d FROM orders WHERE id = :o", o=order.order_id)
     new_day = d.d.isoformat()
-    say = {"done": "Done — moved.", "asked_owner": "I've asked the shop.", "not_possible": "That's not possible."}
+    say = {"done": "Done. Moved.", "asked_owner": "I've asked the shop.", "not_possible": "That's not possible."}
     fake.script(PRIMARY, learning(asks_to_change(order.order_id, {"delivery_date": new_day}, say), []))
     await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "ek din aage kar do"))
     assert (await outbound_texts(db, conv))[-1] == say["asked_owner"]
@@ -479,7 +479,7 @@ async def test_a_full_day_or_a_paid_total_cannot_change(
                     VALUES (:a, :b, :k, 8, 8)"""),
             {"a": installed.automation_id, "b": shop.bid, "k": f"cakes:{full_day}"},
         )
-    say = {"done": "Done — moved.", "not_possible": "That day is full, sorry."}
+    say = {"done": "Done. Moved.", "not_possible": "That day is full, sorry."}
     fake.script(PRIMARY, asks_to_change(order.order_id, {"delivery_date": full_day}, say))
     await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "ek din aage"))
     assert (await outbound_texts(db, conv))[-1] == say["not_possible"]
