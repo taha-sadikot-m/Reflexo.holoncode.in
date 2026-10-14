@@ -108,6 +108,24 @@ boundary makes it a property of the system.
 
 ## Architecture
 
+### D8a. Rebuild on a new architecture, harvest what was proven
+
+**Context.** An earlier Reflexo codebase ([reflexo_code](https://github.com/taha-sadikot-m/reflexo_code)) worked in
+places (Meta webhook parsing, the WhatsApp call bridge, payload limits per channel) but grew around shortcuts:
+separate paths and tables for Meta and non-Meta messages, duplicated identity code, platform-specific send tools.
+
+**Decision.** Start a new codebase on the architecture described here, and bring over only code that had been
+proven in production, through four steps (copy, adapt, harden, test) and an eight-point quality bar: new module
+boundaries and names, fully typed, idempotent handlers, masked logs and tracing, registry error codes, ported plus
+new tests, no restart-critical state in memory, no secrets. Every harvested file is recorded in
+[harvest_log.md](harvest_log.md).
+
+**Alternatives.** Refactoring the old code in place (the shortcuts were structural); rewriting everything (throws
+away hard-won provider details such as WhatsApp's WebRTC rules).
+
+**Consequences.** The proven parts arrived with their tests and with the edge cases they had already survived;
+everything around them follows one design.
+
 ### D8. A modular monolith
 
 **Decision.** One codebase, many processes, strict module boundaries (`<module>.api` only, checked in CI), ports

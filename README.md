@@ -121,4 +121,4 @@ uv run python tasks.py worker              # in a second terminal (and temporal 
 | `evals/` | Evaluation datasets and reports |
 | `deploy/` | Production compose files, Caddy config, Postgres roles |
 | `config/seeds/` | Demo businesses |
-| `docs/` | Architecture, decisions, deployment, quality |
+| `docs/` | Architecture, decisions, deployment, quality, and the log of code harvested from the earlier codebase ([reflexo_code](https://github.com/taha-sadikot-m/reflexo_code)) |
