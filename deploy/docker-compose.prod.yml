@@ -59,6 +59,8 @@ services:
     image: caddy:2.8.4-alpine
     environment:
       REFLEXO_DOMAIN: ${REFLEXO_DOMAIN}
+      # none set: a local-only placeholder, so the redirect block never asks for a certificate
+      REFLEXO_REDIRECT_FROM: ${REFLEXO_REDIRECT_FROM:-http://127.0.0.1:8081}
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
