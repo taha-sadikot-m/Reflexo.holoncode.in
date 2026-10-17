@@ -23,13 +23,23 @@ from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.ports import Registry
 from reflexo.common.xray import emit
-from reflexo.integrations.razorpay import PaymentLink, RazorpayClient, RazorpayError, sign, verify_signature
+from reflexo.integrations.razorpay import (
+    SIMULATED_LINK_PREFIX,
+    PaymentLink,
+    RazorpayClient,
+    RazorpayError,
+    SimulatedRazorpay,
+    sign,
+    verify_signature,
+)
 
 __all__ = [
     "PAYMENT_EVENT_QUEUE",
+    "SIMULATED_LINK_PREFIX",
     "PaymentLink",
     "RazorpayClient",
     "RazorpayError",
+    "SimulatedRazorpay",
     "WebhookResult",
     "ingest_razorpay",
     "razorpay",
@@ -45,6 +55,7 @@ HANDLED_EVENTS = frozenset(
 )
 _registry: Registry | None = None
 _client: RazorpayClient | None = None
+_simulated = SimulatedRazorpay()
 
 
 def register(registry: Registry) -> None:
@@ -52,8 +63,11 @@ def register(registry: Registry) -> None:
     _registry = registry
 
 
-def razorpay() -> RazorpayClient:
+def razorpay(*, simulated: bool = False) -> RazorpayClient | SimulatedRazorpay:
+    """The payment-link provider for an order: simulated conversations never reach Razorpay."""
     global _client
+    if simulated:
+        return _simulated
     if _client is None:
         _client = RazorpayClient()
     return _client

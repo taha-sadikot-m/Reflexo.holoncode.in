@@ -263,32 +263,14 @@ def test_amount_from_a_tool_result_is_backed_without_a_reference() -> None:
     assert check(out(text, topic="payments"), records(amounts_paise={150000, 180000})).passed
 
 
-def test_buttons_without_text_take_the_text_block_before_them() -> None:
-    # live: [text, buttons(no text)] was rejected twice and the customer got a fallback
+def test_reply_fields_are_never_guessed_for_the_model() -> None:
+    """WP-00: a reply is held to its schema when it is generated and explained when it is repaired. Nothing is
+    filled in for the model: the POC's fill-ins for a buttons block without text and a reply without `action`
+    each patched one example of that failure, and the next shape (live 14 Oct) got past them."""
     options = [{"id": "yes", "title": "Yes"}, {"id": "change", "title": "Change"}]
-    merged = out(
-        "x", blocks=[{"type": "text", "text": "Total ₹950. Confirm?"}, {"type": "buttons", "options": options}]
-    )
-    assert [b.type for b in merged.blocks] == ["buttons"] and merged.blocks[0].text == "Total ₹950. Confirm?"
-    with pytest.raises(ValueError):  # nothing to take: still invalid
-        out("x", blocks=[{"type": "buttons", "options": options}])
-
-
-def test_reply_without_action_takes_it_from_its_content() -> None:
-    """Live: a correct price answer was refused twice for leaving out `action`. The content says it."""
-    from reflexo.agent.schemas import AgentOutput
-
-    base = {"topic": "pricing", "language": "hi-Latn"}
-    sent = AgentOutput.model_validate({**base, "blocks": [{"type": "text", "text": "Gulab Jamun 1 kg ₹400"}]})
-    assert sent.action == "send"
-    asked = AgentOutput.model_validate(
-        {
-            **base,
-            "blocks": [{"type": "text", "text": "Ek minute, main check karti hoon"}],
-            "owner_question": {"question": "Can we do eggless laddoo?", "options": []},
-        }
-    )
-    assert asked.action == "ask_owner"
-    with pytest.raises(ValidationError):  # nothing to go on: still invalid
-        AgentOutput.model_validate(base)
-    assert AgentOutput.model_validate({**base, "action": "handoff"}).action == "handoff"  # explicit wins
+    with pytest.raises(ValidationError):
+        out("x", blocks=[{"type": "text", "text": "Total ₹950. Confirm?"}, {"type": "buttons", "options": options}])
+    with pytest.raises(ValidationError):
+        AgentOutput.model_validate(
+            {"topic": "pricing", "language": "hi-Latn", "blocks": [{"type": "text", "text": "Gulab Jamun 1 kg ₹400"}]}
+        )

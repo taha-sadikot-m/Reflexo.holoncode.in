@@ -88,6 +88,56 @@ async def test_create_sends_server_amount_and_retries_5xx() -> None:
     assert calls[-1].headers["authorization"].startswith("Basic ")
 
 
+async def test_rate_limit_waits_as_razorpay_asks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """WP-00 (live 14 Oct, 429 on /payment_links): the retry waits at least Retry-After, not our own short delay."""
+    monkeypatch.setattr(razorpay, "RETRY_DELAYS_S", (0.5, 1.5))
+    slept: list[float] = []
+
+    async def sleep(s: float) -> None:
+        slept.append(s)
+
+    monkeypatch.setattr(razorpay.asyncio, "sleep", sleep)
+    calls = 0
+
+    def handle(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429, headers={"retry-after": "2"}, json={"error": {"description": "Too many"}})
+        return httpx.Response(200, json=LINK)
+
+    assert (await create(client(httpx.MockTransport(handle)))).id == "plink_A"
+    assert slept == [2.0]
+
+
+async def test_rate_limit_longer_than_the_wait_budget_fails_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    slept: list[float] = []
+
+    async def sleep(s: float) -> None:
+        slept.append(s)
+
+    monkeypatch.setattr(razorpay.asyncio, "sleep", sleep)
+    limited = httpx.Response(429, headers={"retry-after": "60"}, json={"error": {"description": "Too many"}})
+    with pytest.raises(RazorpayError) as err:
+        await create(client(httpx.MockTransport(lambda r: limited)))
+    assert (err.value.code, err.value.status, slept) == ("RATE_LIMITED", 429, [])
+
+
+async def test_simulated_links_round_trip_without_any_request() -> None:
+    from reflexo.integrations.api import razorpay as provider
+
+    sim = provider(simulated=True)
+    assert isinstance(sim, razorpay.SimulatedRazorpay) and not isinstance(provider(), razorpay.SimulatedRazorpay)
+    ref = "01a1396e-f375-708b-9963-f0b0f8fa680c"
+    link = await sim.create_payment_link(amount_paise=95000, reference_id=ref, description="d", expire_by=1)
+    assert link.id == razorpay.SIMULATED_LINK_PREFIX + ref.replace("-", "") and link.short_url.endswith(ref)
+    assert (await sim.fetch_payment_link(link.id)).reference_id == ref
+    assert (await sim.cancel_payment_link(link.id)).status == "cancelled"
+    assert (await sim.refund_payment("pay_SIM123", 95000, {}))["amount"] == 95000
+    with pytest.raises(RazorpayError):
+        await sim.create_payment_link(amount_paise=0, reference_id=ref)
+
+
 async def test_duplicate_reference_fetches_existing_link() -> None:
     def handle(req: httpx.Request) -> httpx.Response:
         if req.method == "POST":

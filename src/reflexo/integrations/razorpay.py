@@ -20,6 +20,17 @@ from reflexo.common.logging import get_logger
 log = get_logger(__name__)
 TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 RETRY_DELAYS_S = (0.5, 1.5)
+# Most a request may wait between its retries. A customer is waiting for the reply; a limit that asks for longer
+# fails the request at once, so the caller can say so instead of holding the turn.
+RETRY_WAIT_BUDGET_S = 6.0
+
+
+def _retry_after_s(resp: httpx.Response) -> float | None:
+    """Razorpay's own wait on a 429, if it sends one (seconds form of Retry-After)."""
+    try:
+        return max(0.0, float(resp.headers["retry-after"]))
+    except (KeyError, ValueError):
+        return None
 
 
 class RazorpayError(Exception):
@@ -83,7 +94,9 @@ class RazorpayClient:
         if not self.configured:
             raise RazorpayError("Razorpay keys are not configured", code="CREDENTIAL_INVALID")
         last: RazorpayError | None = None
+        waited = 0.0
         for attempt in range(len(RETRY_DELAYS_S) + 1):
+            wait: float | None = RETRY_DELAYS_S[attempt] if attempt < len(RETRY_DELAYS_S) else None
             try:
                 resp = await self._client.request(method, f"{self._base}{path}", json=json, auth=self._auth)
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError) as exc:
@@ -98,7 +111,14 @@ class RazorpayClient:
                     else {}
                 )
                 retryable = resp.status_code >= 500 or resp.status_code == 429
-                code = "CREDENTIAL_INVALID" if resp.status_code == 401 else str(err.get("code") or "PROVIDER_ERROR")
+                if resp.status_code == 401:
+                    code = "CREDENTIAL_INVALID"
+                elif resp.status_code == 429:
+                    code = "RATE_LIMITED"
+                    asked = _retry_after_s(resp)
+                    wait = max(wait, asked) if wait is not None and asked is not None else wait
+                else:
+                    code = str(err.get("code") or "PROVIDER_ERROR")
                 last = RazorpayError(
                     str(err.get("description") or resp.text[:200]),
                     status=resp.status_code,
@@ -106,9 +126,10 @@ class RazorpayClient:
                     retryable=retryable,
                 )
             log.warning("razorpay_request_failed", path=path, attempt=attempt + 1, code=last.code, status=last.status)
-            if not last.retryable or attempt == len(RETRY_DELAYS_S):
+            if not last.retryable or wait is None or waited + wait > RETRY_WAIT_BUDGET_S:
                 break
-            await asyncio.sleep(RETRY_DELAYS_S[attempt])
+            await asyncio.sleep(wait)
+            waited += wait
         assert last is not None
         raise last
 
@@ -169,3 +190,49 @@ class RazorpayClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+
+SIMULATED_LINK_PREFIX = "plink_sim_"
+
+
+class SimulatedRazorpay:
+    """Payment links for simulated conversations (Simulation Lab, scenarios, benchmark, the public demo).
+
+    Their payments are always simulated (a signed `payment_link.paid` webhook from the Lab's Pay button), so a real
+    link only spent the account's links: a Razorpay test account makes 30 in its whole life, and on 14 Oct the
+    showcase hit that limit and every order fell back. Same interface as `RazorpayClient`; nothing leaves the
+    server. A link is "created" until the simulator pays it or its own expiry passes.
+    """
+
+    configured = True
+
+    def _link(self, reference_id: str, amount: int, status: str = "created") -> PaymentLink:
+        return PaymentLink(
+            id=f"{SIMULATED_LINK_PREFIX}{reference_id.replace('-', '')}",
+            short_url=f"{get_settings().public_base_url.rstrip('/')}/integrations/razorpay/simulated/{reference_id}",
+            status=status,
+            amount=amount,
+            reference_id=reference_id,
+        )
+
+    async def create_payment_link(self, *, amount_paise: int, reference_id: str, **_: Any) -> PaymentLink:
+        if amount_paise <= 0:
+            raise RazorpayError("amount must be positive", code="VALIDATION_FAILED")
+        return self._link(reference_id, amount_paise)
+
+    async def find_by_reference(self, reference_id: str) -> PaymentLink | None:
+        return self._link(reference_id, 0)
+
+    async def fetch_payment_link(self, link_id: str) -> PaymentLink:
+        return self._link(_reference_of(link_id), 0)
+
+    async def cancel_payment_link(self, link_id: str) -> PaymentLink:
+        return self._link(_reference_of(link_id), 0, status="cancelled")
+
+    async def refund_payment(self, payment_id: str, amount_paise: int, notes: dict[str, str]) -> dict[str, Any]:
+        return {"id": f"rfnd_sim_{payment_id[-14:]}", "amount": amount_paise, "status": "processed"}
+
+
+def _reference_of(link_id: str) -> str:
+    raw = link_id.removeprefix(SIMULATED_LINK_PREFIX)
+    return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}" if len(raw) == 32 else raw

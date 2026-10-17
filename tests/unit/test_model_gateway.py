@@ -343,12 +343,23 @@ def test_gemini_tool_choice_maps_to_function_calling_config() -> None:
     p = GeminiProvider("test-key")
     tools = [ToolSpec(name="reply", description="d", parameters={"type": "object", "properties": {}})]
     cfg = RoleConfig(primary="p")
-    auto = p._config(Attempt("p", MSG, tools, cfg), None)
-    assert auto.tool_config is None
     forced = p._config(Attempt("p", MSG, tools, cfg, tool_choice="reply"), None).tool_config.function_calling_config
     assert forced.mode == "ANY" and forced.allowed_function_names == ["reply"]
     anyc = p._config(Attempt("p", MSG, tools, cfg, tool_choice="any"), None).tool_config.function_calling_config
     assert anyc.mode == "ANY" and anyc.allowed_function_names is None
+
+
+def test_unforced_tool_calls_are_held_to_their_schemas() -> None:
+    """WP-00 (live 14 Oct): unconstrained calls sent a buttons block in the model's own shape in 7 of 10 replays of
+    the live turn and the customer got the holding message. Calls are decoded against the schema unless a role
+    explicitly opts out."""
+    p = GeminiProvider("test-key")
+    tools = [ToolSpec(name="reply", description="d", parameters={"type": "object", "properties": {}})]
+    validated = p._config(Attempt("p", MSG, tools, RoleConfig(primary="p")), None).tool_config.function_calling_config
+    assert validated.mode == "VALIDATED" and validated.allowed_function_names is None
+    auto = p._config(Attempt("p", MSG, tools, RoleConfig(primary="p", tool_calling="auto")), None)
+    assert auto.tool_config is None
+    assert p._config(Attempt("p", MSG, None, RoleConfig(primary="p")), None).tool_config is None  # no tools
 
 
 async def test_tool_choice_reaches_every_attempt(gw: ModelGateway, fake: FakeProvider) -> None:

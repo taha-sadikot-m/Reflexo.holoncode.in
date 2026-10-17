@@ -191,6 +191,11 @@ async def order_confirm(ctx: ToolContext, args: OrderConfirmArgs, s: AsyncSessio
             "alternatives": result.alternatives,
         }
         out["next"] = "Explain the reason kindly and offer the alternatives (e.g. pay by link, or another date)."
+        if result.needs_owner:
+            out["next"] = (
+                "Only the shop can resolve this: tell the customer their order is kept and the shop will follow up, "
+                "offer any alternatives, and reply with action=handoff and an owner_brief saying what failed."
+            )
     return out
 
 

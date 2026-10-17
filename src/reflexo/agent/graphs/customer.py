@@ -24,7 +24,7 @@ from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.model_gateway.langchain import GatewayChatModel
 from reflexo.agent.schemas import AgentOutput, GateResult
 from reflexo.agent.tools.actions import ACTION_TOOLS
-from reflexo.agent.tools.base import TOOLS, ToolContext, run_tools
+from reflexo.agent.tools.base import TOOLS, ToolContext, explain_invalid, run_tools
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import TurnHandle
 from reflexo.common.enums import PipelineEventStatus
@@ -114,9 +114,10 @@ async def model_node(state: CustomerState, config: RunnableConfig) -> dict[str, 
         return {"result": "fallback", "fallback_reason": "model_call_limit"}
     await deps.handle.checkpoint("model")
     llm = GatewayChatModel(gateway=deps.gateway, role="customer_desk", purpose="customer_turn")
-    # Auto by default: forcing a tool call on every step (mode ANY) fixed prose answers but pushed Hinglish replies
-    # into Devanagari in live tests. A prose answer is nudged, and the nudged step may only call `reply` — the
-    # model then transcribes its own draft (8/8 live, in the right script).
+    # No forced tool by default: forcing a call on every step (mode ANY) fixed prose answers but pushed Hinglish
+    # replies into Devanagari in live tests. Calls are still held to their schemas (`tool_calling: validated`).
+    # A prose answer is nudged, and the nudged step may only call `reply`: the model then transcribes its own draft
+    # (8/8 live, in the right script).
     choice = "reply" if state.get("nudged") else None
     try:
         ai = await llm.bind_tools(_tool_dicts(deps.bound), tool_choice=choice).ainvoke(state["messages"])
@@ -211,8 +212,10 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
     except ValidationError as exc:
         if repaired:
             return {"messages": skipped, "result": "fallback", "fallback_reason": "invalid_reply"}
-        first = exc.errors()[0]
-        msg = f"reply arguments invalid at {'.'.join(str(x) for x in first['loc'])}: {first['msg']}. Call reply again."
+        msg = (
+            "Your reply was NOT sent: its arguments are invalid. Fix every problem and call reply again:\n"
+            + explain_invalid(AgentOutput, exc, reply_call.args)
+        )
         return {
             "messages": [*skipped, ToolMessage(content=msg, tool_call_id=reply_call.id, name="reply")],
             "repair_attempted": True,

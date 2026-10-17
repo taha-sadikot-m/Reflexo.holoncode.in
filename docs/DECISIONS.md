@@ -86,6 +86,11 @@ hours; creation is limited per client and per day.
 **Consequences.** The demo exercises the real pipeline, gate, learning loop and voice. Nothing in a sandbox can
 reach a real customer, owner or payment.
 
+**Detail that mattered.** Until 18 Oct, simulated orders still created real Razorpay test links. A test account
+makes only 30 links in its whole life, so on launch day every order after the 30th fell back. Now a simulated
+conversation gets its links from a simulated payment provider with the same interface, and the simulator's Pay
+button pays them through the real signed webhook path.
+
 ### D6. One language, enforced by policy
 
 **Decision.** The platform writes and speaks English to everyone (`language_policy = en`); it still understands

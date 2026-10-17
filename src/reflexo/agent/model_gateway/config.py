@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -22,6 +22,10 @@ class RoleConfig(BaseModel):
     hedge_after_ms: int | None = None  # None = no hedging (fallback only on failure)
     timeout_ms: int = Field(default=20000, gt=0)
     thinking_budget: int | None = 0  # 0 = off; -1 = dynamic; None = provider default
+    # How tool calls are decoded when no tool is forced. "validated": the arguments are held to the tool's schema
+    # while the model may still answer in text. "auto": unconstrained (live: 7 of 10 replays sent a buttons block
+    # in a shape of the model's own and the turn fell back).
+    tool_calling: Literal["validated", "auto"] = "validated"
 
 
 class EmbeddingConfig(BaseModel):

@@ -154,10 +154,96 @@ def model_schema(model: type[BaseModel]) -> dict[str, Any]:
 # ---------------------------------------------------------------- execution
 
 
-def _guidance_for(exc: ValidationError) -> str:
-    first = exc.errors()[0]
-    where = ".".join(str(p) for p in first.get("loc", ()))
-    return f"Fix argument '{where}': {first.get('msg')}"
+# ---------------------------------------------------------------- explaining invalid arguments
+
+
+def _tag(alt: dict[str, Any]) -> Any:
+    """The union tag of one schema alternative (`"type": {"const": "buttons"}`), or None."""
+    return ((alt.get("properties") or {}).get("type") or {}).get("const")
+
+
+def _alternatives(node: dict[str, Any]) -> list[dict[str, Any]]:
+    """The non-null members of a union (pydantic writes discriminated unions as oneOf, optional values as anyOf)."""
+    return [a for a in node.get("anyOf", node.get("oneOf", [])) if a.get("type") != "null"]
+
+
+def _step(node: dict[str, Any], data: Any, part: str | int) -> tuple[dict[str, Any], Any, bool]:
+    """Follow one element of a pydantic error location through the schema and the sent data.
+    Returns (schema node, data node, whether `part` named a position in the data)."""
+    alts = _alternatives(node)
+    if alts and isinstance(part, str):
+        tagged = next((a for a in alts if _tag(a) == part), None)
+        if tagged is not None:  # discriminated union: pydantic puts the tag in the location
+            return tagged, data, False
+        node = next((a for a in alts if part in (a.get("properties") or {})), alts[0])
+    if isinstance(part, int):
+        return node.get("items") or {}, data[part] if isinstance(data, list) and part < len(data) else None, True
+    props = node.get("properties") or {}
+    sub = data.get(part) if isinstance(data, dict) else None
+    if part in props:
+        return props[part], sub, True
+    if isinstance(node.get("additionalProperties"), dict):
+        return node["additionalProperties"], sub, True
+    return node, data, False  # a validator name in the location: not a position
+
+
+def _shape(node: dict[str, Any]) -> str:
+    """Compact picture of what a schema node accepts, e.g. {text: string, options: [{id: string, title: string}]}."""
+    alts = _alternatives(node)
+    if alts:
+        tags = [_tag(a) for a in alts]
+        if all(tags):
+            return " | ".join(f'{{type: "{t}", ...}}' for t in tags)
+        nullable = len(alts) < len(node.get("anyOf", node.get("oneOf", [])))
+        return " | ".join(_shape(a) for a in alts) + (" | null" if nullable else "")
+    if "const" in node:
+        return json.dumps(node["const"], ensure_ascii=False)
+    if "enum" in node:
+        return " | ".join(json.dumps(v, ensure_ascii=False) for v in node["enum"])
+    if "properties" in node:
+        required = set(node.get("required", []))
+        fields = [f"{k}{'' if k in required else '?'}: {_shape(v)}" for k, v in node["properties"].items()]
+        return "{" + ", ".join(fields) + "}"
+    if node.get("type") == "array":
+        return f"[{_shape(node.get('items') or {})}]"
+    if isinstance(node.get("additionalProperties"), dict):
+        return f"{{string: {_shape(node['additionalProperties'])}}}"
+    return str(node.get("type") or "any")
+
+
+def explain_invalid(model: type[BaseModel], exc: ValidationError, args: Any) -> str:
+    """Every problem in a tool call's arguments, grouped by the object it is in, with the shape each missing or
+    wrong value should have and the keys that object does not know. One repair round can then fix them all
+    (live: the repair named one missing field without the shape, and the model sent the same arguments again)."""
+    schema = model_schema(model)
+    groups: dict[str, dict[str, Any]] = {}
+    for error in exc.errors():
+        loc = tuple(error.get("loc", ()))
+        missing = error.get("type") == "missing"
+        node, data, label = schema, args, ""
+        for part in loc[:-1] if missing else loc:
+            node, data, positional = _step(node, data, part)
+            if positional:
+                label += f"[{part}]" if isinstance(part, int) else (f".{part}" if label else str(part))
+            elif _tag(node) is not None and not label.endswith(")"):
+                label += f' (type "{_tag(node)}")'
+        group = groups.setdefault(label, {"node": node, "data": data, "problems": []})
+        if missing:
+            field_name = str(loc[-1])
+            field_node = (node.get("properties") or {}).get(field_name, {})
+            group["problems"].append(f"missing {field_name} ({_shape(field_node)})")
+        else:
+            group["problems"].append(f"{error.get('msg')}; expected {_shape(node)}")
+    lines = []
+    for label, group in groups.items():
+        problems = list(dict.fromkeys(group["problems"]))
+        known = (group["node"].get("properties") or {}).keys()
+        if known and isinstance(group["data"], dict):
+            unknown = sorted(k for k in group["data"] if k not in known)
+            if unknown:
+                problems.append(f"not fields here: {', '.join(unknown)}")
+        lines.append(f"- {label or 'arguments'}: " + "; ".join(problems))
+    return "\n".join(lines)
 
 
 async def run_tool(call: ToolCall, ctx: ToolContext, bound: set[str]) -> dict[str, Any]:
@@ -172,7 +258,11 @@ async def run_tool(call: ToolCall, ctx: ToolContext, bound: set[str]) -> dict[st
         try:
             args = td.args.model_validate(call.args)
         except ValidationError as exc:
-            result = err("INVALID_ARGS", str(exc.errors()[0].get("msg")), guidance=_guidance_for(exc))
+            result = err(
+                "INVALID_ARGS",
+                "the arguments do not match the tool's schema",
+                guidance="Fix every problem and call the tool again:\n" + explain_invalid(td.args, exc, call.args),
+            )
         else:
             try:
                 result = ok(await (_run_effect(td, ctx, args) if td.side_effect else td.fn(ctx, args)))

@@ -42,6 +42,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.money import format_inr
 from reflexo.common.ports import Registry
+from reflexo.common.timeutil import utcnow
 from reflexo.common.xray import emit
 
 log = get_logger(__name__)
@@ -173,7 +174,7 @@ async def confirm_order(business_id: UUID, order_id: UUID, method: PaymentMethod
         if method == "cod":
             rule = settings.get("cod_rule") or {}
             max_total = rule.get("max_total_paise")
-            if not rule.get("enabled") or (max_total is not None and v.total_paise > int(max_total)):
+            if not _cod_allowed(settings, v.total_paise):
                 reason = (
                     f"COD only for orders up to {format_inr(int(max_total))}"
                     if rule.get("enabled") and max_total
@@ -198,7 +199,23 @@ async def confirm_order(business_id: UUID, order_id: UUID, method: PaymentMethod
             await _event(s, business_id, "order.confirmed", v)
             confirmed = ConfirmResult(status="confirmed", order=v)
         else:
-            confirmed = await _create_link(s, business_id, v, settings, idem)
+            try:
+                async with s.begin_nested():  # a failed provider call leaves no half-made link row behind
+                    confirmed = await _create_link(s, business_id, v, settings, idem)
+            except integrations.RazorpayError as exc:
+                # live: a 429 escaped as a generic tool failure; the model retried at once, then fell back and the
+                # owner never learnt the link had failed. Now the order stays a draft and the decline says why.
+                log.warning("payment_link_failed", order_id=str(order_id), code=exc.code, status=exc.status)
+                if guard is not None:
+                    await guard.release(business_id, order_id, "payment_link_failed")
+                confirmed = ConfirmResult(
+                    status="declined",
+                    order=v,
+                    decline_code="PAYMENT_PROVIDER_UNAVAILABLE",
+                    decline_reason=f"the payment provider did not create the link ({exc.code})",
+                    alternatives=["cod"] if _cod_allowed(settings, v.total_paise) else [],
+                    needs_owner=True,
+                )
     if confirmed.status == "confirmed":
         await _notify_owner(
             business_id,
@@ -217,6 +234,25 @@ async def confirm_order(business_id: UUID, order_id: UUID, method: PaymentMethod
         total_paise=confirmed.order.total_paise,
     )
     return confirmed
+
+
+async def _payment_provider(s: Any, order_id: UUID) -> Any:
+    """Razorpay for real customers; the simulated provider for an order from a simulated conversation (its payment
+    is always simulated, and a real test link would spend one of the account's lifetime links)."""
+    simulated = (
+        await s.execute(
+            text("""SELECT c.simulated FROM orders o LEFT JOIN conversations c ON c.id = o.conversation_id
+                    WHERE o.id = :o"""),
+            {"o": order_id},
+        )
+    ).scalar_one_or_none()
+    return integrations.razorpay(simulated=bool(simulated))
+
+
+def _cod_allowed(settings: dict[str, Any], total_paise: int) -> bool:
+    rule = settings.get("cod_rule") or {}
+    max_total = rule.get("max_total_paise")
+    return bool(rule.get("enabled")) and (max_total is None or total_paise <= int(max_total))
 
 
 async def _create_link(s: Any, business_id: UUID, v: OrderView, settings: dict[str, Any], idem: str) -> ConfirmResult:
@@ -254,7 +290,8 @@ async def _create_link(s: Any, business_id: UUID, v: OrderView, settings: dict[s
         )
     ).one()
     if row.provider_link_id is None:
-        link = await integrations.razorpay().create_payment_link(
+        provider = await _payment_provider(s, v.order_id)
+        link = await provider.create_payment_link(
             amount_paise=int(row.amount_paise),
             reference_id=str(link_id),
             description=f"{settings.get('name')} order {v.order_number}",
@@ -458,9 +495,10 @@ async def cancel_order(
         )
         v = await orders.view(s, order_id)
         await _event(s, business_id, "order.cancelled", v, by=by, reason=reason, refund_due_paise=int(paid))
-    if link_to_cancel and integrations.razorpay().configured:
+        provider = await _payment_provider(s, order_id)
+    if link_to_cancel and provider.configured:
         try:  # the local row is already cancelled; a late payment on it is caught by apply_paid
-            await integrations.razorpay().cancel_payment_link(link_to_cancel)
+            await provider.cancel_payment_link(link_to_cancel)
         except Exception:
             log.warning("payment_link_cancel_failed", order_id=str(order_id), exc_info=True)
     guard = _port(OrderGuardPort)
@@ -562,10 +600,11 @@ async def refund_order(business_id: UUID, order_id: UUID, *, by: str, reason: st
         ).first()
         if str(o.payment_status) != "paid" or link is None:
             raise CommerceError("NOTHING_TO_REFUND", "nothing was paid online for this order")
+        provider = await _payment_provider(s, order_id)
     refund_id: str | None = None
-    if link.provider_payment_id and integrations.razorpay().configured:
+    if link.provider_payment_id and provider.configured:
         try:
-            refund = await integrations.razorpay().refund_payment(
+            refund = await provider.refund_payment(
                 link.provider_payment_id, int(link.amount_paise), {"order": o.order_number, "by": by}
             )
             refund_id = str(refund.get("id"))
@@ -631,12 +670,14 @@ async def reconcile_link(business_id: UUID, link_id: UUID, attempt: int) -> None
     async with get_db().tenant_session(business_id) as s:
         link = (
             await s.execute(
-                text("SELECT status, provider_link_id, expires_at FROM payment_links WHERE id = :id"), {"id": link_id}
+                text("SELECT status, provider_link_id, expires_at, order_id FROM payment_links WHERE id = :id"),
+                {"id": link_id},
             )
         ).first()
-    if link is None or str(link.status) != "created" or not link.provider_link_id:
-        return
-    remote = await integrations.razorpay().fetch_payment_link(link.provider_link_id)
+        if link is None or str(link.status) != "created" or not link.provider_link_id:
+            return
+        provider = await _payment_provider(s, link.order_id)
+    remote = await provider.fetch_payment_link(link.provider_link_id)
     if remote.status == "paid":
         await apply_paid(
             business_id, link_id, payment_id=remote.payment_id, amount_paid=remote.amount, source="reconcile"
@@ -644,6 +685,10 @@ async def reconcile_link(business_id: UUID, link_id: UUID, attempt: int) -> None
         return
     if remote.status in ("expired", "cancelled"):
         await apply_expired(business_id, link_id, remote.status)
+        return
+    if link.expires_at is not None and link.expires_at <= utcnow():
+        # past our own expiry and still unpaid: expired, whether or not the provider has said so yet
+        await apply_expired(business_id, link_id, "expired")
         return
     enqueuer = _port(JobEnqueuer)
     delay = min(get_settings().razorpay_reconcile_s * (2 ** min(attempt + 1, 4)), 900)
@@ -659,6 +704,22 @@ async def reconcile_link(business_id: UUID, link_id: UUID, attempt: int) -> None
 
 
 # ---------------------------------------------------------------- block views (CommerceViewsPort)
+
+
+async def simulated_link(payment_link_id: UUID) -> dict[str, Any] | None:
+    """What the page behind a simulated payment link shows (order, amount, status). None for any real link."""
+    async with get_db().service_session(ServiceReason.INTEGRATION_ROUTING) as s:
+        r = (
+            await s.execute(
+                text("""SELECT pl.amount_paise, pl.status, o.order_number FROM payment_links pl
+                        JOIN orders o ON o.id = pl.order_id
+                        WHERE pl.id = :id AND pl.provider_link_id LIKE :prefix"""),
+                {"id": payment_link_id, "prefix": integrations.SIMULATED_LINK_PREFIX + "%"},
+            )
+        ).first()
+    if r is None:
+        return None
+    return {"order_number": r.order_number, "amount": format_inr(r.amount_paise), "status": str(r.status)}
 
 
 class CommerceViews:

@@ -346,6 +346,42 @@ async def test_cod_rule_and_guard_decline(registry: Registry, db: Database, rzp:
     assert rzp.created == []  # no link for a declined order
 
 
+async def test_payment_provider_failure_is_a_decline_for_the_owner(
+    registry: Registry, db: Database, rzp: FakeRazorpay, guard: Guard, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WP-00 (live 14 Oct): Razorpay answered 429, the error escaped as a generic retryable tool failure, the model
+    retried at once and the turn fell back. Now the order stays a draft with no half-made link, and the tool returns
+    a decline that only the owner can resolve."""
+    shop = await shop_with_customer(db)
+    order = await ready_order(shop)
+
+    async def rate_limited(**kw: Any) -> PaymentLink:
+        raise integrations.RazorpayError("Too many requests", status=429, code="RATE_LIMITED", retryable=True)
+
+    monkeypatch.setattr(rzp, "create_payment_link", rate_limited)
+    res = await commerce.confirm_order(shop["bid"], order.order_id, "razorpay_link", idem="f1")
+    assert (res.status, res.decline_code, res.needs_owner) == ("declined", "PAYMENT_PROVIDER_UNAVAILABLE", True)
+    assert res.order.status == "draft" and res.alternatives == []  # COD is off for this shop
+    assert guard.released == ["payment_link_failed"]
+    assert await q(db, "SELECT id FROM payment_links WHERE order_id = :o", o=order.order_id) == []
+
+    ctx = agent.ToolContext(
+        business_id=shop["bid"],
+        desk="customer",
+        channel="whatsapp",
+        conversation_id=shop["conv"],
+        customer_id=shop["cust"],
+        member_id=None,
+        turn_id=new_id(),
+        step=1,
+    )
+    args = {"order_id": str(order.order_id), "payment_method": "razorpay_link"}
+    tool = await agent.run_tool(ToolCall(id="1", name="order_confirm", args=args), ctx, {"order_confirm"})
+    assert tool["ok"] and tool["data"]["decline"]["code"] == "PAYMENT_PROVIDER_UNAVAILABLE"
+    assert tool["data"]["order"]["reference"] == {"type": "order", "id": str(order.order_id)}  # the reply can cite it
+    assert "handoff" in tool["data"]["next"]
+
+
 # ---------------------------------------------------------------- Razorpay link + webhook (CHK-F03-2, -3, -6)
 
 
@@ -440,6 +476,56 @@ async def test_payment_link_webhook_confirms_order(registry: Registry, db: Datab
         )
         is False
     )
+
+
+async def test_simulated_conversations_never_reach_razorpay(
+    registry: Registry, db: Database, rzp: FakeRazorpay
+) -> None:
+    """WP-00 (live 14 Oct): simulated orders created real test links until the account's lifetime limit of 30 was
+    reached, and every order after that fell back. A simulated conversation gets simulated links end to end: the
+    Lab's Pay button confirms the order, refunds and cancels stay local, and an unpaid link expires on time."""
+    from reflexo.admin import sim
+    from reflexo.api.routes.integrations import simulated_payment_link
+
+    shop = await shop_with_customer(db)
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(text("UPDATE conversations SET simulated = true WHERE id = :c"), {"c": shop["conv"]})
+    order = await ready_order(shop)
+    res = await commerce.confirm_order(shop["bid"], order.order_id, "razorpay_link", idem="s1")
+    assert res.status == "awaiting_payment" and rzp.created == []  # nothing reached the real provider
+    [link] = await q(db, "SELECT provider_link_id, short_url FROM payment_links WHERE id = :l", l=res.payment_link_id)
+    assert link.provider_link_id.startswith(integrations.SIMULATED_LINK_PREFIX)
+    assert link.short_url.endswith(f"/integrations/razorpay/simulated/{res.payment_link_id}")
+    page = await simulated_payment_link(res.payment_link_id)
+    assert page.status_code == 200 and "MB-1001" in bytes(page.body).decode() and "₹1,050" in bytes(page.body).decode()
+
+    assert await sim.pay_link(shop["bid"], res.payment_link_id) == 200  # the simulator's Pay button
+    assert await run_jobs(registry, "commerce.payment_event") == 1
+    [o] = await q(db, "SELECT status, payment_status FROM orders WHERE id = :o", o=order.order_id)
+    assert (str(o.status), str(o.payment_status)) == ("confirmed", "paid")
+    refund = await commerce.refund_order(shop["bid"], order.order_id, by="owner")
+    assert refund["provider_refund"] is True and rzp.cancelled == []
+
+    other = await shop_with_customer(db)  # a real customer's link is not shown on the simulated page
+    real = await commerce.confirm_order(other["bid"], (await ready_order(other)).order_id, "razorpay_link", idem="s2")
+    assert len(rzp.created) == 1 and (await simulated_payment_link(real.payment_link_id)).status_code == 404
+
+    third = await shop_with_customer(db)  # unpaid simulated link: expires on its own expiry
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(text("UPDATE conversations SET simulated = true WHERE id = :c"), {"c": third["conv"]})
+    unpaid = await commerce.confirm_order(third["bid"], (await ready_order(third)).order_id, "razorpay_link", idem="s3")
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        await s.execute(
+            text("UPDATE payment_links SET expires_at = now() - interval '1 minute' WHERE id = :l"),
+            {"l": unpaid.payment_link_id},
+        )
+        await s.execute(
+            text("UPDATE jobs SET run_after = now() WHERE queue = 'commerce.reconcile_link' AND business_id = :b"),
+            {"b": third["bid"]},
+        )
+    await run_jobs(registry, "commerce.reconcile_link")
+    [gone] = await q(db, "SELECT status FROM payment_links WHERE id = :l", l=unpaid.payment_link_id)
+    assert str(gone.status) == "expired" and len(rzp.created) == 1
 
 
 async def test_reconciliation_confirms_without_webhook(registry: Registry, db: Database, rzp: FakeRazorpay) -> None:

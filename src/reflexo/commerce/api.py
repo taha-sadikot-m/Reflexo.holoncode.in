@@ -36,6 +36,7 @@ from reflexo.commerce.payments import (
     confirm_order,
     grounding_amounts,
     refund_order,
+    simulated_link,
 )
 from reflexo.common.contracts import CommerceViewsPort, JobHandlerRegistry, JobRow
 from reflexo.common.ports import Registry
@@ -61,6 +62,7 @@ __all__ = [
     "order_status",
     "refund_order",
     "register",
+    "simulated_link",
     "situation",
     "start_order",
     "update_order",

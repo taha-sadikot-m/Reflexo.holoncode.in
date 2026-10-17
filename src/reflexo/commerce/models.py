@@ -112,6 +112,7 @@ class ConfirmResult(BaseModel):
     decline_code: str | None = None
     decline_reason: str | None = None
     alternatives: list[str] = []
+    needs_owner: bool = False  # the decline is something only the shop can resolve (e.g. the payment provider failed)
 
 
 # Capability invariants (POC_10 §3): facts about the world, not business policy. Whether the business *wants* a

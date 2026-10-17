@@ -183,6 +183,10 @@ class GeminiProvider:
                         mode=t.FunctionCallingConfigMode.ANY, allowed_function_names=only
                     )
                 )
+            elif cfg.tool_calling == "validated":
+                kwargs["tool_config"] = t.ToolConfig(
+                    function_calling_config=t.FunctionCallingConfig(mode=t.FunctionCallingConfigMode.VALIDATED)
+                )
         if attempt.response_schema is not None:
             kwargs["response_mime_type"] = "application/json"
             kwargs["response_json_schema"] = attempt.response_schema
