@@ -29,9 +29,10 @@ build on any other import, and on dependencies the table below does not allow. C
 | `common` | Settings, ids (UUIDv7), money in paise, time and demo time scale, database sessions and tenancy, logging, tracing, ports, the X-ray event emitter, language policy |
 | `pipeline` | Queue mechanics, worker runtime, turn scheduling (coalescing, supersession), jobs |
 | `gateway` | Channel adapters (WhatsApp, Messenger, Instagram, Telegram, simulator), signature checks, normalisation, identity, conversations and messages, rendering content blocks per channel, outbound sending, channel policy (24-hour window, opt-out) |
-| `agent` | LangGraph desks (customer, owner, automation builder), context assembly, tools, the output gate, capabilities and the decision function, ask-the-owner, the model gateway |
+| `agent` | LangGraph desks (customer, owner, automation builder), context assembly, tools, the output gate, capabilities and `decide()`, messages written by purpose and checked, ask-the-owner, the model gateway |
+| `policy` | Cedar policies for `decide()`: schema, the owner's rules compiled one to one, layered evaluation, the reference evaluator, the bridge to the rule checker (`tools/policy-check`) |
 | `voice` | Call sessions, the WhatsApp WebRTC bridge, browser calls, the LiveKit agent, in-call chat events, end-of-call reconciliation |
-| `knowledge` | Business profile, catalogue (offerings and variants), Q&A, playbook rules, change sets with undo, hybrid search (full text + pgvector), menu import |
+| `knowledge` | Business profile, catalogue (offerings and variants), Q&A, playbook rules and their compiled policy sets, change sets with undo, hybrid search (full text + pgvector), menu import |
 | `commerce` | Orders, payment links (Razorpay), cash-on-delivery rules, order events |
 | `automations` | Automation definitions, CEL expressions (no `eval`), validator, read-back, router, guards, Temporal interpreter |
 | `approvals` | Approval requests with short codes, decisions, Temporal signals |
@@ -97,18 +98,20 @@ description into an automation definition.
 ### The learning employee
 
 No business flow is coded. The system has **capabilities** (typed actions such as `order.cancel`, `order.change`,
-`refund.request`) with hard invariants only (a delivered order cannot be cancelled) and a risk class.
+`refund.request`, `message.send`), each an action of the Cedar schema with a risk class. `decide()` evaluates Cedar
+policy layers: platform invariants (a delivered order cannot be cancelled), this customer's rules, the shop's rules,
+the risk default, and ceilings (money from a customer chat is always proposed).
 
 ```mermaid
 flowchart LR
-    R[Customer asks for an action] --> DEC{"decide()<br/>invariants, then the owner's rules,<br/>then the default for the risk class"}
+    R[Customer asks for an action] --> DEC{"decide() on Cedar<br/>invariants, then the owner's rules,<br/>then the default, then ceilings"}
     DEC -->|allowed| DO[Do it, tell the customer,<br/>note to the owner citing the rule]
     DEC -->|not allowed| NO[Decline with the reason]
     DEC -->|nothing covers it| P[Propose the exact action to the owner<br/>with buttons and a short brief]
     P --> OD[Owner decides]
     OD --> EX[Execute exactly as decided]
     EX --> L[Offer: always / only for this customer / just this once]
-    L --> RULE[Compile a rule, read it back,<br/>store with provenance and undo]
+    L --> RULE[Check the rule with the solver,<br/>read it back with an example,<br/>store with provenance and undo]
     RULE -.-> DEC
 ```
 

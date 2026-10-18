@@ -4,5 +4,6 @@ work_packages:
   - WP-00   # order-flow fix (no check ids; regression tests in tests/unit/test_invalid_args.py and others)
   - WP-01   # model-call tracing, cost, the benchmark baseline
   - WP-02   # credential vault and per-business connections
+  - WP-26   # policy engine on Cedar, the rule checker, messages written by purpose and checked
 checks:
   - CHK-DB-13   # every WP with a migration: WP-01 adds 0008

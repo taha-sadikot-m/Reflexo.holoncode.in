@@ -22,7 +22,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
+from reflexo.common import ports
 from reflexo.common.config import get_settings
+from reflexo.common.contracts import JobEnqueuer
 from reflexo.common.costs import Priced, Usage, price_call
 from reflexo.common.db import get_db
 from reflexo.common.enums import ModelCallKind, PipelineEventStatus
@@ -55,6 +57,7 @@ FEATURE_BY_PURPOSE = {
     "voice.call": "voice",
     "embedding": "embedding",
 }
+CAP_WARNING_QUEUE = "costs.cap_warning"  # the owner is told at the alert share (BETA_12 §8.3)
 
 
 def feature_of(ctx: CallCtx) -> str:
@@ -250,6 +253,14 @@ async def _check_cap(business_id: UUID, total: int, day: date) -> None:
         cap_micro_inr=cap,
         pct=pct,
     )
+    enqueuer = ports.registry.optional(JobEnqueuer)  # type: ignore[type-abstract]
+    if enqueuer is not None:  # the owner is told by a job: a turn never waits on writing the warning
+        await enqueuer.enqueue(
+            CAP_WARNING_QUEUE,
+            {"business_id": str(business_id), "spent_micro_inr": total, "cap_micro_inr": cap, "pct": pct},
+            business_id=business_id,
+            dedupe_key=f"costcap:{business_id}:{day.isoformat()}",
+        )
 
 
 async def turn_cost(business_id: UUID, turn_id: UUID) -> dict[str, int]:

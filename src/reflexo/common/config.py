@@ -109,6 +109,16 @@ class Settings(BaseSettings):
 
     # speed and cost (BETA_12 §6, §8.3, §9, §11)
     model_prices: str = "config/model_prices.yaml"
+    # policy engine (BETA_04 §7.5, §7.6)
+    policy_engine: Literal["cedar", "reference"] = "cedar"
+    policy_dir: str = "config/policy"
+    policy_check_cmd: str = "reflexo-policy-check"
+    policy_check_timeout_s: float = 10.0
+    # messages written by purpose (BETA_13 §6, §8)
+    messages_dir: str = "config/messages"
+    message_repair_rounds: int = 1
+    fallback_holding_per_day: int = 1
+    model_messages: str = "gemini-2.5-flash"  # WP-26: the cheapest model that passes the `messages` suite
     fx_primary_url: str = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR"
     fx_fallback_url: str = "https://open.er-api.com/v6/latest/USD"
     fx_refresh_at: str = "06:00"  # IST, daily

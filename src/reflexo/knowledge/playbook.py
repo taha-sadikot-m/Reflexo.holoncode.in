@@ -1,115 +1,40 @@
-"""Playbook rules (ADR-015, POC_10 §4): how *this* business wants the agent to act, taught by the owner.
+"""Playbook rules (ADR-015, POC_10 §4; BETA_04 §7): how *this* business wants the agent to act, taught by the owner.
 
 A rule says, for one capability, whether the agent may do it (`allow`), must not (`deny`) or must ask first
-(`propose`), optionally only when typed conditions hold. Conditions are data, not code or free CEL: a fixed
-catalogue of situation fields, each with a type and a plain-language label, so a rule evaluates deterministically
-and reads back to the owner word for word as it will behave. Rules are created, edited and undone through
-knowledge change sets (entity type `playbook_rule`).
+(`propose`), optionally only when typed conditions hold. The rule language (`FIELDS`, `Condition`) lives in
+`reflexo.policy`, which compiles active rules to Cedar for `decide()`. Rules are created, edited and undone
+through knowledge change sets (entity type `playbook_rule`); every change recompiles the policy sets in the same
+transaction. Before a new rule is read back to the owner, the rule checker verifies it (`check_change`).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+import reflexo.policy.api as policy
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
+from reflexo.common.logging import get_logger
 from reflexo.knowledge.changesets import apply_now
+from reflexo.knowledge.policysets import active_rules
 
-Effect = Literal["allow", "deny", "propose"]
-Op = Literal["is", "is_not", "in", "not_in", "lt", "lte", "gt", "gte", "includes"]
-SAFETY = {"deny": 3, "propose": 2, "allow": 1}  # on a tie the safest effect wins
-
-
-@dataclass(frozen=True)
-class FieldSpec:
-    kind: Literal["enum", "number", "list"]
-    en: str
-    hi: str
-    values: tuple[str, ...] = ()
-
-
-# The situation a capability is requested in. Every capability fills the fields that apply to it; a condition on
-# a missing field is false (a rule never fires on data it cannot see).
-FIELDS: dict[str, FieldSpec] = {
-    "order.status": FieldSpec(
-        "enum", "the order's status", "order ka status",
-        ("draft", "awaiting_payment", "confirmed", "preparing", "out_for_delivery", "delivered"),
-    ),
-    "order.payment_method": FieldSpec("enum", "the payment method", "payment ka tareeka", ("cod", "razorpay_link")),
-    "order.payment_status": FieldSpec(
-        "enum", "the payment status", "payment status", ("unpaid", "pending", "cod_pending", "paid")
-    ),
-    "order.total_rupees": FieldSpec("number", "the order total (₹)", "order total (₹)"),
-    "order.hours_until_delivery": FieldSpec("number", "hours left until delivery", "delivery mein bache ghante"),
-    "order.hours_since_placed": FieldSpec("number", "hours since the order was placed", "order kiye hue ghante"),
-    "order.categories": FieldSpec("list", "the order's categories", "order ki categories"),
-    "customer.orders_count": FieldSpec("number", "the customer's past orders", "customer ke pichhle orders"),
-}  # fmt: skip
-OPS_EN = {"is": "is", "is_not": "is not", "in": "is one of", "not_in": "is not one of", "lt": "is below",
-          "lte": "is at most", "gt": "is above", "gte": "is at least", "includes": "includes"}  # fmt: skip
-OPS_HI = {"is": "hai", "is_not": "nahi hai", "in": "inmein se hai", "not_in": "inmein se nahi hai",
-          "lt": "se kam hai", "lte": "zyada se zyada hai", "gt": "se zyada hai", "gte": "kam se kam hai",
-          "includes": "mein shaamil hai"}  # fmt: skip
+log = get_logger(__name__)
+Effect = policy.RuleEffect
+Op = policy.Op
+SAFETY = policy.SAFETY
+FieldSpec = policy.FieldSpec
+FIELDS = policy.FIELDS
+OPS_EN = policy.OPS_EN
+OPS_HI = policy.OPS_HI
+Condition = policy.Condition
 
 
-class Condition(BaseModel):
-    field: str
-    op: Op
-    value: str | float | list[str]
-
-    @field_validator("field")
-    @classmethod
-    def _known(cls, v: str) -> str:
-        if v not in FIELDS:
-            raise ValueError(f"unknown field {v}; use one of {sorted(FIELDS)}")
-        return v
-
-    def holds(self, situation: dict[str, Any]) -> bool:
-        if self.field not in situation or situation[self.field] is None:
-            return False
-        have = situation[self.field]
-        want = self.value
-        if self.op == "includes":
-            return str(want) in [str(x) for x in (have or [])]
-        if self.op in ("in", "not_in"):
-            members = [str(x) for x in (want if isinstance(want, list) else [want])]
-            return (str(have) in members) == (self.op == "in")
-        if self.op in ("is", "is_not"):
-            return (str(have) == str(want)) == (self.op == "is")
-        try:
-            a, b = float(have), float(want)  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return False
-        return {"lt": a < b, "lte": a <= b, "gt": a > b, "gte": a >= b}[self.op]
-
-    def words(self, lang: str = "en") -> str:
-        spec = FIELDS[self.field]
-        value = ", ".join(self.value) if isinstance(self.value, list) else str(self.value).replace("_", " ")
-        if isinstance(self.value, float) and self.value.is_integer():
-            value = str(int(self.value))
-        if lang == "en":
-            return f"{spec.en} {OPS_EN[self.op]} {value}"
-        return f"{spec.hi} {value} {OPS_HI[self.op]}"
-
-
-class PlaybookRule(BaseModel):
-    id: UUID
-    capability: str
-    effect: Effect
-    conditions: list[Condition] = Field(default_factory=list)
-    says: str
-    scope: Literal["global", "customer"] = "global"
-    customer_id: UUID | None = None
-    source: Literal["owner_instruction", "owner_decision"]
+class PlaybookRule(policy.Rule):
     source_ref: UUID | None = None
-
-    def applies(self, situation: dict[str, Any]) -> bool:
-        return all(c.holds(situation) for c in self.conditions)
 
     def readback(self, capability_label: str, lang: str = "en") -> str:
         """Deterministic: exactly what the rule will do, in the owner's language."""
@@ -121,15 +46,6 @@ class PlaybookRule(BaseModel):
         verb = {"allow": "main khud kar deti hoon", "deny": "main mana kar deti hoon",
                 "propose": "main pehle aapse poochti hoon"}[self.effect]  # fmt: skip
         return f"{capability_label}: " + (f"jab {when}, " if when else "hamesha ") + verb
-
-
-@dataclass(frozen=True)
-class RuleMatch:
-    rule: PlaybookRule
-
-    @property
-    def effect(self) -> Effect:
-        return self.rule.effect
 
 
 def _row(r: Any) -> PlaybookRule:
@@ -150,7 +66,7 @@ async def rules(
     business_id: UUID, *, capability: str | None = None, customer_id: UUID | None = None
 ) -> list[PlaybookRule]:
     """Active rules: global ones plus this customer's (all customers' when `customer_id` is None and the caller
-    wants the whole playbook — pass `customer_id` for a decision)."""
+    wants the whole playbook)."""
     async with get_db().tenant_session(business_id) as s:
         rows = (
             await s.execute(
@@ -158,28 +74,11 @@ async def rules(
                         FROM playbook_rules WHERE status = 'active'
                           AND (CAST(:cap AS text) IS NULL OR capability = :cap)
                           AND (scope = 'global' OR CAST(:c AS uuid) IS NULL OR customer_id = CAST(:c AS uuid))
-                        ORDER BY created_at"""),
+                        ORDER BY created_at, id"""),
                 {"cap": capability, "c": customer_id},
             )
         ).all()
     return [_row(r) for r in rows]
-
-
-async def match(
-    business_id: UUID, capability: str, situation: dict[str, Any], customer_id: UUID | None
-) -> RuleMatch | None:
-    """The rule that decides this request: this customer's rules before the business-wide ones; within a scope
-    the safest effect wins a tie (deny > propose > allow). None = the playbook does not cover it."""
-    applicable = [
-        r
-        for r in await rules(business_id, capability=capability, customer_id=customer_id)
-        if (r.scope == "global" or r.customer_id == customer_id) and r.applies(situation)
-    ]
-    for scope in ("customer", "global"):
-        candidates = [r for r in applicable if r.scope == scope]
-        if candidates:
-            return RuleMatch(max(candidates, key=lambda r: SAFETY[r.effect]))
-    return None
 
 
 async def add_rule(
@@ -222,3 +121,74 @@ async def add_rule(
         member_id=member_id,
     )
     return rule_id
+
+
+# ---------------------------------------------------------------- the rule checker before the read-back
+
+
+class RuleExample(BaseModel):
+    """One concrete situation where the change makes a difference, in playbook fields."""
+
+    kind: Literal["newly_acts", "no_longer_acts", "newly_declines", "no_longer_declines"]
+    capability: str
+    facts: dict[str, Any]
+
+
+class RuleCheck(BaseModel):
+    status: Literal["ok", "blocked", "unchecked"]
+    problem: Literal["impossible", "may_error", "invalid"] | None = None
+    shadowed_by: str | None = None  # the rule id that makes the new one never decide
+    examples: list[RuleExample] = Field(default_factory=list)
+    analysis: dict[str, Any] = Field(default_factory=dict)  # stored on the policy set (`policy_sets.analysis`)
+
+
+EXAMPLE_KINDS = {
+    ("acts", "more"): "newly_acts",
+    ("acts", "less"): "no_longer_acts",
+    ("declines", "more"): "newly_declines",
+    ("declines", "less"): "no_longer_declines",
+}
+
+
+async def check_change(business_id: UUID, proposed: policy.Rule, *, replaces: list[UUID] | None = None) -> RuleCheck:
+    """Verify a rule before it is read back (BETA_04 §7.6): it can match, it can never error, and what it newly
+    allows or forbids, with one concrete example each. `unchecked` = the checker could not run."""
+    async with get_db().tenant_session(business_id) as s:
+        old = await active_rules(s)
+    gone = set(replaces or [])
+    new = [r for r in old if r.id not in gone] + [proposed]
+    layer: policy.RuleLayer = "customer" if proposed.scope == "customer" else "shop"
+    compiled = policy.compile_rules(new, layer=layer).cedar_text
+    pid = f"rule:{proposed.id}"
+
+    lint = await policy.check("lint", set=compiled)
+    errors = await policy.check("never-errors", set=compiled) if lint.available else lint
+    pairs = [{"name": kind, "old": policy.view(old, kind, layer=layer), "new": policy.view(new, kind, layer=layer)}
+             for kind in ("acts", "declines")]  # fmt: skip
+    compare = await policy.check("compare", pairs=pairs) if errors.available else errors
+    analysis = {r.command: r.model_dump(exclude={"comparisons"}) for r in (lint, errors, compare)}
+    if not (lint.available and errors.available and compare.available):
+        log.warning("rule_check_unavailable", business_id=str(business_id), error=compare.error or lint.error)
+        return RuleCheck(status="unchecked", analysis=analysis)
+    if lint.error or errors.error or compare.error:
+        return RuleCheck(status="blocked", problem="invalid", analysis=analysis)
+    mine = [f for f in lint.findings if f.policy_id == pid]
+    if any(f.kind == "impossible" for f in mine):
+        return RuleCheck(status="blocked", problem="impossible", analysis=analysis)
+    if pid in errors.may_error:
+        return RuleCheck(status="blocked", problem="may_error", analysis=analysis)
+    examples = []
+    for comparison in compare.comparisons:
+        for direction in ("more", "less"):
+            cexs = comparison.more if direction == "more" else comparison.less
+            if cexs:
+                facts = policy.example_facts(cexs[0], old, new, comparison.name, layer, direction)  # type: ignore[arg-type]
+                examples.append(
+                    RuleExample(
+                        kind=EXAMPLE_KINDS[(comparison.name, direction)],
+                        capability=policy.as_request(cexs[0]).action,
+                        facts=facts,
+                    )
+                )
+    shadow = next((f.by for f in mine if f.kind == "shadowed"), None)
+    return RuleCheck(status="ok", shadowed_by=shadow, examples=examples, analysis=analysis)

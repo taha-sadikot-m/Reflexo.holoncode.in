@@ -1,0 +1,12 @@
+# Read-back vocabulary for what a rule change newly allows or forbids (BETA_04 §7.6). Each line is followed by the
+# example in the playbook's field words: "This also lets me do it myself when the order total (₹) is 500."
+en:
+  newly_acts: "This also lets me do it myself when"
+  no_longer_acts: "I will no longer do it myself when"
+  newly_declines: "This also makes me say no when"
+  no_longer_declines: "I will no longer say no when"
+hi-Latn:
+  newly_acts: "Isse main yeh khud bhi kar dungi jab"
+  no_longer_acts: "Main yeh ab khud nahi karungi jab"
+  newly_declines: "Isse main mana bhi kar dungi jab"
+  no_longer_declines: "Main ab mana nahi karungi jab"

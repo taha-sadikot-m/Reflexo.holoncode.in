@@ -211,7 +211,7 @@ async def test_failed_turn_while_owner_question_open_does_not_ask_again(
             )
         ).scalar_one()
     assert questions == 1  # live bug: "any update" became question 3162
-    assert notes.sent[1][0] == "question_followup" and '"any update?"' in notes.sent[1][1]
+    assert notes.sent[1][0] == "question_followup" and "any update?" in notes.sent[1][1]
     assert "still" in (await outbound_texts(db, first.ref.conversation_id))[-1].lower()
 
 

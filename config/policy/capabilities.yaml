@@ -1,0 +1,21 @@
+# How the owner reads each capability (read-backs, proposals, buttons). One entry per action of
+# reflexo.cedarschema; checked by CHK-POL-8. `verb` is the approve button's verb, `label` names the action.
+order.cancel: {label: {en: "Cancelling an order", hi-Latn: "Order cancel karna"}, verb: "cancel"}
+order.change: {label: {en: "Changing a placed order", hi-Latn: "Order badalna"}, verb: "change"}
+refund.request: {label: {en: "Refunding an order", hi-Latn: "Refund karna"}, verb: "refund"}
+reply.answer: {label: {en: "Answering a customer", hi-Latn: "Customer ko jawab dena"}, verb: "answer"}
+message.send: {label: {en: "Messaging a customer", hi-Latn: "Customer ko message bhejna"}, verb: "send"}
+broadcast.send: {label: {en: "Messaging a group of customers", hi-Latn: "Kai customers ko message bhejna"}, verb: "send"}
+call.place: {label: {en: "Calling a customer", hi-Latn: "Customer ko call karna"}, verb: "call"}
+customer.update: {label: {en: "Updating a customer's details", hi-Latn: "Customer ki details badalna"}, verb: "update"}
+webhook.call: {label: {en: "Sending data to your system", hi-Latn: "Aapke system ko data bhejna"}, verb: "send"}
+order.confirm_by_customer: {label: {en: "Confirming an order for a customer", hi-Latn: "Customer ka order confirm karna"}, verb: "confirm"}
+order.tag: {label: {en: "Tagging an order", hi-Latn: "Order par tag lagana"}, verb: "tag"}
+return.request: {label: {en: "Starting a return", hi-Latn: "Return shuru karna"}, verb: "start"}
+payment.request: {label: {en: "Asking for payment", hi-Latn: "Payment maangna"}, verb: "ask"}
+payment.confirm_manual: {label: {en: "Marking a payment as received", hi-Latn: "Payment mila mark karna"}, verb: "confirm"}
+stock.check: {label: {en: "Checking stock", hi-Latn: "Stock dekhna"}, verb: "check"}
+shipment.track: {label: {en: "Tracking a shipment", hi-Latn: "Shipment track karna"}, verb: "track"}
+slot.find: {label: {en: "Finding a free slot", hi-Latn: "Khaali slot dhoondhna"}, verb: "find"}
+booking.create: {label: {en: "Making a booking", hi-Latn: "Booking karna"}, verb: "book"}
+comment.hide: {label: {en: "Hiding a comment", hi-Latn: "Comment chhupana"}, verb: "hide"}

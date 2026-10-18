@@ -18,19 +18,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 from reflexo.agent import language as lang
-from reflexo.agent import prompts
+from reflexo.agent import messages, prompts
 from reflexo.agent.checkpointer import get_checkpointer
 from reflexo.agent.context import PreparedContext, holding_text, prepare
 from reflexo.agent.graphs.customer import CustomerState, TurnDeps, build_graph
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.owner_desk import OwnerDesk
-from reflexo.agent.questions import SLA_QUEUE, contact_line, create_owner_question, question_notice
+from reflexo.agent.questions import SLA_QUEUE, contact_line, create_owner_question, notify_question
 from reflexo.agent.runs import record_run
 from reflexo.agent.schemas import AgentOutput, OwnerQuestionDraft
 from reflexo.agent.tools.base import ToolContext
 from reflexo.agent.tools.customer import CUSTOMER_TOOLS
 from reflexo.common.config import get_settings
-from reflexo.common.contracts import JobEnqueuer, OwnerNotifyPort, TurnHandle, TurnRef
+from reflexo.common.contracts import JobEnqueuer, TurnHandle, TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass, TurnOutcome
 from reflexo.common.llm import CallCtx, current_call_ctx
@@ -44,11 +44,6 @@ HANDOFF_ACK = {
     "hi-Latn": "Main abhi team ko bata rahi hoon 🙏 Woh aapse jaldi baat karenge.",
     "hi": "मैं अभी टीम को बता रही हूँ 🙏 वे जल्दी आपसे बात करेंगे।",
     "en": "I'm letting the team know right away 🙏 They'll get back to you shortly.",
-}
-STILL_CHECKING = {
-    "hi-Latn": "Main abhi bhi team se confirm kar rahi hoon 🙏 Jaise hi jawab aata hai, batati hoon.",
-    "hi": "मैं अभी भी टीम से पूछ रही हूँ 🙏 जवाब आते ही बताती हूँ।",
-    "en": "I'm still checking with the team 🙏 I'll get back to you as soon as I hear from them.",
 }
 TIER = {"send": "t0", "no_reply": "t0", "ask_owner": "t1", "fallback": "t1", "handoff": "t2"}
 OUTCOME = {
@@ -172,6 +167,7 @@ class CustomerDesk:
 
         blocks: list[Any] = []
         draft: OwnerQuestionDraft | None = None
+        idempotency_base = f"turn:{ref.turn_id}"
         if action == "send" and output:
             blocks = list(output.blocks)
         elif action == "handoff":
@@ -186,9 +182,16 @@ class CustomerDesk:
             blocks = [{"type": "text", "text": str(prepared.relay["answer"])}]
             action = "send"
         elif action == "fallback" and prepared.open_question:
-            blocks = [{"type": "text", "text": STILL_CHECKING.get(language, STILL_CHECKING["hi-Latn"])}]
+            holding = await messages.holding_line(ref.business_id, ref.conversation_id, language, still_checking=True)
+            if holding:
+                blocks, idempotency_base = [{"type": "text", "text": holding[0]}], holding[1]
         elif action in ("ask_owner", "fallback"):
-            blocks = [{"type": "text", "text": holding_text(settings, language)}]
+            if action == "fallback":
+                holding = await messages.holding_line(ref.business_id, ref.conversation_id, language)
+                if holding:
+                    blocks, idempotency_base = [{"type": "text", "text": holding[0]}], holding[1]
+            else:
+                blocks = [{"type": "text", "text": holding_text(settings, language)}]
             draft = (output.owner_question if output and action == "ask_owner" else None) or OwnerQuestionDraft(
                 question=prepared.inbound_text[:500] or "(customer sent a message without text)"
             )
@@ -216,7 +219,7 @@ class CustomerDesk:
                     conversation_id=ref.conversation_id,
                     blocks=blocks,
                     origin="ai_turn",
-                    idempotency_base=f"turn:{ref.turn_id}",
+                    idempotency_base=idempotency_base,
                     turn_id=ref.turn_id,
                 )
             if action == "handoff":
@@ -307,68 +310,64 @@ class CustomerDesk:
     ) -> None:
         """Owner messages read like a colleague (POC_10 §8): what is needed, the agent's brief, one compact facts
         line — no transcript; [💬 Show chat] fetches the last messages only if the owner wants them."""
-        notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
-        if notifier is None or action not in ("handoff", "ask_owner", "fallback"):
+        if action not in ("handoff", "ask_owner", "fallback"):
             return
-        facts = owner_context(conv, customer, prepared)
-        name = customer.display_name or "A customer"
-        note = f"\n{brief.strip()}" if brief and brief.strip() else ""
-        show_chat = (f"chat:{conv.id}", "💬 Show chat")
+        contact = contact_line(conv, customer)
+        open_order = order_line(prepared)
+        name = customer.display_name or None
         async with get_db().tenant_session(business_id) as s:  # the owner sees what the customer showed
             media = await gateway.recent_customer_media(s, conv.id)
         if question and draft:
             qid, code = question
-            head = (
-                f'❓ *Question {code}* from {name}: "{inbound_text[:300]}"\nI couldn\'t reply to this myself.'
-                if action == "fallback"
-                else None
-            )
-            body, buttons = question_notice(
+            await notify_question(
+                business_id,
                 qid=qid,
                 code=code,
                 question=draft.question,
-                facts=facts,
-                conversation_id=conv.id,
+                conv=conv,
+                contact=contact,
+                customer_wrote=inbound_text[:300] if action == "fallback" else None,
                 brief=brief,
                 guess=draft.ai_guess,
                 options=draft.options,
-                head=head,
-            )
-            await notifier.notify(
-                business_id,
-                "question",
-                body,
-                dedupe_key=f"oq:{qid}",
-                about_conversation=conv.id,
-                priority=PriorityClass.P1,
-                buttons=buttons,
-                ref={"question_id": str(qid)},
+                open_order=open_order,
+                could_not_reply=action == "fallback",
                 media=media,
             )
         elif action == "fallback" and prepared and prepared.open_question:
-            code = prepared.open_question["code"]
-            body = f'🔁 *{name} is asking again* about question {code}: "{inbound_text[:300]}"\n\n{facts}'
-            await notifier.notify(
-                business_id,
-                "question_followup",
-                body,
+            await messages.notify_owner(
+                "owner.question_followup",
+                business_id=business_id,
+                facts={
+                    "customer.name": name,
+                    "code": prepared.open_question["code"],
+                    "customer_wrote": inbound_text[:300],
+                    "contact": contact,
+                    "open_order": open_order,
+                },
+                kind="question_followup",
                 dedupe_key=f"oqf:{conv.id}:{int(time.time() // 600)}",
                 about_conversation=conv.id,
                 priority=PriorityClass.P1,
-                buttons=[show_chat],
+                buttons={"show_chat": f"chat:{conv.id}"},
             )
         else:
-            channel = conv.channel.replace("_", " ")
-            what = note.strip() or f'They wrote: "{inbound_text[:300]}"'
-            body = f"🙋 *{name} needs you* (please reply on {channel})\n{what}\n\n{facts}"
-            await notifier.notify(
-                business_id,
-                "handoff",
-                body,
+            await messages.notify_owner(
+                "owner.handoff",
+                business_id=business_id,
+                facts={
+                    "customer.name": name,
+                    "channel": conv.channel.replace("_", " "),
+                    "customer_wrote": inbound_text[:300],
+                    "note": brief.strip() if brief and brief.strip() else None,
+                    "contact": contact,
+                    "open_order": open_order,
+                },
+                kind="handoff",
                 dedupe_key=f"handoff:{conv.id}:{int(time.time() // 600)}",
                 about_conversation=conv.id,
                 priority=PriorityClass.P1,
-                buttons=[show_chat],
+                buttons={"show_chat": f"chat:{conv.id}"},
                 media=media,
             )
 
@@ -414,15 +413,17 @@ class CustomerDesk:
                 return
             raw = "\n".join(m.text for m in msgs if m.text)[:500] or "(message without text)"
             language = lang.reply_language(raw, str(settings.get("default_language") or "hi-Latn"))
-            await gateway.outbound().enqueue(
-                s,
-                business_id=ref.business_id,
-                conversation_id=ref.conversation_id,
-                origin="system",
-                turn_id=ref.turn_id,
-                idempotency_base=f"fallback:{ref.turn_id}",
-                blocks=[{"type": "text", "text": holding_text(settings, language)}],
-            )
+            holding = await messages.holding_line(ref.business_id, ref.conversation_id, language)
+            if holding:
+                await gateway.outbound().enqueue(
+                    s,
+                    business_id=ref.business_id,
+                    conversation_id=ref.conversation_id,
+                    origin="system",
+                    turn_id=ref.turn_id,
+                    idempotency_base=holding[1],
+                    blocks=[{"type": "text", "text": holding[0]}],
+                )
             draft = OwnerQuestionDraft(question=raw)
             question = await create_owner_question(
                 s,
@@ -437,14 +438,11 @@ class CustomerDesk:
         await self._notify(ref.business_id, "fallback", conv, conv.customer, raw, draft, question, None)
 
 
-def owner_context(
-    conv: gateway.ConversationView, customer: gateway.CustomerView, prepared: PreparedContext | None
-) -> str:
-    """One compact facts line for the owner: who, where, the open order. The conversation itself is one tap away
-    ([💬 Show chat]), never pasted in (live: owners read the transcript dump as a log, not a message)."""
-    line = contact_line(conv, customer)
+def order_line(prepared: PreparedContext | None) -> str | None:
+    """The open order in one line for the owner; the conversation itself is one tap away ([Show chat]), never
+    pasted in (live: owners read the transcript dump as a log, not a message)."""
     order = prepared.open_order if prepared else None
-    if order:
-        items = ", ".join(f"{ln['qty']} × {ln['item']}" for ln in order.get("lines", []))
-        line += f"\n🧾 {order['order_number']} ({str(order['status']).replace('_', ' ')}): {items} · {order['total']}"
-    return line
+    if not order:
+        return None
+    items = ", ".join(f"{ln['qty']} × {ln['item']}" for ln in order.get("lines", []))
+    return f"{order['order_number']} ({str(order['status']).replace('_', ' ')}): {items} · {order['total']}"

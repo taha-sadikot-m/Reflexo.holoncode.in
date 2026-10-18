@@ -25,6 +25,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.knowledge.playbook import Condition
 from reflexo.pipeline import api as pipeline_api
+from tests import fake_writer
 from tests.integration.test_ask_owner import Bakery, bakery, claim_pending, owner_messages, owner_says, q, wa_number
 from tests.integration.test_commerce import FakeRazorpay
 from tests.integration.test_customer_desk import PRIMARY, outbound_texts, reply, tool_results, turn_for
@@ -46,7 +47,18 @@ def _generous_speculative_budget(monkeypatch: pytest.MonkeyPatch) -> Iterator[No
 
 @pytest.fixture
 def fake() -> agent.FakeProvider:
-    return agent.FakeProvider()
+    return fake_writer.install(agent.FakeProvider())  # owner messages are written by purpose (BETA_13 §6)
+
+
+def prompts_for(fake: agent.FakeProvider, purpose: str) -> list[str]:
+    """What the `messages` role was given for one purpose: the facts and the context of the owner's message."""
+    return [
+        m.content or ""
+        for a in fake.calls
+        if a.model == fake_writer.MESSAGES_MODEL
+        for m in a.messages
+        if m.role == "user" and "# PURPOSE" in (m.content or "") and purpose in (m.content or "")
+    ]
 
 
 @pytest.fixture
@@ -131,7 +143,8 @@ async def test_a_draft_is_cancelled_on_day_one_common_sense(
     assert await status_of(db, order.order_id) == "cancelled"
     assert (await outbound_texts(db, conv))[-1] == SAY["done"]
     assert not await q(db, "SELECT id FROM approval_requests WHERE business_id = :b", b=shop.bid)
-    assert any("Done for the customer" in str(m) for m in await owner_messages(db, shop))  # an FYI, not a question
+    fyi = [str(m) for m in await owner_messages(db, shop) if order.order_number in str(m)]
+    assert fyi and "Cancelling an order" in fyi[0] and "apv:" not in fyi[0]  # an FYI, not a question
 
 
 async def test_uncovered_cancel_is_proposed_and_the_owners_yes_is_carried_out(
@@ -153,8 +166,9 @@ async def test_uncovered_cancel_is_proposed_and_the_owners_yes_is_carried_out(
         b=shop.bid,
     )
     assert proposal.subject["capability"] == "order.cancel" and proposal.subject["reason"] == "plans changed"
-    brief = next(str(m) for m in await owner_messages(db, shop) if "wants" in str(m))
-    assert "Cancelling an order".lower() in brief.lower() and order.order_number in brief and "I suggest" in brief
+    brief = next(str(m) for m in await owner_messages(db, shop) if f"apv:{proposal.id}:a" in str(m))
+    assert "Cancelling an order" in brief and order.order_number in brief and proposal.short_code in brief
+    assert any("I suggest" in p for p in prompts_for(fake, "only the owner can allow"))
 
     await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
     assert await status_of(db, order.order_id) == "cancelled"
@@ -256,7 +270,7 @@ async def test_the_owners_rules_decide_without_asking(
     await registry.require(TurnRunnerPort).run_turn(await turn_for(registry, db, shop.pnid, wa, "ab cancel kar do"))
     assert await status_of(db, order.order_id) == "cancelled"
     assert (await outbound_texts(db, conv))[-1] == SAY["done"]
-    assert any("your rule" in str(m) and "24 ghante" in str(m) for m in await owner_messages(db, shop))
+    assert any("24 ghante pehle tak cancel free hai" in str(m) for m in await owner_messages(db, shop))  # the rule
     assert not await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid)
 
 
@@ -290,11 +304,12 @@ async def test_one_decision_teaches_the_rule_and_undo_forgets_it(
     )
     await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
 
-    offer = next(m for m in await owner_messages(db, shop) if "Next time" in str(m))
-    assert "I do it myself when hours left until delivery is at least 24" in str(offer)
-    assert "delivered" not in str(offer).split("Next time")[1]  # the condition that did not hold was dropped
+    offer = next(str(m) for m in await owner_messages(db, shop) if f"lrn:{proposal.id}:g" in str(m))
+    readback = "Cancelling an order: I do it myself when hours left until delivery is at least 24"
+    assert readback in offer
+    assert "status is delivered" not in offer  # the condition that did not hold was dropped
     await owner_says(registry, db, shop, callback=f"lrn:{proposal.id}:g")
-    assert any("Got it ✅ From now on" in str(m) for m in await owner_messages(db, shop))
+    assert sum(readback in str(m) for m in await owner_messages(db, shop)) == 2  # the offer, then "saved"
     [rule] = await q(
         db, "SELECT effect, conditions, source, source_ref FROM playbook_rules WHERE business_id = :b", b=shop.bid
     )
@@ -309,7 +324,7 @@ async def test_one_decision_teaches_the_rule_and_undo_forgets_it(
         len(await q(db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid))
         == 1
     )
-    assert any("your rule" in str(m) and "Learned from your decision" in str(m) for m in await owner_messages(db, shop))
+    assert any("Learned from your decision" in str(m) for m in await owner_messages(db, shop))  # the rule's words
 
     await owner_says(registry, db, shop, "/undo")  # the owner takes the rule back → asking again
     fake.script(PRIMARY, asks_to_cancel(order3.order_id, SAY))
@@ -397,7 +412,7 @@ async def test_the_owner_acts_on_an_order_and_the_customer_is_told(
     await owner_says(registry, db, shop, f"YES {code}")
     [row] = await q(db, "SELECT status, cancelled_by FROM orders WHERE id = :o", o=order.order_id)
     assert (str(row.status), row.cancelled_by) == ("cancelled", "owner")
-    assert not any("Next time" in str(m) for m in await owner_messages(db, shop))  # nothing to learn from this
+    assert not any("lrn:" in str(m) for m in await owner_messages(db, shop))  # nothing to learn from this
 
     relay = await claim_pending(registry, db, conv)
     seen: list[str] = []
@@ -448,13 +463,13 @@ async def test_a_date_change_follows_the_same_learning_loop(
     [proposal] = await q(
         db, "SELECT id FROM approval_requests WHERE kind = 'tool_call' AND business_id = :b", b=shop.bid
     )
-    brief = next(str(m) for m in await owner_messages(db, shop) if "wants" in str(m))
-    assert "changing a placed order" in brief.lower() and new_day in brief
+    brief = next(str(m) for m in await owner_messages(db, shop) if "apv:" in str(m))
+    assert "Changing a placed order" in brief and new_day in brief
 
     await owner_says(registry, db, shop, callback=f"apv:{proposal.id}:a")
     [row] = await q(db, "SELECT delivery_date FROM orders WHERE id = :o", o=order.order_id)
     assert row.delivery_date.isoformat() == new_day
-    assert any("Next time" in str(m) for m in await owner_messages(db, shop))  # it offers to learn here too
+    assert any("lrn:" in str(m) for m in await owner_messages(db, shop))  # it offers to learn here too
 
 
 async def test_a_full_day_or_a_paid_total_cannot_change(

@@ -23,12 +23,15 @@ import reflexo.commerce.api as commerce
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
 import reflexo.owner.api as owner
-from reflexo.agent.capabilities import CAPABILITIES, describe_order
+import reflexo.policy.api as policy
+from reflexo.agent import rules
+from reflexo.agent.capabilities import CAPABILITIES, ActionRequest, decide, describe_order
 from reflexo.agent.language import reply_language
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
 from reflexo.common.contracts import QuestionAnswerPort, WorkflowPort
 from reflexo.common.db import get_db
+from reflexo.common.ids import new_id
 from reflexo.common.money import format_inr
 from reflexo.common.timeutil import to_business_tz, utcnow
 
@@ -411,7 +414,26 @@ async def send_to_customer(ctx: ToolContext, args: SendToCustomerArgs, s: AsyncS
         raise ToolError("AMBIGUOUS_MATCH", "several customers match", guidance=f"Ask which one: {names}.")
     c = rows[0]
     who, channel = c.display_name or c.phone_e164 or "customer", str(c.channel).replace("_", " ")
-    if args.send_now:
+    decision = await decide(
+        ActionRequest(
+            capability="message.send",
+            business_id=ctx.business_id,
+            requested_by="owner_turn",
+            desk="owner",
+            member_id=ctx.member_id,
+            customer_id=c.id,
+            resource=policy.EntityRef(type="Customer", id=str(c.id)),
+            conversation_id=c.conversation_id,
+            owner_approved=args.send_now,  # the owner said "send now": their words are the approval
+        )
+    )
+    if decision.effect in ("not_possible", "decline"):
+        raise ToolError(
+            "NOT_ALLOWED",
+            f"not sent: {decision.reason or decision.says or decision.effect}",
+            guidance="Tell the owner why it was not sent.",
+        )
+    if args.send_now and decision.effect == "act":
         await gateway.outbound().enqueue(
             s,
             business_id=ctx.business_id,
@@ -638,29 +660,42 @@ class PlaybookChangeArgs(BaseModel):
 @tool("playbook_change", PlaybookChangeArgs, desks=OWNER, side_effect=True)
 async def playbook_change(ctx: ToolContext, args: PlaybookChangeArgs, s: AsyncSession) -> dict[str, Any]:
     """The owner tells you how they want an action handled ("cancellation sirf 24 ghante pehle tak", "date change
-    ke liye mujhse poochna", "drafts tum khud cancel kar sakti ho"). Read-back of the exact rule + confirmation."""
+    ke liye mujhse poochna", "drafts tum khud cancel kar sakti ho"). The rule is checked, then read back exactly
+    with what it changes, and confirmed."""
     cap = CAPABILITIES.get(args.capability)
     if cap is None:
         raise ToolError("VALIDATION_FAILED", f"unknown action {args.capability}", guidance="Pick one from the list.")
     rule = knowledge.playbook.PlaybookRule(
-        id=UUID(int=0), capability=cap.name, effect=args.effect, conditions=args.conditions, says=args.says,
+        id=new_id(), capability=cap.name, effect=args.effect, conditions=args.conditions, says=args.says,
         source="owner_instruction",
     )  # fmt: skip
+    replaced = (
+        [old for old in await knowledge.playbook.rules(ctx.business_id, capability=cap.name) if old.scope == "global"]
+        if args.replaces_existing
+        else []
+    )
+    checked = await rules.review(ctx.business_id, rule, replaces=[old.id for old in replaced])
+    if checked.status == "blocked":
+        raise ToolError(
+            "RULE_NEVER_APPLIES" if checked.problem == "impossible" else "RULE_INVALID",
+            f"this rule {'can never apply' if checked.problem == 'impossible' else 'cannot be evaluated safely'}",
+            guidance="Nothing was saved. Tell the owner which conditions contradict each other and ask what they "
+            "meant.",
+        )
+    saved = rule.model_copy(update={"effect": checked.effect})
     cs = await knowledge.begin(ctx.business_id, "owner_command", f"Playbook: {cap.label}", member_id=ctx.member_id)
     lines = []
-    if args.replaces_existing:
-        for old in await knowledge.playbook.rules(ctx.business_id, capability=cap.name):
-            if old.scope == "global":
-                await knowledge.add(cs, "playbook_rule", "update", old.id, {"status": "archived"})
-                lines.append(f"➖ {old.readback(cap.label)}")
+    for old in replaced:
+        await knowledge.add(cs, "playbook_rule", "update", old.id, {"status": "archived"})
+        lines.append(f"➖ {old.readback(cap.label)}")
     await knowledge.add(
         cs,
         "playbook_rule",
         "create",
-        None,
+        rule.id,
         {
             "capability": cap.name,
-            "effect": args.effect,
+            "effect": saved.effect,
             "conditions": [c.model_dump() for c in args.conditions],
             "says": args.says,
             "scope": "global",
@@ -668,8 +703,23 @@ async def playbook_change(ctx: ToolContext, args: PlaybookChangeArgs, s: AsyncSe
             "status": "active",
         },
     )
-    lines.append(f"➕ {rule.readback(cap.label)}")
-    return await _confirmation(ctx, {"change_set_id": str(cs.id)}, "Playbook rule", lines)
+    lines.append(f"➕ {saved.readback(cap.label)}")
+    lines += [d.line for d in checked.differences]  # what the change newly allows or forbids, with an example
+    result = await _confirmation(ctx, {"change_set_id": str(cs.id)}, "Playbook rule", lines)
+    result["check"] = checked.model_dump(include={"status", "differences", "shadowed_by"})
+    if checked.differences:
+        result["next"] += " Ask the owner whether what the change newly allows or forbids is what they want."
+    if checked.shadowed_by:
+        result["next"] += " Say that an existing rule (check.shadowed_by) already decides these cases first."
+    if checked.status == "unchecked":
+        result["next"] += (
+            " The rule could not be checked now, so it is saved as 'ask me first'. Tell the owner you will ask "
+            f"them first for this until it is checked, and that they will hear when it is ({rule.readback(cap.label)})."
+        )
+        await rules.schedule_recheck(
+            ctx.business_id, rule.id, args.effect, change_set_id=cs.id, member_id=ctx.member_id
+        )
+    return result
 
 
 class OrderActionArgs(BaseModel):
@@ -686,9 +736,26 @@ async def order_action(ctx: ToolContext, args: OrderActionArgs, s: AsyncSession)
     if order is None:
         raise ToolError("NOT_FOUND", f"no order {args.order_number}", guidance="Check the order number (orders_list).")
     cap = CAPABILITIES[f"order.{args.action}"]
-    situation = await commerce.situation(ctx.business_id, order.order_id)
-    if why_not := cap.invariant(situation):
-        raise ToolError("NOT_POSSIBLE", f"can't: {why_not}", guidance="Tell the owner why.")
+    decision = await decide(
+        ActionRequest(
+            capability=cap.name,
+            business_id=ctx.business_id,
+            requested_by="owner_turn",
+            desk="owner",
+            member_id=ctx.member_id,
+            customer_id=order.customer_id,
+            resource=policy.EntityRef(type="Order", id=str(order.order_id)),
+            conversation_id=order.conversation_id,
+        )
+    )
+    if decision.effect == "not_possible":
+        raise ToolError("NOT_POSSIBLE", f"can't: {decision.reason}", guidance="Tell the owner why.")
+    if decision.effect == "decline":
+        raise ToolError(
+            "DECLINED_BY_RULE",
+            f"the owner's own rule says no: {decision.says}",
+            guidance="Tell the owner their rule blocks this; they can change the rule first if they want it done.",
+        )
     conv = await gateway.conversation_view(s, order.conversation_id) if order.conversation_id else None
     name = (conv.customer.display_name if conv and conv.customer else None) or "the customer"
     summary = describe_order(order)

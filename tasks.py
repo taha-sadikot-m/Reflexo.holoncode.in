@@ -71,6 +71,8 @@ def main(argv: list[str]) -> None:
         run(py, "scripts/eval.py", *args)
     elif task == "benchmark":
         run(py, "scripts/benchmark.py", *args)
+    elif task == "policy-check":  # the rule checker's Linux image (BETA_04 §7.6), used through docker run
+        run("docker", "build", "-t", "reflexo-policy-check:0.1.0", "tools/policy-check")
     elif task == "api":
         run(py, "-m", "uvicorn", "reflexo.api.main:app", "--reload", "--port", "8080")
     elif task == "worker":
@@ -97,6 +99,7 @@ def main(argv: list[str]) -> None:
         run(py, "scripts/check_guards.py")
         run(py, "scripts/check_traceability.py")  # CHK-Q-1
         run(py, "scripts/check_fixtures.py")  # CHK-Q-6
+        run(py, "scripts/check_fixed_text.py")  # CHK-MSG-4
     elif task == "typecheck":
         run(py, "-m", "mypy")
     elif task == "check":

@@ -130,3 +130,33 @@ async def rollup(days: int = 2) -> int:
             {"since": since, "days": days},
         )
         return len(written.all())
+
+
+async def cap_warning(payload: dict[str, Any]) -> None:
+    """Job `costs.cap_warning`: tell the owner, once that day, that AI use reached the alert share of the daily cap
+    (BETA_12 §8.3). Written by purpose `owner.cost_cap_warning`."""
+    from uuid import UUID
+
+    from reflexo.agent import messages
+    from reflexo.common.enums import PriorityClass
+
+    bid = UUID(payload["business_id"])
+    pct = float(payload["pct"])
+    await messages.notify_owner(
+        "owner.cost_cap_warning",
+        business_id=bid,
+        facts={
+            "spent_today": messages.Amount(paise=int(payload["spent_micro_inr"]) // 10_000),
+            "daily_cap": messages.Amount(paise=int(payload["cap_micro_inr"]) // 10_000),
+            "share": f"{pct:g}%",
+        },
+        context={
+            "at_the_cap": "replies continue on a simpler, cheaper model",
+            "at_one_and_a_half_times_the_cap": "AI replies pause; customers get one holding line and the owner "
+            "answers chats",
+            "resets": "at midnight, shop time",
+        },
+        kind="cost_cap",
+        dedupe_key=f"costcap:{bid}:{utcnow().astimezone(IST).date().isoformat()}",
+        priority=PriorityClass.P2,
+    )

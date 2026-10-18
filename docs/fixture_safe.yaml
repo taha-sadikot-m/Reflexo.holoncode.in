@@ -16,3 +16,9 @@ names:              # seed owners and scenario actors
   - Priya
   - Aman
   - Eval
+  - Anjali          # messages eval actors (evals/datasets/messages.yaml)
+  - Arjun
+  - Neha
+  - Vikram
+  - Pooja
+  - Sanjay

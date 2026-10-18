@@ -1,0 +1,12 @@
+# How the owner reads each playbook field in rules and read-backs (BETA_04 §7.4). The fields themselves (type,
+# where they live in a Cedar request) are in reflexo.policy.rules; every field there needs a label here.
+order.status: {en: "the order's status", hi: "order ka status"}
+order.payment_method: {en: "the payment method", hi: "payment ka tareeka"}
+order.payment_status: {en: "the payment status", hi: "payment status"}
+order.total_rupees: {en: "the order total (₹)", hi: "order total (₹)"}
+order.hours_until_delivery: {en: "hours left until delivery", hi: "delivery mein bache ghante"}
+order.hours_since_placed: {en: "hours since the order was placed", hi: "order kiye hue ghante"}
+order.categories: {en: "the order's categories", hi: "order ki categories"}
+customer.orders_count: {en: "the customer's past orders", hi: "customer ke pichhle orders"}
+refunds.today_rupees: {en: "refunds today, this one included (₹)", hi: "aaj ke refund, isko milakar (₹)"}
+cancellations.this_week: {en: "cancellations in the last 7 days, this one included", hi: "pichhle 7 din ke cancel, isko milakar"}

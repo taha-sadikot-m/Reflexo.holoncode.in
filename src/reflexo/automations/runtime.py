@@ -12,9 +12,11 @@ from uuid import UUID
 
 from sqlalchemy import text
 
+import reflexo.agent.api as agent
 import reflexo.commerce.api as commerce
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
+import reflexo.policy.api as policy
 from reflexo.automations import cel
 from reflexo.automations.guard import _reserve
 from reflexo.automations.schema import AutomationDefinition
@@ -220,6 +222,25 @@ async def _send(ctx: RunContext, s: Any) -> dict[str, Any]:
     conversation_id = await customer_conversation(ctx.business_id, v)
     if conversation_id is None:
         raise StepFailed("no conversation for this customer")
+    customer_id = (v.get("customer") or {}).get("id") or (v.get("event") or {}).get("customer_id")
+    if not customer_id:
+        raise StepFailed("no customer for this message")
+    # every step that acts is decided (BETA_05 §2.3); the owner's confirmation of the automation is the approval
+    # for the actions it names, while platform limits and later owner rules still apply
+    decision = await agent.decide(
+        agent.ActionRequest(
+            capability="message.send",
+            business_id=ctx.business_id,
+            requested_by="automation",
+            desk="automation",
+            customer_id=UUID(str(customer_id)),
+            resource=policy.EntityRef(type="Customer", id=str(customer_id)),
+            conversation_id=conversation_id,
+            owner_approved=True,
+        )
+    )
+    if decision.effect != "act":
+        return {"to": "customer", "sent": False, "decision": decision.effect, "policy_ids": decision.policy_ids}
     if s.text:
         blocks: list[dict[str, Any]] = [{"type": "text", "text": cel.render(s.text, v, tz=tz)}]
     else:

@@ -131,7 +131,7 @@ async def test_the_voice_agent_asks_the_owner_who_sees_the_photo_and_answers_int
 
     told = [json.dumps(m, ensure_ascii=False) for m in await owner_messages(db, shop)]
     photo = next(i for i, m in enumerate(told) if "photo" in m.lower() and str(call["media"]) in m)
-    ask = next(i for i, m in enumerate(told) if f"Question {code}" in m)
+    ask = next(i for i, m in enumerate(told) if "oq:" in m and code in m)  # the question, by its code
     assert photo < ask  # the owner sees the design first, then the question
     assert "phone call" in told[ask] and "Taha called" in told[ask]
 

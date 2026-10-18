@@ -160,6 +160,32 @@ async def test_instant_rule_runs_once_per_event(registry: Registry, db: Database
     assert str(run.status) == "completed"
 
 
+@pytest.mark.check("CHK-ARCH-5")
+async def test_an_automation_send_is_decided_before_it_goes_out(registry: Registry, db: Database) -> None:
+    from tests.integration.test_policy import undecided_effects
+
+    shop = await cod_shop(db)
+    thanks = {
+        "schema_version": 1,
+        "name": "Order thanks",
+        "trigger": {"type": "order_confirmed"},
+        "instance_key": "{{ order.id }}",
+        "steps": [
+            {"id": "s", "type": "send", "to": "customer", "text": "Shukriya! {{ order.number }}", "next": "e"},
+            {"id": "e", "type": "end"},
+        ],
+    }
+    await automations.install(shop["bid"], thanks, description_nl="order aate hi thanks bolna")
+    await confirmed_cod_order(registry, shop)
+    assert await run_jobs(registry, "automations.instant_step") == 1
+    assert "Shukriya! MB-1001" in await customer_texts(db, shop)
+    assert await undecided_effects(db, shop["bid"]) == []
+    [decision] = await q(
+        db, "SELECT attrs FROM pipeline_events WHERE business_id = :b AND stage = 'decision'", b=shop["bid"]
+    )
+    assert (decision.attrs["capability"], decision.attrs["requested_by"]) == ("message.send", "automation")
+
+
 async def test_cod_confirmation_consumes_the_customers_haan(registry: Registry, db: Database, worker: None) -> None:
     shop = await cod_shop(db)
     await automations.install(shop["bid"], automations.demo.COD_CONFIRMATION, description_nl="COD confirm karwana")

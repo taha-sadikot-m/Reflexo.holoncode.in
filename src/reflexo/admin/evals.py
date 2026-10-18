@@ -64,6 +64,7 @@ THRESHOLDS: dict[str, float] = {
     "owner_commands": 0.85,
     "builder": 7 / 8,
     "learning": 0.80,
+    "messages": 1.0,  # BETA_08 §5.2, CHK-MSG-1: every required fact, link and button, nothing invented
 }
 ORDER = list(THRESHOLDS)  # in-process suites interleave fine; owner_commands mutates eval data, so it runs last
 
@@ -92,7 +93,8 @@ class SuiteResult:
 
     @property
     def ok(self) -> bool:
-        return self.cases > 0 and self.score >= self.threshold
+        language = self.metrics.get("language_pct")  # the messages suite: language >= 95% (BETA_08 §5.2)
+        return self.cases > 0 and self.score >= self.threshold and (language is None or language >= 95)
 
 
 def load_cases(suite: str) -> list[dict[str, Any]]:
@@ -549,6 +551,35 @@ async def suite_learning(shop: EvalShop, cases: list[dict[str, Any]], run: str) 
     return await _bounded(cases, one, 4)
 
 
+async def suite_messages(shop: EvalShop, cases: list[dict[str, Any]], run: str) -> list[CaseResult]:
+    """Each situation is composed by the `messages` role; it passes only when the written message passes the
+    check by itself (a fallback means the writer failed twice)."""
+
+    async def one(c: dict[str, Any]) -> CaseResult:
+        started = time.perf_counter()
+        facts = {k: agent.messages.Amount(**v) if isinstance(v, dict) else v for k, v in c["facts"].items()}
+        for _ in range(2):  # a provider failure is retried once: the suite measures the writer, not uptime
+            m = await agent.messages.compose(
+                c["purpose"],
+                business_id=shop.business_id,
+                recipient=agent.messages.RecipientRef(kind="owner", language=c.get("language")),
+                facts=facts,
+                context=c.get("context") or {},
+                language=c.get("language"),
+            )
+            if not (m.fallback_reason or "").startswith("model:"):
+                break
+        failures = [f"{f.name}: {f.detail}" for f in m.check.failures]
+        why = "; ".join(failures) or (f"fallback ({m.fallback_reason})" if m.fallback_used else "ok")
+        written_in = agent.detect_language(m.text, "?") if not m.fallback_used else None
+        observed = {"text": m.text, "buttons": [b.model_dump() for b in m.buttons], "language": m.language,
+                    "detected": written_in, "language_ok": written_in == c.get("language", "en"),
+                    "rejected": m.rejected}  # fmt: skip
+        return CaseResult(c["id"], not m.fallback_used, why, round(time.perf_counter() - started, 2), observed)
+
+    return await _bounded(cases, one, 4)
+
+
 SuiteFn = Callable[[EvalShop, list[dict[str, Any]], str], Awaitable[list[CaseResult]]]
 SUITES: dict[str, SuiteFn] = {
     "tool_selection": suite_tool_selection,
@@ -559,6 +590,7 @@ SUITES: dict[str, SuiteFn] = {
     "owner_commands": suite_owner_commands,
     "builder": suite_builder,
     "learning": suite_learning,
+    "messages": suite_messages,
 }
 PIPELINE_SUITES = frozenset({"tool_selection", "grounding", "language", "owner_commands"})
 
@@ -592,6 +624,9 @@ async def run(
         metrics: dict[str, Any] = {"seconds": round(time.perf_counter() - started, 1)}
         if name in PIPELINE_SUITES:
             metrics |= _pipeline_metrics(results)
+        if name == "messages":
+            matched = [r.observed.get("language_ok") for r in results if "language_ok" in r.observed]
+            metrics["language_pct"] = round(100 * sum(1 for x in matched if x) / len(matched), 1) if matched else None
         suite = SuiteResult(name, len(results), passed, THRESHOLDS[name], metrics, results)
         out.append(suite)
         await _store(ref, suite)
@@ -634,7 +669,9 @@ def write_report(ref: str, suites: list[SuiteResult]) -> Path:
     for s in suites:
         m = s.metrics
         notes = ", ".join(
-            f"{k} {v}" for k, v in m.items() if k in ("p50_s", "p95_s", "one_call_turns", "gate_repairs", "errors")
+            f"{k} {v}"
+            for k, v in m.items()
+            if k in ("p50_s", "p95_s", "one_call_turns", "gate_repairs", "errors", "language_pct")
         )
         lines.append(
             f"| {s.suite} | {s.passed}/{s.cases} ({s.score:.0%}) | {s.threshold:.0%} | "

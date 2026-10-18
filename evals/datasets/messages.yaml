@@ -1,0 +1,2002 @@
+# Messages written by purpose (BETA_13 §6; CHK-MSG-1): 20 situations per purpose, in three languages, with
+# unusual context. A case passes only when the written message passes the check by itself (no fallback).
+# Money facts are {paise: N}. Generated once with a fixed seed; add 20 cases with every new purpose.
+cases:
+- id: proposal-01
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Rahul
+    action: Cancelling an order
+    order.number: MB-1188
+    order.total:
+      paise: 79900
+    reason: ordered twice by mistake
+    code: '8492'
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: proposal-02
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Priya Sharma
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 125000
+    change: 'delivery date: 2026-10-23'
+    reason: budget issue
+    code: '1917'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: proposal-03
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: राहुल वर्मा
+    action: Changing a placed order
+    order.number: KK-2210
+    order.total:
+      paise: 45000
+    change: 'message on cake: Happy 40th Papa'
+    reason: ordered twice by mistake
+    code: '4042'
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: proposal-04
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Mohammed Irfan
+    action: Refunding an order
+    order.number: MB-1301
+    order.total:
+      paise: 65000
+    reason: the party is cancelled
+    code: '3069'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: proposal-05
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Anjali (office)
+    action: Cancelling an order
+    order.number: MB-1042
+    order.total:
+      paise: 54900
+    reason: ordered twice by mistake
+    code: '4474'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: proposal-06
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Dr. Kavita Rao
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 125000
+    change: 'delivery date: 2026-10-23'
+    reason: plans changed
+    code: '8949'
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: this is the customer's third message about it today
+- id: proposal-07
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Sunny
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 18500
+    change: 'message on cake: Happy 40th Papa'
+    reason: the party is cancelled
+    code: '3801'
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: proposal-08
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Fatima Shaikh
+    action: Refunding an order
+    order.number: KK-2045
+    order.total:
+      paise: 54900
+    reason: मेहमान नहीं आ रहे
+    code: '1527'
+    note: Placed today, not prepared yet. I suggest yes.
+  context: {}
+- id: proposal-09
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Arjun
+    action: Cancelling an order
+    order.number: MB-1301
+    order.total:
+      paise: 125000
+    reason: budget issue
+    code: '2594'
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: proposal-10
+  purpose: owner.proposal
+  language: en
+  facts:
+    customer.name: Meenakshi Iyer
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 125000
+    change: 'delivery date: 2026-10-23'
+    reason: date badalni hai
+    code: '9487'
+    note: First order. Paid online in full.
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: proposal-11
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Taha
+    action: Changing a placed order
+    order.number: KK-2045
+    order.total:
+      paise: 30000
+    change: 'message on cake: Happy 40th Papa'
+    reason: need it a day earlier
+    code: '9396'
+    note: First order. Paid online in full.
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: proposal-12
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Neha K
+    action: Refunding an order
+    order.number: MB-1301
+    order.total:
+      paise: 9950
+    reason: budget issue
+    code: '9136'
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: proposal-13
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Gurpreet Singh
+    action: Cancelling an order
+    order.number: KK-2045
+    order.total:
+      paise: 9950
+    reason: galti se order ho gaya
+    code: '1359'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: proposal-14
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Ritu
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 125000
+    change: 'delivery date: 2026-10-23'
+    reason: date badalni hai
+    code: '7628'
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: proposal-15
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Joseph D'Souza
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 65000
+    change: 'message on cake: Happy 40th Papa'
+    reason: cake arrived damaged
+    code: '7125'
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: proposal-16
+  purpose: owner.proposal
+  language: hi-Latn
+  facts:
+    customer.name: Ayesha
+    action: Refunding an order
+    order.number: MB-1188
+    order.total:
+      paise: 125000
+    reason: budget issue
+    code: '2248'
+  context:
+    what_happened: this is the customer's third message about it today
+- id: proposal-17
+  purpose: owner.proposal
+  language: hi
+  facts:
+    customer.name: Vikram Mehta
+    action: Cancelling an order
+    order.number: MB-1188
+    order.total:
+      paise: 1240000
+    reason: budget issue
+    code: '9290'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: proposal-18
+  purpose: owner.proposal
+  language: hi
+  facts:
+    customer.name: Pooja
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 18500
+    change: 'delivery date: 2026-10-23'
+    reason: need it a day earlier
+    code: '4567'
+    note: Already in preparation, the cake is half done.
+  context: {}
+- id: proposal-19
+  purpose: owner.proposal
+  language: hi
+  facts:
+    customer.name: Sanjay
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 210000
+    change: 'message on cake: Happy 40th Papa'
+    reason: cake arrived damaged
+    code: '8462'
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: proposal-20
+  purpose: owner.proposal
+  language: hi
+  facts:
+    customer.name: Lakshmi
+    action: Refunding an order
+    order.number: MB-1188
+    order.total:
+      paise: 18500
+    reason: cake arrived damaged
+    code: '7227'
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: action_done-01
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Cancelling an order
+    order.number: KK-2210
+    order.total:
+      paise: 125000
+    reason: plans changed
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the customer says they already paid part of it by UPI
+- id: action_done-02
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 54900
+    change: 'delivery date: 2026-10-23'
+    reason: galti se order ho gaya
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer is paying from their husband's number
+- id: action_done-03
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: KK-2210
+    order.total:
+      paise: 210000
+    change: 'message on cake: Happy 40th Papa'
+    reason: need it a day earlier
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: action_done-04
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Cancelling an order
+    order.number: MB-1301
+    order.total:
+      paise: 210000
+    reason: मेहमान नहीं आ रहे
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: action_done-05
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 18500
+    change: 'delivery date: 2026-10-23'
+    reason: galti se order ho gaya
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: action_done-06
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 210000
+    change: 'message on cake: Happy 40th Papa'
+    reason: budget issue
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: this is the customer's third message about it today
+- id: action_done-07
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Cancelling an order
+    order.number: MB-1042
+    order.total:
+      paise: 54900
+    reason: wrong flavour chosen
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the customer wants the same cake as last time
+- id: action_done-08
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 54900
+    change: 'delivery date: 2026-10-23'
+    reason: need it a day earlier
+    rule: 24 ghante pehle tak cancel free hai
+  context:
+    basis: the owner's rule
+- id: action_done-09
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Changing a placed order
+    order.number: KK-2210
+    order.total:
+      paise: 18500
+    change: 'message on cake: Happy 40th Papa'
+    reason: date badalni hai
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer mixed Hindi and English
+- id: action_done-10
+  purpose: owner.action_done
+  language: en
+  facts:
+    action: Cancelling an order
+    order.number: MB-1042
+    order.total:
+      paise: 54900
+    reason: wrong flavour chosen
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer sent a photo of the damaged box
+- id: action_done-11
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Changing a placed order
+    order.number: MB-1042
+    order.total:
+      paise: 18500
+    change: 'delivery date: 2026-10-23'
+    reason: date badalni hai
+    rule: 24 ghante pehle tak cancel free hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer says they already paid part of it by UPI
+- id: action_done-12
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Changing a placed order
+    order.number: MB-1188
+    order.total:
+      paise: 1240000
+    change: 'message on cake: Happy 40th Papa'
+    reason: need it a day earlier
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer is paying from their husband's number
+- id: action_done-13
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Cancelling an order
+    order.number: MB-1042
+    order.total:
+      paise: 1240000
+    reason: wrong flavour chosen
+    rule: 24 ghante pehle tak cancel free hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: action_done-14
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Changing a placed order
+    order.number: MB-1007
+    order.total:
+      paise: 65000
+    change: 'delivery date: 2026-10-23'
+    reason: date badalni hai
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: action_done-15
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Changing a placed order
+    order.number: MB-1188
+    order.total:
+      paise: 18500
+    change: 'message on cake: Happy 40th Papa'
+    reason: budget issue
+  context:
+    basis: 'a draft order: nothing was promised yet'
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: action_done-16
+  purpose: owner.action_done
+  language: hi-Latn
+  facts:
+    action: Cancelling an order
+    order.number: KK-2045
+    order.total:
+      paise: 125000
+    reason: wrong flavour chosen
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: this is the customer's third message about it today
+- id: action_done-17
+  purpose: owner.action_done
+  language: hi
+  facts:
+    action: Changing a placed order
+    order.number: KK-2045
+    order.total:
+      paise: 45000
+    change: 'delivery date: 2026-10-23'
+    reason: budget issue
+    rule: 24 ghante pehle tak cancel free hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer wants the same cake as last time
+- id: action_done-18
+  purpose: owner.action_done
+  language: hi
+  facts:
+    action: Changing a placed order
+    order.number: MB-1007
+    order.total:
+      paise: 210000
+    change: 'message on cake: Happy 40th Papa'
+    reason: galti se order ho gaya
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+- id: action_done-19
+  purpose: owner.action_done
+  language: hi
+  facts:
+    action: Cancelling an order
+    order.number: MB-1188
+    order.total:
+      paise: 18500
+    reason: galti se order ho gaya
+    rule: date change theek hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer mixed Hindi and English
+- id: action_done-20
+  purpose: owner.action_done
+  language: hi
+  facts:
+    action: Changing a placed order
+    order.number: MB-1301
+    order.total:
+      paise: 1240000
+    change: 'delivery date: 2026-10-23'
+    reason: the party is cancelled
+    rule: 24 ghante pehle tak cancel free hai
+  context:
+    basis: the owner's rule
+    what_happened: the customer sent a photo of the damaged box
+- id: learn_offer-01
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    customer.name: Rahul
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-02
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    customer.name: Priya Sharma
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-03
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: राहुल वर्मा
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-04
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    customer.name: Mohammed Irfan
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-05
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    customer.name: Anjali (office)
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-06
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: Dr. Kavita Rao
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-07
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: Sunny
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-08
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    customer.name: Fatima Shaikh
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-09
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    customer.name: Arjun
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-10
+  purpose: owner.learn_offer
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    customer.name: Meenakshi Iyer
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-11
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    customer.name: Taha
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-12
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: Neha K
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-13
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    customer.name: Gurpreet Singh
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-14
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    customer.name: Ritu
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-15
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    customer.name: Joseph D'Souza
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-16
+  purpose: owner.learn_offer
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    customer.name: Ayesha
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-17
+  purpose: owner.learn_offer
+  language: hi
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: Vikram Mehta
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-18
+  purpose: owner.learn_offer
+  language: hi
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    customer.name: Pooja
+  context:
+    owner_decided: 'yes'
+    checked: true
+- id: learn_offer-19
+  purpose: owner.learn_offer
+  language: hi
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    customer.name: Sanjay
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: learn_offer-20
+  purpose: owner.learn_offer
+  language: hi
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    customer.name: Lakshmi
+  context:
+    owner_decided: 'no'
+    checked: true
+- id: question-01
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Rahul
+    code: '8660'
+    question: Do you make sugar-free cakes?
+    customer_wrote: koi hai?
+    reply_with: 8660 <answer>
+    note: First order. Paid online in full.
+    contact: 👤 Rahul (+919811476172) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer says they already paid part of it by UPI
+- id: question-02
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Priya Sharma
+    code: '3381'
+    question: Kya 2 kg chocolate cake kal tak ban jayega?
+    customer_wrote: koi hai?
+    reply_with: 3381 <answer>
+    note: Regular customer (6 orders). Delivery is in 3 days.
+    contact: 👤 Priya Sharma (+919811112688) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer is paying from their husband's number
+- id: question-03
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: राहुल वर्मा
+    code: '1411'
+    question: Price for this design as a 1 kg cake (photo in chat)?
+    customer_wrote: koi hai?
+    reply_with: 1411 <answer>
+    contact: 👤 राहुल वर्मा (+919811921665) · whatsapp
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: question-04
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Mohammed Irfan
+    code: '7430'
+    question: क्या आप वीगन केक बनाते हैं?
+    reply_with: 7430 <answer>
+    note: Regular customer (6 orders). Delivery is in 3 days.
+    contact: 👤 Mohammed Irfan (+919811894245) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: question-05
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Anjali (office)
+    code: '2187'
+    question: Can you deliver to Hinjewadi at 7 am?
+    customer_wrote: please reply fast
+    reply_with: 2187 <answer>
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Anjali (office) (+919811376991) · whatsapp
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: question-06
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Dr. Kavita Rao
+    code: '4978'
+    question: Eggless option hai?
+    customer_wrote: koi hai?
+    reply_with: 4978 <answer>
+    guess: ₹1,400 for 1 kg
+    note: Already in preparation, the cake is half done.
+    contact: 👤 Dr. Kavita Rao (+919811420908) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: this is the customer's third message about it today
+- id: question-07
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Sunny
+    code: '4313'
+    question: Do you make sugar-free cakes?
+    customer_wrote: please reply fast
+    reply_with: 4313 <answer>
+    guess: ₹1,400 for 1 kg
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Sunny (+919811569665) · whatsapp
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: question-08
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Fatima Shaikh
+    code: '6069'
+    question: Kya 2 kg chocolate cake kal tak ban jayega?
+    customer_wrote: please reply fast
+    reply_with: 6069 <answer>
+    contact: 👤 Fatima Shaikh (+919811902202) · whatsapp
+  context:
+    could_not_reply_itself: true
+- id: question-09
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Arjun
+    code: '3284'
+    question: Price for this design as a 1 kg cake (photo in chat)?
+    reply_with: 3284 <answer>
+    note: First order. Paid online in full.
+    contact: 👤 Arjun (+919811104720) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer mixed Hindi and English
+- id: question-10
+  purpose: owner.question
+  language: en
+  facts:
+    customer.name: Meenakshi Iyer
+    code: '7937'
+    question: क्या आप वीगन केक बनाते हैं?
+    reply_with: 7937 <answer>
+    guess: Not on the menu
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Meenakshi Iyer (+919811481207) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer sent a photo of the damaged box
+- id: question-11
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Taha
+    code: '6760'
+    question: Can you deliver to Hinjewadi at 7 am?
+    customer_wrote: koi hai?
+    reply_with: 6760 <answer>
+    contact: 👤 Taha (+919811566575) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer says they already paid part of it by UPI
+- id: question-12
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Neha K
+    code: '1559'
+    question: Eggless option hai?
+    reply_with: 1559 <answer>
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Neha K (+919811981977) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer is paying from their husband's number
+- id: question-13
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Gurpreet Singh
+    code: '5462'
+    question: Do you make sugar-free cakes?
+    customer_wrote: koi hai?
+    reply_with: 5462 <answer>
+    guess: Not on the menu
+    note: First order. Paid online in full.
+    contact: 👤 Gurpreet Singh (+919811437919) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: question-14
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Ritu
+    code: '5052'
+    question: Kya 2 kg chocolate cake kal tak ban jayega?
+    customer_wrote: koi hai?
+    reply_with: 5052 <answer>
+    guess: ₹1,400 for 1 kg
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Ritu (+919811891175) · whatsapp
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: question-15
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Joseph D'Souza
+    code: '7291'
+    question: Price for this design as a 1 kg cake (photo in chat)?
+    customer_wrote: koi hai?
+    reply_with: 7291 <answer>
+    note: First order. Paid online in full.
+    contact: 👤 Joseph D'Souza (+919811806390) · whatsapp
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: question-16
+  purpose: owner.question
+  language: hi-Latn
+  facts:
+    customer.name: Ayesha
+    code: '5950'
+    question: क्या आप वीगन केक बनाते हैं?
+    customer_wrote: please reply fast
+    reply_with: 5950 <answer>
+    guess: ₹1,400 for 1 kg
+    contact: 👤 Ayesha (+919811977829) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: this is the customer's third message about it today
+- id: question-17
+  purpose: owner.question
+  language: hi
+  facts:
+    customer.name: Vikram Mehta
+    code: '2948'
+    question: Can you deliver to Hinjewadi at 7 am?
+    reply_with: 2948 <answer>
+    note: Regular customer (6 orders). Delivery is in 3 days.
+    contact: 👤 Vikram Mehta (+919811857722) · whatsapp
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: question-18
+  purpose: owner.question
+  language: hi
+  facts:
+    customer.name: Pooja
+    code: '5810'
+    question: Eggless option hai?
+    reply_with: 5810 <answer>
+    guess: ₹1,400 for 1 kg
+    note: First order. Paid online in full.
+    contact: 👤 Pooja (+919811967168) · whatsapp
+  context: {}
+- id: question-19
+  purpose: owner.question
+  language: hi
+  facts:
+    customer.name: Sanjay
+    code: '7582'
+    question: Do you make sugar-free cakes?
+    reply_with: 7582 <answer>
+    note: Placed today, not prepared yet. I suggest yes.
+    contact: 👤 Sanjay (+919811831385) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer mixed Hindi and English
+- id: question-20
+  purpose: owner.question
+  language: hi
+  facts:
+    customer.name: Lakshmi
+    code: '9334'
+    question: Kya 2 kg chocolate cake kal tak ban jayega?
+    customer_wrote: koi hai?
+    reply_with: 9334 <answer>
+    guess: ₹1,400 for 1 kg
+    note: Already in preparation, the cake is half done.
+    contact: 👤 Lakshmi (+919811810267) · whatsapp
+  context:
+    could_not_reply_itself: true
+    what_happened: the customer sent a photo of the damaged box
+- id: question_followup-01
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Rahul
+    code: '3122'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: question_followup-02
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Priya Sharma
+    code: '1953'
+    customer_wrote: Hello?? still waiting
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: question_followup-03
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: राहुल वर्मा
+    code: '8532'
+    customer_wrote: any update?
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: question_followup-04
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Mohammed Irfan
+    code: '7268'
+    customer_wrote: Hello?? still waiting
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: question_followup-05
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Anjali (office)
+    code: '3945'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: question_followup-06
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Dr. Kavita Rao
+    code: '2419'
+    customer_wrote: kab tak batayenge?
+  context:
+    what_happened: this is the customer's third message about it today
+- id: question_followup-07
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Sunny
+    code: '2006'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: question_followup-08
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Fatima Shaikh
+    code: '6884'
+    customer_wrote: Hello?? still waiting
+  context: {}
+- id: question_followup-09
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Arjun
+    code: '9456'
+    customer_wrote: kab tak batayenge?
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: question_followup-10
+  purpose: owner.question_followup
+  language: en
+  facts:
+    customer.name: Meenakshi Iyer
+    code: '6080'
+    customer_wrote: Hello?? still waiting
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: question_followup-11
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Taha
+    code: '8221'
+    customer_wrote: Hello?? still waiting
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: question_followup-12
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Neha K
+    code: '5910'
+    customer_wrote: kab tak batayenge?
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: question_followup-13
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Gurpreet Singh
+    code: '1183'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: question_followup-14
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Ritu
+    code: '7842'
+    customer_wrote: Hello?? still waiting
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: question_followup-15
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Joseph D'Souza
+    code: '3526'
+    customer_wrote: kab tak batayenge?
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: question_followup-16
+  purpose: owner.question_followup
+  language: hi-Latn
+  facts:
+    customer.name: Ayesha
+    code: '4898'
+    customer_wrote: any update?
+  context:
+    what_happened: this is the customer's third message about it today
+- id: question_followup-17
+  purpose: owner.question_followup
+  language: hi
+  facts:
+    customer.name: Vikram Mehta
+    code: '3911'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: question_followup-18
+  purpose: owner.question_followup
+  language: hi
+  facts:
+    customer.name: Pooja
+    code: '5214'
+    customer_wrote: any update?
+  context: {}
+- id: question_followup-19
+  purpose: owner.question_followup
+  language: hi
+  facts:
+    customer.name: Sanjay
+    code: '1022'
+    customer_wrote: जल्दी बताइए
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: question_followup-20
+  purpose: owner.question_followup
+  language: hi
+  facts:
+    customer.name: Lakshmi
+    code: '2009'
+    customer_wrote: any update?
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: handoff-01
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Rahul
+    channel: whatsapp
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: First order. Paid online in full.
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: handoff-02
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Priya Sharma
+    channel: instagram
+    customer_wrote: I want to talk to the owner
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: handoff-03
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: राहुल वर्मा
+    channel: telegram
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: handoff-04
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Mohammed Irfan
+    channel: facebook messenger
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: handoff-05
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Anjali (office)
+    channel: whatsapp
+    customer_wrote: मुझे बड़ा ऑर्डर देना है
+    note: First order. Paid online in full.
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: handoff-06
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Dr. Kavita Rao
+    channel: instagram
+    customer_wrote: I want to talk to the owner
+  context:
+    what_happened: this is the customer's third message about it today
+- id: handoff-07
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Sunny
+    channel: telegram
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: handoff-08
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Fatima Shaikh
+    channel: facebook messenger
+    customer_wrote: मुझे बड़ा ऑर्डर देना है
+    note: Placed today, not prepared yet. I suggest yes.
+  context: {}
+- id: handoff-09
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Arjun
+    channel: whatsapp
+    customer_wrote: mera cake kharab aaya hai
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: handoff-10
+  purpose: owner.handoff
+  language: en
+  facts:
+    customer.name: Meenakshi Iyer
+    channel: instagram
+    customer_wrote: मुझे बड़ा ऑर्डर देना है
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: handoff-11
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Taha
+    channel: telegram
+    customer_wrote: मुझे बड़ा ऑर्डर देना है
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer says they already paid part of it by UPI
+- id: handoff-12
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Neha K
+    channel: facebook messenger
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer is paying from their husband's number
+- id: handoff-13
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Gurpreet Singh
+    channel: whatsapp
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer also asked if the shop delivers to Wakad
+- id: handoff-14
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Ritu
+    channel: instagram
+    customer_wrote: I want to talk to the owner
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer sounds upset and wrote in capital letters
+- id: handoff-15
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Joseph D'Souza
+    channel: telegram
+    customer_wrote: Can I get a corporate quote for 40 cakes?
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the order is for a friend's birthday tomorrow morning
+- id: handoff-16
+  purpose: owner.handoff
+  language: hi-Latn
+  facts:
+    customer.name: Ayesha
+    channel: facebook messenger
+    customer_wrote: I want to talk to the owner
+  context:
+    what_happened: this is the customer's third message about it today
+- id: handoff-17
+  purpose: owner.handoff
+  language: hi
+  facts:
+    customer.name: Vikram Mehta
+    channel: whatsapp
+    customer_wrote: mera cake kharab aaya hai
+    note: Placed today, not prepared yet. I suggest yes.
+  context:
+    what_happened: the customer wants the same cake as last time
+- id: handoff-18
+  purpose: owner.handoff
+  language: hi
+  facts:
+    customer.name: Pooja
+    channel: instagram
+    customer_wrote: mera cake kharab aaya hai
+  context: {}
+- id: handoff-19
+  purpose: owner.handoff
+  language: hi
+  facts:
+    customer.name: Sanjay
+    channel: telegram
+    customer_wrote: mera cake kharab aaya hai
+    note: Regular customer (6 orders). Delivery is in 3 days.
+  context:
+    what_happened: the customer mixed Hindi and English
+- id: handoff-20
+  purpose: owner.handoff
+  language: hi
+  facts:
+    customer.name: Lakshmi
+    channel: facebook messenger
+    customer_wrote: mera cake kharab aaya hai
+    note: Already in preparation, the cake is half done.
+  context:
+    what_happened: the customer sent a photo of the damaged box
+- id: rule_saved-01
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-02
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-03
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-04
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-05
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-06
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-07
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-08
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-09
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-10
+  purpose: owner.rule_saved
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    until_checked: 'Cancelling an order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-11
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-12
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-13
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-14
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-15
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-16
+  purpose: owner.rule_saved
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-17
+  purpose: owner.rule_saved
+  language: hi
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-18
+  purpose: owner.rule_saved
+  language: hi
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_saved-19
+  purpose: owner.rule_saved
+  language: hi
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    until_checked: 'Changing a placed order: I ask you first, always'
+    undo: /undo
+  context:
+    checked: false
+- id: rule_saved-20
+  purpose: owner.rule_saved
+  language: hi
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    undo: /undo
+  context:
+    checked: true
+- id: rule_checked-01
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    code: '3014'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-02
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '3102'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-03
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    code: '4357'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-04
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '8105'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-05
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    code: '7702'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-06
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '3282'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-07
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    code: '3743'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-08
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    code: '6201'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-09
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    code: '1873'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-10
+  purpose: owner.rule_checked
+  language: en
+  facts:
+    rule_readback: 'Refunding an order: I say no when the payment status is cod_pending'
+    code: '7595'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-11
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '9171'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-12
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    code: '5417'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-13
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '8108'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-14
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '3792'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-15
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    code: '4297'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-16
+  purpose: owner.rule_checked
+  language: hi-Latn
+  facts:
+    rule_readback: 'Changing a placed order: I do it myself, always'
+    code: '5368'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-17
+  purpose: owner.rule_checked
+  language: hi
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when the order''s status is one of draft, confirmed'
+    code: '6870'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-18
+  purpose: owner.rule_checked
+  language: hi
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    code: '5231'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: rule_checked-19
+  purpose: owner.rule_checked
+  language: hi
+  facts:
+    rule_readback: 'Changing a placed order: I ask you first when the order total (₹) is above 2000'
+    code: '4135'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences: []
+- id: rule_checked-20
+  purpose: owner.rule_checked
+  language: hi
+  facts:
+    rule_readback: 'Cancelling an order: I do it myself when hours left until delivery is at least 24'
+    code: '6431'
+  context:
+    until_now: 'Cancelling an order: I ask you first, always'
+    differences:
+    - kind: newly_acts
+      line: This also lets me do it myself when the order total (₹) is 500.
+- id: cost_cap_warning-01
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 450
+    daily_cap:
+      paise: 500
+    share: 90%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-02
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 400
+    daily_cap:
+      paise: 500
+    share: 80%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-03
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 400
+    daily_cap:
+      paise: 500
+    share: 80%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-04
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 970
+    daily_cap:
+      paise: 1000
+    share: 97%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-05
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 845
+    daily_cap:
+      paise: 1000
+    share: 84.5%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-06
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 240
+    daily_cap:
+      paise: 300
+    share: 80%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-07
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 243
+    daily_cap:
+      paise: 300
+    share: 81%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-08
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 845
+    daily_cap:
+      paise: 1000
+    share: 84.5%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-09
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 240
+    daily_cap:
+      paise: 300
+    share: 80%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-10
+  purpose: owner.cost_cap_warning
+  language: en
+  facts:
+    spent_today:
+      paise: 405
+    daily_cap:
+      paise: 500
+    share: 81%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-11
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 900
+    daily_cap:
+      paise: 1000
+    share: 90%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-12
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 291
+    daily_cap:
+      paise: 300
+    share: 97%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-13
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 291
+    daily_cap:
+      paise: 300
+    share: 97%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-14
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 243
+    daily_cap:
+      paise: 300
+    share: 81%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-15
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 845
+    daily_cap:
+      paise: 1000
+    share: 84.5%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-16
+  purpose: owner.cost_cap_warning
+  language: hi-Latn
+  facts:
+    spent_today:
+      paise: 400
+    daily_cap:
+      paise: 500
+    share: 80%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-17
+  purpose: owner.cost_cap_warning
+  language: hi
+  facts:
+    spent_today:
+      paise: 970
+    daily_cap:
+      paise: 1000
+    share: 97%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-18
+  purpose: owner.cost_cap_warning
+  language: hi
+  facts:
+    spent_today:
+      paise: 405
+    daily_cap:
+      paise: 500
+    share: 81%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-19
+  purpose: owner.cost_cap_warning
+  language: hi
+  facts:
+    spent_today:
+      paise: 243
+    daily_cap:
+      paise: 300
+    share: 81%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time
+- id: cost_cap_warning-20
+  purpose: owner.cost_cap_warning
+  language: hi
+  facts:
+    spent_today:
+      paise: 253
+    daily_cap:
+      paise: 300
+    share: 84.5%
+  context:
+    at_the_cap: replies continue on a simpler, cheaper model
+    at_one_and_a_half_times_the_cap: AI replies pause; customers get one holding line and the owner answers chats
+    resets: at midnight, shop time

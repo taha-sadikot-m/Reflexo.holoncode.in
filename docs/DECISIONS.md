@@ -235,3 +235,42 @@ the disk and IP are paid.
   machine.
 - Only ports 80 and 443 are public; Postgres and Redis listen on localhost.
 - Earlier public addresses redirect to the domain, so links already shared keep working.
+
+## Beta
+
+### D18. Decisions on Cedar, checked before a rule goes live (beta WP-26, ADR-028)
+
+**Problem.** `decide()` was a small Python evaluator. Connector tools, automation steps and team members all need
+the same gate, and an owner's new rule could widen what the agent does without anyone noticing.
+
+**Decision.**
+- Every effectful action asks `decide()` (`reflexo.agent.capabilities`): built-in capabilities, the owner's own
+  actions, automation sends. It answers `act`, `decline`, `propose`, `not_possible` or `shadow` and writes an X-ray
+  `decision` record.
+- The rules are Cedar policies (`reflexo.policy`), evaluated in layers: platform invariants
+  (`config/policy/platform.cedar`), this customer's rules, the shop's rules, risk defaults, ceilings. The owner's
+  rules compile one to one into stored, versioned policy sets; a decision checks the stored set still matches the
+  active rules.
+- The POC's evaluator is kept as the reference: 10,000 generated requests and a property test must get the same
+  answers from both.
+- Before a rule is read back, `tools/policy-check` (Rust, `cedar-policy-symcc`, the cvc5 solver) checks it can
+  match and can never error, and finds a concrete example of what it newly allows or forbids. The read-back says
+  it in the owner's words. Without the checker the rule is saved as "ask me first" and re-checked hourly.
+
+**Consequences.** Authority is data the owner can read and undo, verified by a solver whose core is proven in Lean.
+One Cedar call per decision (about 0.3 ms); the rule checker never runs during a turn.
+
+### D19. System messages are written by purpose and checked (beta WP-26, ADR-033)
+
+**Problem.** Fixed sentences ("Done for the customer: ...") cannot fit real situations: a half payment, another
+language, a question on the side.
+
+**Decision.** Every message the system starts is a purpose in `config/messages/purposes.yaml`. The caller passes
+facts from records and a short context; the `messages` role writes it; a deterministic check requires every
+listed name, number, code, amount and read-back and refuses any amount, link or phone number that is not a fact.
+One repair round, then the fallback: a fact card for the owner (labelled facts and buttons, no sentence), one
+holding line a day for a customer. `scripts/check_fixed_text.py` fails on any new sentence for people in code;
+the POC's remaining ones are listed in `docs/fixed_text_baseline.txt`, which may only shrink.
+
+**Consequences.** About ₹0.03 a message on gemini-2.5-flash (the cheaper flash-lite fails the eval at 88%). A
+model outage never blocks a notification: the fact card goes out with working buttons.

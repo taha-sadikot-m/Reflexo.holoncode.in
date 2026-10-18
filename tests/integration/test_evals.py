@@ -20,6 +20,7 @@ REQUIRED = {
     "owner_commands": {"messages"},
     "builder": {"description", "expect"},
     "learning": {"capability", "situation", "approve"},
+    "messages": {"purpose", "language", "facts"},
 }
 
 

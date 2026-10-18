@@ -21,13 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import reflexo.gateway.api as gateway
 import reflexo.knowledge.api as knowledge
+from reflexo.agent import messages
 from reflexo.agent.model_gateway.gateway import ModelGateway
 from reflexo.agent.schemas import OwnerQuestionDraft
 from reflexo.common import ports
 from reflexo.common.contracts import (
     AnswerResult,
     JobEnqueuer,
-    OwnerNotifyPort,
     TurnScheduler,
 )
 from reflexo.common.db import get_db
@@ -116,27 +116,51 @@ def contact_line(conv: gateway.ConversationView, customer: gateway.CustomerView 
     return f"👤 {who}{phone} · {conv.channel.replace('_', ' ')}"
 
 
-def question_notice(
+async def notify_question(
+    business_id: UUID,
     *,
     qid: UUID,
     code: str,
     question: str,
-    facts: str,
-    conversation_id: UUID,
+    conv: gateway.ConversationView,
+    contact: str,
+    customer_wrote: str | None = None,
     brief: str | None = None,
     guess: str | None = None,
     options: list[str] | None = None,
-    head: str | None = None,
-) -> tuple[str, list[tuple[str, str]]]:
-    """The owner's view of a question, as a colleague would ask it: what is needed, the brief, one facts line,
-    how to answer — buttons for the options, "I'll reply" and "Show chat"."""
-    note = f"\n{brief.strip()}" if brief and brief.strip() else ""
-    mine = f"\nMy guess: {guess}" if guess else ""
-    top = head or f"❓ *Question {code}*: {question}{note}{mine}"
-    body = f"{top}\n\n{facts}\n\nReply: `{code} <answer>`"
-    buttons = [(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate((options or [])[:2])]
-    buttons += [(f"oq:{qid}:later", "I'll reply"), (f"chat:{conversation_id}", "💬 Show chat")]
-    return body, buttons
+    open_order: str | None = None,
+    could_not_reply: bool = False,
+    media: list[UUID] | None = None,
+) -> None:
+    """The owner's view of a question, as a colleague would ask it (purpose `owner.question`): what is needed, the
+    brief, how to answer. Buttons for the answer options (labels from the draft), "I'll reply" and "Show chat"."""
+    name = (conv.customer.display_name if conv.customer else None) or None
+    await messages.notify_owner(
+        "owner.question",
+        business_id=business_id,
+        facts={
+            "customer.name": name,
+            "code": code,
+            "question": question,
+            "customer_wrote": customer_wrote,
+            "reply_with": f"{code} <answer>",
+            "guess": guess,
+            "note": brief.strip() if brief else None,  # the assistant's note, as it wrote it
+            "contact": contact,
+            "open_order": open_order,
+        },
+        context={
+            "could_not_reply_itself": could_not_reply or None,
+        },
+        kind="question",
+        dedupe_key=f"oq:{qid}",
+        priority=PriorityClass.P1,
+        buttons={"later": f"oq:{qid}:later", "show_chat": f"chat:{conv.id}"},
+        fixed_buttons=[(f"oq:{qid}:{i}", str(opt)[:20]) for i, opt in enumerate((options or [])[:2])],
+        ref={"question_id": str(qid)},
+        about_conversation=conv.id,
+        media=media,
+    )
 
 
 async def ask_owner(
@@ -176,30 +200,19 @@ async def ask_owner(
             session=s,
         )
         media = await gateway.recent_customer_media(s, conversation_id)
-    notifier = ports.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
-    if notifier is not None:
-        facts = contact_line(conv, conv.customer) + (f"\n{facts_extra}" if facts_extra else "")
-        body, buttons = question_notice(
-            qid=qid,
-            code=code,
-            question=draft.question,
-            facts=facts,
-            conversation_id=conversation_id,
-            brief=brief,
-            guess=draft.ai_guess,
-            options=draft.options,
-        )
-        await notifier.notify(
-            business_id,
-            "question",
-            body,
-            dedupe_key=f"oq:{qid}",
-            about_conversation=conversation_id,
-            priority=PriorityClass.P1,
-            buttons=buttons,
-            ref={"question_id": str(qid)},
-            media=media,
-        )
+    extra = f" · {facts_extra}" if facts_extra else ""
+    await notify_question(
+        business_id,
+        qid=qid,
+        code=code,
+        question=draft.question,
+        conv=conv,
+        contact=contact_line(conv, conv.customer) + extra,
+        brief=brief,
+        guess=draft.ai_guess,
+        options=draft.options,
+        media=media,
+    )
     await emit("owner_question", PipelineEventStatus.OK, business_id=business_id, conversation_id=conversation_id)
     return qid, code
 

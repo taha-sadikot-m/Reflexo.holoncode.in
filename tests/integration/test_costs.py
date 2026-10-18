@@ -265,7 +265,11 @@ async def test_daily_jobs_schedule_today_once_and_then_tomorrow(registry: Regist
     jobs = registry.require(Jobs)
     await jobs.ensure_daily()
     await jobs.ensure_daily()  # a second worker or a restart changes nothing
-    rows = await q(db, "SELECT queue, dedupe_key, payload FROM jobs WHERE queue LIKE 'costs.%' AND status = 'pending'")
+    rows = await q(
+        db,
+        """SELECT queue, dedupe_key, payload FROM jobs
+           WHERE queue IN ('costs.fx_refresh', 'costs.rollup') AND status = 'pending'""",
+    )  # the daily jobs (costs.cap_warning jobs are per business, queued by other tests)
     by_queue = {r.queue: r for r in rows}
     assert set(by_queue) == {"costs.fx_refresh", "costs.rollup"} and len(rows) == 2
     fx = by_queue["costs.fx_refresh"]

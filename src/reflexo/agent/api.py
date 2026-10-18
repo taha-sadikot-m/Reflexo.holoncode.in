@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from reflexo.agent import cost_jobs, grounding, media_describe, metering, output_gate, sandbox
-from reflexo.agent.capabilities import CAPABILITIES
+from reflexo.agent import cost_jobs, grounding, media_describe, messages, metering, output_gate, rules, sandbox
+from reflexo.agent.capabilities import CAPABILITIES, ActionRequest, Decision, decide
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
 from reflexo.agent.model_gateway.gateway import GatewayEmbedder, ModelGateway, tool_result
@@ -127,6 +127,16 @@ def register(registry: Registry, provider: ModelProvider | None = None) -> None:
         jobs.register_daily(cost_jobs.FX_QUEUE, fx_refresh, get_settings().fx_refresh_at)
         jobs.register_daily(cost_jobs.ROLLUP_QUEUE, cost_rollup, cost_jobs.ROLLUP_AT)
 
+        async def cost_cap_warning(job: JobRow) -> None:
+            await cost_jobs.cap_warning(job.payload)
+
+        jobs.register(metering.CAP_WARNING_QUEUE, cost_cap_warning)
+
+        async def rule_recheck(job: JobRow) -> None:
+            await rules.recheck(job.payload)
+
+        jobs.register(rules.RECHECK_QUEUE, rule_recheck)
+
 
 def gateway() -> ModelGateway:
     if _gateway is None:
@@ -177,7 +187,9 @@ async def describe_media(business_id: UUID, media_object_id: UUID, *, owner_file
 __all__ += ["describe_media"]
 
 
-__all__ += ["CAPABILITIES"]  # risk-classed actions (ADR-015): name → label, verb, default authority
+__all__ += ["CAPABILITIES"]  # every action of the Cedar schema (ADR-015, ADR-028): risk, resource, label, verb
+__all__ += ["ActionRequest", "Decision", "decide"]  # the one gate for every effectful action (BETA_04 §7.1)
+__all__ += ["messages"]  # messages written by purpose and checked (BETA_13 §6): compose, notify_owner
 
 
 async def decide_answer_scope(business_id: UUID, question: str, answer: str) -> str:

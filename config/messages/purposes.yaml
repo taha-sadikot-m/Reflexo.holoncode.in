@@ -1,0 +1,103 @@
+# System messages are defined by purpose, never by their words (BETA_13 §6). The `messages` role writes each one
+# for the situation from the facts the caller passes; the check then requires every listed fact, link and button.
+# A new purpose needs at least 20 situations in evals/datasets/messages/ (BETA_08 §5.2). Reviewed like code.
+#
+# facts: the keys that must appear when the caller passes a value (None = not known, not required): names,
+# numbers, codes, amounts and read-backs, never descriptions the writer should put in its own words. A money fact is
+# checked by value; every other required fact must appear exactly as written. The caller may pass more facts: the
+# writer uses them as needed, and every amount, link and phone number in the message must come from a fact.
+
+- key: owner.proposal
+  audience: owner
+  purpose: >-
+    A customer asked for something only the owner can allow. Ask the owner to decide: who asked, what exactly
+    would be done, the order it is about and the customer's reason. Add the assistant's note if it helps.
+    Tell the owner they can also reply with YES or NO followed by the code.
+  facts: [customer.name, order.number, order.total, code]
+  buttons:
+    - {id: approve, meaning: "do exactly this action now"}
+    - {id: reject, meaning: "do not do it; the customer is told kindly"}
+  max_chars: 700
+
+- key: owner.action_done
+  audience: owner
+  purpose: >-
+    Tell the owner, for their information only, that the assistant did something for a customer on its own,
+    and on what basis (the owner's rule, or a draft order where nothing was promised yet).
+  facts: [order.number, order.total]
+  max_chars: 500
+
+- key: owner.learn_offer
+  audience: owner
+  purpose: >-
+    The owner just decided on a customer's request. Offer to remember the decision as a rule for next time, and
+    show the rule exactly as written in the facts, word for word, so the owner knows what it will do.
+  facts: [rule_readback]
+  buttons:
+    - {id: always, meaning: "save the rule for every customer"}
+    - {id: this_customer, meaning: "save the rule only for this customer"}
+    - {id: once, meaning: "do not save anything; ask again next time"}
+  max_chars: 600
+
+- key: owner.question
+  audience: owner
+  purpose: >-
+    Ask the owner something only they can answer for a customer, as a colleague would: what is needed, the
+    assistant's note and guess if any, and how to answer (reply with the code and the answer). If the context
+    says the assistant could not reply itself, say so plainly.
+  facts: [customer.name, code, reply_with]
+  buttons:
+    - {id: later, meaning: "the owner will answer the customer themselves"}
+    - {id: show_chat, meaning: "show the last messages of the chat"}
+  max_chars: 800
+
+- key: owner.question_followup
+  audience: owner
+  purpose: >-
+    The customer wrote again while the owner's answer to an open question is still missing. Tell the owner
+    who wrote, what they wrote now, and which question it is about.
+  facts: [customer.name, code]
+  buttons:
+    - {id: show_chat, meaning: "show the last messages of the chat"}
+  max_chars: 600
+
+- key: owner.handoff
+  audience: owner
+  purpose: >-
+    A customer needs the owner personally. Say who, on which channel the owner should reply, and what the
+    customer needs (from the assistant's note, or what they wrote).
+  facts: [customer.name, channel]
+  buttons:
+    - {id: show_chat, meaning: "show the last messages of the chat"}
+  max_chars: 700
+
+- key: owner.rule_saved
+  audience: owner
+  purpose: >-
+    Confirm to the owner that their rule is saved and say how to undo it. Show the rule word for word. If the
+    facts also have a rule in force until it is checked (until_checked), show that rule word for word too, and
+    explain that the assistant follows it, asking first, until the check is done, and that the owner will hear
+    when it is.
+  facts: [rule_readback, until_checked, undo]
+  max_chars: 500
+
+- key: owner.rule_checked
+  audience: owner
+  purpose: >-
+    A rule the owner gave earlier could not be checked at the time, so the assistant has been asking first. The
+    check is now done. Show the rule exactly as the owner asked for it, mention any example of what it newly
+    allows or forbids from the context, and ask the owner to confirm it (or reply YES with the code).
+  facts: [rule_readback, code]
+  buttons:
+    - {id: approve, meaning: "use the rule exactly as written from now on"}
+    - {id: reject, meaning: "keep asking first"}
+  max_chars: 700
+
+- key: owner.cost_cap_warning
+  audience: owner
+  purpose: >-
+    Tell the owner, once today, that the assistant's AI use has reached this share of the shop's daily limit:
+    how much is spent and what the limit is. Say plainly what happens if use goes on (from the context) and when
+    it resets. No alarm; it is information.
+  facts: [spent_today, daily_cap, share]
+  max_chars: 500

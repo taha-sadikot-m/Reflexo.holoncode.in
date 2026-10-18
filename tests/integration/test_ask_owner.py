@@ -27,6 +27,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.pipeline import api as pipeline_api
 from reflexo.pipeline.turns import _TURN_COLUMNS, PipelineTurnHandle, TurnService, _ref
+from tests import fake_writer
 from tests.factories import vault_credential
 from tests.integration.test_customer_desk import PRIMARY, make_bakery, outbound_texts, reply, turn_for
 from tests.integration.test_gateway import deliver, wa_message
@@ -48,7 +49,7 @@ def _generous_speculative_budget(monkeypatch: pytest.MonkeyPatch) -> Iterator[No
 
 @pytest.fixture
 def fake() -> agent.FakeProvider:
-    return agent.FakeProvider()
+    return fake_writer.install(agent.FakeProvider())  # owner messages are written by purpose (BETA_13 §6)
 
 
 @pytest.fixture
@@ -205,7 +206,7 @@ async def test_owner_answer_on_telegram_is_relayed_saved_and_reused(
     conv = handle.ref.conversation_id
 
     [note] = await owner_messages(db, shop)
-    assert f"Question {code}" in note["text"] and "Eggless option hai?" in note["text"]
+    assert code in note["text"] and "Eggless option hai?" in note["text"] and f"{code} &lt;answer&gt;" in note["text"]
     keyboard = [b[0]["callback_data"] for b in note["reply_markup"]["inline_keyboard"]]
     assert keyboard == [
         f"o:oq:{question.id}:0",
@@ -293,7 +294,7 @@ async def test_button_tap_and_swipe_reply_answer_the_question(
         await s.execute(
             text("""UPDATE outbound_messages SET provider_message_id = '9001'
                     WHERE idempotency_key LIKE 'notify:%' AND rendered_payload->>'text' LIKE :t"""),
-            {"t": f"%Question {second.short_code.strip()}%"},
+            {"t": f"%code: {second.short_code.strip()}%"},
         )
     await owner_says(registry, db, shop, "sirf isko 10% off de do", reply_to=9001)
     [row] = await q(db, "SELECT status, answer, answer_scope FROM owner_questions WHERE id = :i", i=second.id)

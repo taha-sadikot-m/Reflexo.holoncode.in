@@ -115,6 +115,10 @@ TEST_SECRETS = {
         "k1:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=,k2:ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8="
     ),
     "REFLEXO_VAULT_ACTIVE_KEY_ID": "k1",
+    # the rule checker's Linux image (`make policy-check`); tests that need it are marked `slow`
+    "REFLEXO_POLICY_CHECK_CMD": "docker run --rm -i reflexo-policy-check:0.1.0",
+    # the messages role on its own model, so tests can script it apart from the desks (tests/fake_writer.py)
+    "REFLEXO_MODEL_MESSAGES": "gemini-2.5-flash-lite",
 }
 
 

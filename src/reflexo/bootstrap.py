@@ -36,6 +36,7 @@ def bootstrap(service: str) -> Registry:
     configure_logging(service, settings.log_level)
     configure_tracing(service, settings.otel_exporter_otlp_endpoint, settings.env, settings.otel_sampling_ratio)
     importlib.import_module("reflexo.vault.api").check_keys(settings)  # BETA_10 §4: no start without a usable key
+    importlib.import_module("reflexo.policy.api").start()  # BETA_04 §7.5: Cedar loads, or no start
     registry = reset_registry()
     for name in MODULES:
         module = importlib.import_module(f"reflexo.{name}.api")

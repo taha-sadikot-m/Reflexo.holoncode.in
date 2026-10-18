@@ -1,0 +1,291 @@
+# Fixed sentences for people that the POC code already had (BETA_13 §6.3; CHK-MSG-4).
+# Each moves to a message purpose (config/messages/purposes.yaml) when its module is next changed.
+# This file may only shrink: scripts/check_fixed_text.py fails on any sentence not listed here.
+# Format: <file> | <sentence, whitespace collapsed; {} = a value filled in>
+src/reflexo/agent/context.py | (none matched, use catalog_search if products are asked about)
+src/reflexo/agent/context.py | Current time: {} ({}). {} Reply by calling `reply`.
+src/reflexo/agent/context.py | - You asked the owner: {} {}, no answer yet. If the customer asks, the shop is deciding and you will update them; never say it is done.
+src/reflexo/agent/context.py | One minute, let me check and get back to you 🙏
+src/reflexo/agent/desk.py | Main abhi team ko bata rahi hoon 🙏 Woh aapse jaldi baat karenge.
+src/reflexo/agent/desk.py | मैं अभी टीम को बता रही हूँ 🙏 वे जल्दी आपसे बात करेंगे।
+src/reflexo/agent/desk.py | I'm letting the team know right away 🙏 They'll get back to you shortly.
+src/reflexo/agent/desk.py | (customer sent a message without text)
+src/reflexo/agent/graphs/customer.py | {"ok": false, "error": {"code": "NOT_EXECUTED", "message": "reply ended the turn"}}
+src/reflexo/agent/graphs/customer.py | Your reply was NOT sent: its arguments are invalid. Fix every problem and call reply again:
+src/reflexo/agent/language.py | hai hain ho hoga hogi honge hua hui hue tha thi raha rahi rahe rha rhi kya kaise kitna kitne kitni kab kahan kaun kyun kyu konsa kaunsa ka ki ke ko mein mai se par pe tak liye wala wali wale mera meri mere mujhe muje tera teri tere apna apni apne aap aapka aapki aapke hum hamara hamari humara humko tum tumhara yeh ye woh wo vo isko usko inko unko iska uska unka inka nahi nahin haan ji jee bhai didi bhaiya accha acha achha theek thik sahi chahiye chahte chahta chahti chaiye kar karo karna karke karunga karungi karenge kariye kijiye karwa karwana kiya kiye dena dijiye diya diye dedo lena lijiye liya gaya gayi gaye jayega jayegi jaye jaana jana aana aaya aayi aaye bata batao bataiye batana bhejo bhejna bhejiye milega milegi milenge sakte sakta sakti abhi kal aaj parso bahut thoda zyada jyada sab koi kuch kuchh aur bhi toh agar lekin phir fir
+src/reflexo/agent/language.py | the a an is are was were be been am will would can could should shall may might must i you he she we they it my your our their me him her them this that these those what when where which who why how please thanks thank want wanted need have has had for of with from at by about into than then there here and but or not no yes any some much many more most very just only also get got send sent give tell know
+src/reflexo/agent/language.py | Reply in the language AND script of the customer's LATEST message (see "language of the latest message"), not of earlier messages, your own earlier replies or the examples below: English → English only (no Hindi words); Hindi in Devanagari → Devanagari; Hinglish (Hindi in Roman letters) → Hinglish. Set `language` to what you actually wrote (en / hi / hi-Latn).
+src/reflexo/agent/language.py | Reply in the owner's language and script (English, Hindi, or Hinglish in Roman letters), matching their latest message.
+src/reflexo/agent/language.py | Mirror the caller's language: Hinglish → Hinglish (Roman Hindi), Hindi → Hindi, English → English.
+src/reflexo/agent/language.py | Always reply in clear, simple English, even when the customer writes in Hindi or Hinglish (you understand them; you answer in English). No Hindi words. Set `language` to en.
+src/reflexo/agent/language.py | Always reply in clear, simple English, even when the owner writes in Hindi or Hinglish. No Hindi words.
+src/reflexo/agent/language.py | Always speak simple, clear English, even if the caller speaks Hindi or Hinglish. No Hindi words.
+src/reflexo/agent/language.py | Never use the long em-dash; write a comma, colon or full stop instead.
+src/reflexo/agent/media_describe.py | Describe this file for a shop owner's file library in ONE short line (max 25 words): what it is (menu, price list, product photo, receipt, invoice…) and its key contents (item names and prices if visible).
+src/reflexo/agent/media_describe.py | A customer sent this photo to a shop. Describe it in ONE short line (max 30 words) for the shop assistant: what product it shows (type, flavour cues, colours, decorations, size/tiers, any text written on it).
+src/reflexo/agent/media_describe.py | Excel (old .xls format). Ask for .xlsx or CSV to read it
+src/reflexo/agent/media_describe.py | Excel file (could not be read)
+src/reflexo/agent/media_describe.py | PDF (too large to read)
+src/reflexo/agent/media_describe.py | Image (too large to read)
+src/reflexo/agent/owner_desk.py | Sorry, I couldn't finish that just now. Please try again in a moment.
+src/reflexo/agent/owner_desk.py | Current time: {} ({}); {}. Finish with `reply_owner`.
+src/reflexo/agent/owner_desk.py | Current question key '{}': "{}". When the owner answers, call onboarding_answer with that key and their words (answer=null if they say later/skip); then ask the next question it returns.
+src/reflexo/agent/owner_desk.py | Ask the remaining onboarding questions via onboarding_answer.
+src/reflexo/agent/owner_desk.py | Ask for the menu / price list (photo, PDF, Excel, or typed). When a file appears in RECENT FILES, call import_from_file with mode='onboarding'; when the owner types their items with prices, call import_from_text with their full text and mode='onboarding'.
+src/reflexo/agent/owner_desk.py | The menu is being read, or waits for the owner to confirm the summary (confirm_pending if they agree in their own words).
+src/reflexo/agent/owner_desk.py | The owner is reviewing sample answers. 'theek hai'/ok → onboarding_finish. A correction → knowledge_change (qa) with the right answer, then ask if everything else is fine.
+src/reflexo/agent/proposals.py | I can't find that request any more.
+src/reflexo/agent/proposals.py | That action is no longer available.
+src/reflexo/agent/proposals.py | Okay, not doing it. I'll let {} know.
+src/reflexo/agent/proposals.py | Couldn't do it: {}. I'll let {} know.
+src/reflexo/agent/proposals.py | Done ✅ {} {}.{} I'll tell {}.
+src/reflexo/agent/proposals.py | A shop's assistant asked the owner whether to do this for a customer: {}. The owner said {}. Facts of this case: {} Customer's reason: {} Propose the general rule the owner most likely follows, so the assistant can decide alone next time. At most 3 conditions, only from these fields: {} Ops: is, is_not, in, not_in, lt, lte, gt, gte, includes. Prefer facts that explain the decision (how close delivery is, whether it is being prepared, the payment state) over incidental ones (the exact total, this customer); use round thresholds an owner would say (24, 48 hours). Every condition must be true for this case. No conditions = always. Reply as JSON: {"conditions": [{"field": "...", "op": "...", "value": ...}]}
+src/reflexo/agent/proposals.py | Nothing to learn from that one.
+src/reflexo/agent/proposals.py | Okay, I'll ask you again next time. 👍
+src/reflexo/agent/proposals.py | Learned from your decision on {}{}
+src/reflexo/agent/proposals.py | Reference the order as order:{}.
+src/reflexo/agent/proposals.py | The owner decided not to do it. Tell them kindly and offer what is possible instead.
+src/reflexo/agent/proposals.py | The owner agreed, but it could not be done: {}. Explain kindly.
+src/reflexo/agent/proposals.py | A refund of {} is due; the shop will arrange it.
+src/reflexo/agent/proposals.py | The owner agreed and it is done (status: {}).{}
+src/reflexo/agent/questions.py | Hamari team jaldi aapko batayegi 🙏
+src/reflexo/agent/questions.py | हमारी टीम जल्दी आपको बताएगी 🙏
+src/reflexo/agent/questions.py | Our team will get back to you shortly 🙏
+src/reflexo/agent/questions.py | A shop owner answered a customer's question. Decide who the answer applies to. global = true for every customer (a general fact about the shop or products); customer = only this one customer; temporary = only for today / a limited time. Customer question: "{}" Owner answer: "{}" Reply as JSON: {"scope": "global|customer|temporary", "confidence": 0..1}
+src/reflexo/agent/questions.py | Asked the owner to decide ({}): {} {}
+src/reflexo/agent/sandbox.py | (I'd check this with you first)
+src/reflexo/agent/schemas.py | Your reply was NOT sent. Fix these problems and call reply again:
+src/reflexo/agent/tools/actions.py | Why the customer wants this, in their words
+src/reflexo/agent/tools/actions.py | For the shop owner, as a colleague would write it (2–3 short lines, their language): who, what they want, the relevant facts and what you suggest, e.g. 'Taha wants to cancel MB-1028 (500 g Truffle, Thu 15 Oct), placed 10 min ago, not prepared yet. I suggest cancelling.' Used only if the owner has to decide.
+src/reflexo/agent/tools/actions.py | 📞 asked during a phone call
+src/reflexo/agent/tools/base.py | tool {} is not available here
+src/reflexo/agent/tools/base.py | the arguments do not match the tool's schema
+src/reflexo/agent/tools/orders.py | not placed yet, still being put together with the customer
+src/reflexo/agent/tools/orders.py | not confirmed yet, it confirms automatically when the payment arrives
+src/reflexo/agent/tools/orders.py | on its way to the customer
+src/reflexo/agent/tools/orders.py | Detail values the customer already gave, by key, e.g. {'delivery_date': 'YYYY-MM-DD' (use the Dates line), 'delivery_slot': '4pm-8pm', 'address': '...', 'eggless': 'yes', 'message_on_cake': '...'}
+src/reflexo/agent/tools/owner.py | 💵 Cash on delivery: off
+src/reflexo/agent/tools/owner.py | 💵 Cash on delivery: on, for orders up to {}
+src/reflexo/agent/tools/owner.py | 💵 Cash on delivery: on, for all orders
+src/reflexo/agent/tools/owner.py | Done. The result follows in a moment.
+src/reflexo/api/routes/integrations.py | <h1>Test payment: order {}</h1><p>Amount: {}. Status: {}.</p><p>This is a simulated payment link. No money moves. To pay it, use the Pay button under the chat in the simulator.</p>
+src/reflexo/api/routes/integrations.py | <!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Test payment</title></head><body style='font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem'>{}</body></html>
+src/reflexo/automations/awareness.py | The shop's rule “{}” is waiting for this customer's reply to the message it sent above (about {} min left); their reply goes to that rule. Never contradict it: if they ask, point them to that message.
+src/reflexo/automations/builder.py | DEFINITION: {schema_version: 1, name, kind: "flow"|"guard", mode: "observe"|"consume", trigger, instance_key, steps[]} TRIGGERS (trigger.type): message_received {channels[], keywords_any[], cel} · comment_received {keywords_any[]} · order_created | order_confirmed | order_cancelled {cel} · order_status_changed {to_status[]} · payment_link_created | payment_captured | payment_failed · order_confirming (guards only) · schedule {cron} · manual STEPS (each has a unique lowercase id and `next` unless it ends): send {to: customer|owner, text | blocks, template_fallback?: {name, vars[]}} wait {duration: ISO 8601 like PT2H/P1D | until: CEL timestamp} wait_for_event {event: message_received|payment_captured|order_status_changed, match: CEL, consume, timeout, on_timeout} branch {cel, then, else} · counter_limit {key, limit, amount, on_exhausted: deny|skip|goto, release_on[]} claim_once {key, on_claimed} · deny {reason, alternatives?: "next_available_dates"} (guards) notify_owner {text, priority: p0..p3} · approval {preview, timeout, on_timeout: reject} · end TEMPLATES: "{{ <CEL> }}" inside strings. Variables: event, customer{name}, order{id, number, items, total_paise, delivery_date, delivery_slot, payment_method, payment_status, status}, business{name}, now. CEL FUNCTIONS: contains_any(text, [..]), lower(s), money(paise), date_fmt(ts, "d MMM"), hours_since(ts), order.delivery_date.at("HH:MM") (timestamp), order.has_category("cakes"), order.cake_count(), duration("24h"). RULES: never put prices/amounts/discounts in texts (use money(order.total_paise)); a guard is kind "guard" with trigger order_confirming and only counter_limit/branch/deny/end steps; every wait_for_event/approval needs a timeout; customer messages that may go out >24 h after the trigger need template_fallback {name: "order_update", vars: [<the message>]}; no loops; write customer texts in the owner's language (Hinglish if they wrote Hinglish).
+src/reflexo/automations/builder.py | You compile a shop owner's instruction into automation definitions (JSON). Return {"automations": [...]} with 1–{} definitions, one per distinct rule in the instruction.
+src/reflexo/automations/builder.py | BUSINESS: categories {}; order detail fields {}; channels whatsapp, telegram; approved WhatsApp templates {}.
+src/reflexo/automations/builder.py | EXAMPLES (one definition per line):
+src/reflexo/automations/builder.py | IT FAILED VALIDATION: fix exactly these problems and return the full corrected list: -
+src/reflexo/automations/demo.py | Cake orders for {{ date_fmt(order.delivery_date, 'd MMM') }} are full.
+src/reflexo/automations/demo.py | Please reply YES to confirm order {{ order.number }} ({{ money(order.total_paise) }}, cash on delivery) 🙏
+src/reflexo/automations/demo.py | contains_any(lower(event.text), ['yes', 'haan', 'ha', 'confirm', 'ok'])
+src/reflexo/automations/demo.py | Thank you! Order confirmed ✅
+src/reflexo/automations/demo.py | COD order {{ order.number }} ({{ customer.name }}) was not confirmed within 2 hours.
+src/reflexo/automations/demo.py | order.delivery_date.at('10:00') - duration('24h')
+src/reflexo/automations/demo.py | Reminder: your order {{ order.number }} will be delivered tomorrow ({{ order.delivery_slot }}). 🎂
+src/reflexo/automations/demo.py | Your order {{ order.number }} will be delivered tomorrow ({{ order.delivery_slot }}).
+src/reflexo/automations/demo.py | Your order {{ order.number }} is waiting for payment. The link is above 🙂
+src/reflexo/automations/demo.py | {{ customer.name }}'s order {{ order.number }} has been unpaid for 24 hours.
+src/reflexo/automations/demo.py | Hi {{ customer.name }}! I've sent you the price details in a DM 💌
+src/reflexo/automations/demo.py | Your order {{ order.number }} is out for delivery 🚚
+src/reflexo/automations/guard.py | I can't confirm that right now. I'll try again in a minute 🙏
+src/reflexo/automations/guard.py | Abhi confirm nahi kar pa rahi, ek minute mein try karti hoon 🙏
+src/reflexo/automations/guard.py | ⚠️ Order {} could not be checked against your limits; the customer was asked to wait a minute.
+src/reflexo/automations/readback.py | {cond}order confirm hote hi
+src/reflexo/automations/readback.py | when {cond}an order is confirmed
+src/reflexo/automations/readback.py | naya {cond}order aate hi
+src/reflexo/automations/readback.py | when a new {cond}order comes in
+src/reflexo/automations/readback.py | {cond}order cancel hone par
+src/reflexo/automations/readback.py | when {cond}an order is cancelled
+src/reflexo/automations/readback.py | when an order becomes '{to}'
+src/reflexo/automations/readback.py | payment link bhejne ke baad
+src/reflexo/automations/readback.py | after a payment link is sent
+src/reflexo/automations/readback.py | customer ka message aane par{kw}
+src/reflexo/automations/readback.py | post par comment aane par{kw}
+src/reflexo/automations/readback.py | har {cond}order confirm karte waqt
+src/reflexo/automations/readback.py | whenever {cond}an order is being confirmed
+src/reflexo/automations/readback.py | (24 ghante ki window band ho to template '{}' se)
+src/reflexo/automations/readback.py | (using the '{}' template if the 24 h window is closed)
+src/reflexo/automations/readback.py | delivery se ek din pehle {} baje
+src/reflexo/automations/readback.py | one day before delivery at {}
+src/reflexo/automations/readback.py | delivery se {} ghante pehle ({} ke hisaab se)
+src/reflexo/automations/readback.py | (us reply par AI alag se jawab nahi degi)
+src/reflexo/automations/readback.py | (the AI won't also answer that reply)
+src/reflexo/automations/readback.py | aur agle available dates bataungi
+src/reflexo/automations/readback.py | and offer the next available dates
+src/reflexo/automations/readback.py | {}th order aane par customer ko politely mana karungi{}
+src/reflexo/automations/readback.py | the {}th order is politely declined{}
+src/reflexo/automations/readback.py | (cancel ya payment expire hone par jagah wapas)
+src/reflexo/automations/readback.py | (cancelled/expired orders free a slot)
+src/reflexo/automations/readback.py | har customer ko sirf ek baar
+src/reflexo/automations/readback.py | AI se message samjhungi/likhwaungi
+src/reflexo/automations/readback.py | use AI to classify/write the message
+src/reflexo/automations/readback.py | Samajh gayi, ye {} rule{} lagaungi:
+src/reflexo/automations/readback.py | Got it, I'll set up {} rule{}:
+src/reflexo/automations/readback.py | ⏱ Demo mode: 1 din = {} sec.
+src/reflexo/automations/readback.py | ⏱ Demo mode: 1 day = {} s.
+src/reflexo/automations/router.py | already running for this instance
+src/reflexo/automations/validator.py | longest path waits more than 30 days
+src/reflexo/automations/validator.py | runs an AI step on every matching message
+src/reflexo/automations/validator.py | steps loop back on themselves (not allowed)
+src/reflexo/automations/validator.py | guards use only counter_limit/branch/deny/end on order_confirming
+src/reflexo/automations/validator.py | order_confirming is only for kind=guard
+src/reflexo/automations/validator.py | automations cannot set prices or amounts
+src/reflexo/automations/validator.py | amounts must come from the order (money(...)), not be typed in
+src/reflexo/automations/validator.py | Messenger/Instagram can't message after 24 h
+src/reflexo/automations/validator.py | This message may go out more than 24 h after the customer's last message; WhatsApp then needs an approved template. Use the 'order_update' template?
+src/reflexo/automations/validator.py | No, skip if the window is closed
+src/reflexo/automations/validator.py | lands in quiet hours (21:00–09:00); sent at 09:00
+src/reflexo/commerce/models.py | it is already on its way
+src/reflexo/commerce/payments.py | COD only for orders up to {}
+src/reflexo/commerce/payments.py | Cash on delivery is not available
+src/reflexo/commerce/payments.py | the payment provider did not create the link ({})
+src/reflexo/commerce/payments.py | Payment of {} received, but order {} was cancelled. The shop will refund it and be in touch 🙏
+src/reflexo/commerce/payments.py | 💸 {} paid for cancelled order {}, refund needed.
+src/reflexo/commerce/payments.py | Payment received ✅ Thank you! Your order is confirmed.
+src/reflexo/commerce/payments.py | Paid {}, refund needed.
+src/reflexo/commerce/payments.py | ❌ Order {} cancelled by {}
+src/reflexo/commerce/payments.py | ✏️ Order {} changed by the customer:
+src/reflexo/commerce/payments.py | please refund it from the Razorpay dashboard
+src/reflexo/common/ratelimit.py | local key, rate, burst, now = KEYS[1], tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]) local state = redis.call('HMGET', key, 'tokens', 'ts') local tokens = tonumber(state[1]) or burst local ts = tonumber(state[2]) or now tokens = math.min(burst, tokens + (now - ts) * rate) local allowed = 0 if tokens >= 1 then tokens = tokens - 1; allowed = 1 end redis.call('HSET', key, 'tokens', tokens, 'ts', now) redis.call('EXPIRE', key, 60) return allowed
+src/reflexo/gateway/inbound.py | You won't receive messages from us any more. Reply START anytime to resume.
+src/reflexo/gateway/inbound.py | Welcome back! You'll receive our messages again.
+src/reflexo/gateway/inbound.py | Done! ✅ I'll continue here on WhatsApp, with your earlier chat.
+src/reflexo/gateway/inbound.py | You're all set. We're already connected here. 🙂
+src/reflexo/gateway/inbound.py | That code has expired. Please ask for a new one in the original chat.
+src/reflexo/gateway/inbound.py | I couldn't recognise that code. Please check and try again.
+src/reflexo/gateway/inbound.py | 🤖 Let AI handle
+src/reflexo/gateway/inbound.py | ✋ {} wrote while a person is handling this chat. The AI is staying quiet.{}
+src/reflexo/gateway/outbound.py | A reply could not be delivered ({}).
+src/reflexo/gateway/render.py | Reply with a number.
+src/reflexo/gateway/render.py | This payment link has {}.
+src/reflexo/gateway/render.py | {} Amount: {} ⏳ Confirms automatically once paid
+src/reflexo/gateway/render.py | What would you like to do?
+src/reflexo/gateway/views.py | buttons: no (quick replies instead)
+src/reflexo/gateway/views.py | conversation_id = :c AND NOT (id = ANY(CAST(:ex AS uuid[]))) AND status NOT IN ('blocked', 'failed', 'pending_approval') ORDER BY created_at DESC, id DESC LIMIT :n
+src/reflexo/gateway/views.py | id = ANY(CAST(:ids AS uuid[])) ORDER BY created_at, id
+src/reflexo/knowledge/changesets.py | CAST(CAST(:p AS text) AS {})
+src/reflexo/knowledge/imports.py | A shop's price list spreadsheet. Return the 0-based column index of the item name and the price, and of the size/variant, category and description if present (else null), plus your confidence 0..1. Header: {} Rows: {}
+src/reflexo/knowledge/imports.py | Read this menu / price list and return every item. Copy prices EXACTLY as printed into price_text (with the currency sign if printed). Sizes or packs (500 g, 1 kg, box of 6) are separate variants of one item. If no price is printed for an item, set price_on_request=true and leave variants without price_text. Do NOT guess prices. source_text = the exact text you read for that item (name, size and price). category = the section heading if any. confidence 0..1 per item.
+src/reflexo/knowledge/imports.py | ⚠️ Needs your input (left out for now):
+src/reflexo/knowledge/imports.py | Reply *YES {}* to apply, or tell me what to change.
+src/reflexo/knowledge/playbook.py | main khud kar deti hoon
+src/reflexo/knowledge/playbook.py | main mana kar deti hoon
+src/reflexo/knowledge/playbook.py | main pehle aapse poochti hoon
+src/reflexo/knowledge/profile.py | about us who are you what do you make shop bakery kaun ho
+src/reflexo/knowledge/profile.py | opening hours timings timing open close closed today sunday kab khulte kab tak khula band samay
+src/reflexo/knowledge/profile.py | delivery area deliver pincode zone charges fee pickup kahan tak deliver ghar tak
+src/reflexo/knowledge/profile.py | policy returns refund cancellation custom order cancel wapas
+src/reflexo/knowledge/profile.py | payment pay upi card cod cash on delivery payment kaise karu online
+src/reflexo/knowledge/profile.py | contact phone number address location maps website kahan ho pata
+src/reflexo/knowledge/profile.py | Pickup available at {}.
+src/reflexo/knowledge/profile.py | Delivery needs {} h notice.
+src/reflexo/knowledge/profile.py | Persona: speak as {}; tone {}; formality {}; emoji {}; languages {}.
+src/reflexo/knowledge/search.py | , vec AS ( SELECT id, row_number() OVER (ORDER BY embedding <=> CAST(:v AS vector)) AS r FROM search_documents WHERE business_id = :b AND entity_type = ANY(:types) AND embedding IS NOT NULL ORDER BY embedding <=> CAST(:v AS vector) LIMIT :lim )
+src/reflexo/knowledge/search.py | UNION ALL SELECT * FROM vec
+src/reflexo/owner/commands.py | Commands: • `1234 <answer>`: answer customer question 1234 (or reply to the question message) • `/undo`: undo the last change • `/pause` / `/resume`: stop / restart AI replies to customers Anything else: just tell me what you need.
+src/reflexo/owner/commands.py | ✅ Saved for everyone.
+src/reflexo/owner/commands.py | ✅ Kept for this customer only.
+src/reflexo/owner/commands.py | That question is no longer open.
+src/reflexo/owner/commands.py | Ok 👍 Reply `{} <answer>` when you're ready.
+src/reflexo/owner/commands.py | I can't find that chat any more.
+src/reflexo/owner/commands.py | 🤖 I'm back on this chat
+src/reflexo/owner/commands.py | and answering their last message.
+src/reflexo/owner/commands.py | ⏸️ AI replies to customers are paused. Send /resume to restart.
+src/reflexo/owner/commands.py | ▶️ AI replies to customers are back on.
+src/reflexo/owner/commands.py | Question {} was already answered ✅
+src/reflexo/owner/commands.py | Question {} was already answered ✅
+src/reflexo/owner/commands.py | ✅ {}. Saved for {} only for now. Should it apply to everyone?
+src/reflexo/owner/commands.py | ✅ {}. Saved {}. Next time I'll answer this myself. (/undo to remove)
+src/reflexo/owner/commands.py | Nothing to undo.
+src/reflexo/owner/commands.py | Can't undo: those items changed after that edit. Tell me what to fix instead.
+src/reflexo/owner/commands.py | That was already {}.
+src/reflexo/owner/commands.py | That confirmation expired. Tell me again and I'll redo the read-back.
+src/reflexo/owner/commands.py | That review has already ended. Send it again if you still want it.
+src/reflexo/owner/commands.py | Cancelled. Nothing changed.
+src/reflexo/owner/commands.py | Done ✅ {} updated. (/undo to revert)
+src/reflexo/owner/commands.py | Not applied: those items changed after the read-back. Tell me again and I'll redo it.
+src/reflexo/owner/commands.py | No messages yet.
+src/reflexo/owner/files.py | Menu / price list typed in chat
+src/reflexo/owner/onboarding.py | Hello! Send me your menu or price list as a photo, PDF or Excel file, or just type it here. 📄
+src/reflexo/owner/onboarding.py | Namaste! Apna menu ya price list bhejiye (photo, PDF ya Excel), ya type kar dijiye. 📄
+src/reflexo/owner/onboarding.py | All set! 🎉 I'll take care of your customers from now on. Tell me anytime if something should change.
+src/reflexo/owner/onboarding.py | Ho gaya! 🎉 Ab customers ko main handle karungi. Kuch badalna ho to bas mujhe bata dijiye.
+src/reflexo/owner/onboarding.py | Where do you deliver, and what do you charge? (Or pickup only?)
+src/reflexo/owner/onboarding.py | Delivery kahan tak karte hain aur charge kitna hai? (ya sirf pickup?)
+src/reflexo/owner/onboarding.py | Do you deliver? What are the delivery charges?
+src/reflexo/owner/onboarding.py | How do customers pay: UPI, card or cash on delivery?
+src/reflexo/owner/onboarding.py | Payment kaise lete hain: UPI, card ya cash on delivery?
+src/reflexo/owner/onboarding.py | How can I pay?
+src/reflexo/owner/onboarding.py | Do you make eggless cakes? Any extra charge?
+src/reflexo/owner/onboarding.py | Eggless cakes milte hain? Extra charge?
+src/reflexo/owner/onboarding.py | Do you have eggless cakes?
+src/reflexo/owner/onboarding.py | What are your shop timings?
+src/reflexo/owner/onboarding.py | Shop ki timing kya hai?
+src/reflexo/owner/onboarding.py | What are your timings?
+src/reflexo/pipeline/outbound.py | id, business_id, message_id, conversation_id, channel_connection_id, part_index, idempotency_key, rendered_payload, attempts, status, provider_message_id, trace_context
+src/reflexo/pipeline/turns.py | id, business_id, conversation_id, desk, priority, message_ids, inherited_turn_ids, attempts, hints, trace_context
+src/reflexo/voice/agent.py | Dhanyavaad! Aapka din shubh ho.
+src/reflexo/voice/agent.py | धन्यवाद! आपका दिन शुभ हो।
+src/reflexo/voice/agent.py | Thank you for calling. Have a lovely day!
+src/reflexo/voice/agent.py | (The payment link is now in the customer's WhatsApp chat. Tell them to pay there.)
+src/reflexo/voice/agent.py | not sent: the text has a price you haven't looked up in this call
+src/reflexo/voice/agent.py | not sent: use what=product/order_summary with ref, or what=text with text
+src/reflexo/voice/agent.py | sent to the customer's WhatsApp chat
+src/reflexo/voice/agent.py | timeout: no photo arrived, carry on with the call
+src/reflexo/voice/context.py | Hello{}! This is {}'s assistant. What would you like to do?
+src/reflexo/voice/context.py | Namaste{} ji! {} ka assistant bol raha hoon. Bataiye, kya karna hai?
+src/reflexo/voice/context.py | {} How can I help you?
+src/reflexo/voice/context.py | {} Bataiye, kya chahiye?
+src/reflexo/voice/context.py | Hello, this is {}. How can I help you?
+src/reflexo/voice/context.py | Namaste, {} se bol rahi hoon. Bataiye, kya chahiye?
+src/reflexo/voice/context.py | the OWNER of the business
+src/reflexo/voice/gate.py | Iska exact price main aapko WhatsApp par bhejti hoon.
+src/reflexo/voice/gate.py | इसका सही दाम मैं आपको व्हाट्सऐप पर भेजती हूँ।
+src/reflexo/voice/gate.py | I'll send you the exact price on WhatsApp.
+src/reflexo/voice/in_call.py | Photo mil gayi, ek second dekhti hoon.
+src/reflexo/voice/in_call.py | File mil gayi, ek second.
+src/reflexo/voice/in_call.py | फ़ोटो मिल गई, एक सेकंड देखती हूँ।
+src/reflexo/voice/in_call.py | फ़ाइल मिल गई, एक सेकंड।
+src/reflexo/voice/in_call.py | Got the photo, one second.
+src/reflexo/voice/in_call.py | Got the file, one second.
+src/reflexo/voice/in_call.py | Respond to what the customer just shared, using the matches.
+src/reflexo/voice/in_call.py | [Customer shared their location in the WhatsApp chat] {}
+src/reflexo/voice/in_call.py | Use this as the delivery address; check delivery_quote.
+src/reflexo/voice/in_call.py | [Customer sent a {} in the WhatsApp chat, but it could not be downloaded yet]
+src/reflexo/voice/in_call.py | No close catalogue match.
+src/reflexo/voice/in_call.py | [Customer shared a {} in the WhatsApp chat] {}.{}{}
+src/reflexo/voice/meta_calling.py | Calling is not enabled on this WhatsApp number.
+src/reflexo/voice/meta_calling.py | This number cannot receive WhatsApp calls.
+src/reflexo/voice/meta_calling.py | A call with this customer is already in progress.
+src/reflexo/voice/meta_calling.py | WhatsApp call rate limit reached.
+src/reflexo/voice/meta_calling.py | No approved call permission for this customer.
+src/reflexo/voice/meta_calling.py | Meta rejected the SDP.
+src/reflexo/voice/meta_calling.py | Daily business-initiated call limit reached for this customer.
+src/reflexo/voice/summary.py | - nothing (no order was placed, nothing was asked)
+src/reflexo/voice/summary.py | A phone call between {}'s assistant and a customer has ended. WHAT THE SYSTEM RECORDED DURING THE CALL (the only facts): {} TRANSCRIPT:
+src/reflexo/voice/summary.py | 1. open_promises: every thing the assistant told the customer it would do LATER (check with the owner, send a price/details, call back, arrange something) that is NOT covered by a recorded fact above. Write each as what the customer is waiting for, with the details from the call (item, design, date, pickup or address). Empty if every promise is on record. 2. summary: 1-3 short lines for the customer's WhatsApp chat, in {}. State orders ONLY as recorded (if no order was placed, do not say one was). For anything waiting on the shop (recorded questions and open_promises), say the shop will reply here on WhatsApp. No new promises, no prices that are not recorded.
+src/reflexo/voice/summary.py | On the phone I told {} we'd get back to them about this. They are waiting for your answer.
+src/reflexo/voice/summary.py | 📞 promised during a phone call
+src/reflexo/workflows/automation_build.py | Active ✅ Kabhi bhi dekhne ke liye: 'automations dikhao'
+src/reflexo/workflows/automation_build.py | Active ✅ Ask 'show automations' anytime.
+src/reflexo/workflows/automation_build.py | Ye rule theek se samajh nahi paayi 🙏 Thoda aur detail mein batayiye?
+src/reflexo/workflows/automation_build.py | I couldn't turn that into a working rule. Could you say it in a bit more detail?
+src/reflexo/workflows/automation_build.py | Rules activate nahi kiye (24 ghante mein jawab nahi aaya).
+src/reflexo/workflows/automation_build.py | The rules were not activated (no answer in 24 h).
+src/reflexo/workflows/automation_build.py | Theek hai, nahi lagaya. Kya badlun?
+src/reflexo/workflows/automation_build.py | OK, not activated. What should I change?
+src/reflexo/workflows/import_activities.py | Reading your file… 📄 ({})
+src/reflexo/workflows/import_activities.py | Done ✅ {} change{} applied. (/undo to revert)
+src/reflexo/workflows/imports.py | Sorry, something went wrong reading this file. Please send it again.
+src/reflexo/workflows/imports.py | The import review expired. Nothing was changed.
+src/reflexo/workflows/imports.py | Cancelled. Nothing changed.
+src/reflexo/workflows/onboarding.py | Write {} short, realistic messages customers would send this shop on WhatsApp:
+src/reflexo/workflows/onboarding.py | a mix of Hinglish and English
+src/reflexo/workflows/onboarding.py | : prices of specific items, eggless/custom options, delivery, payment, timings. Items: {} Profile: {}
+src/reflexo/workflows/onboarding.py | Here's how I'd answer 👇
+src/reflexo/workflows/onboarding.py | Aise jawab dungi 👇
+src/reflexo/workflows/onboarding.py | Tell me if anything is wrong. Otherwise reply 'ok' and I'll go live.
+src/reflexo/workflows/onboarding.py | Kuch galat ho to batayiye, warna 'theek hai' likhiye aur main live ho jaungi.
+src/reflexo/workflows/onboarding.py | I couldn't prepare the preview just now 🙏 Reply 'preview' to try again, or 'go live' to go live now.
+src/reflexo/workflows/onboarding.py | Preview abhi nahi ban paya 🙏 'preview' likhiye to dobara try karti hoon, ya 'live karo' to seedha live ho jaungi.

@@ -134,6 +134,12 @@ sudo docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.l
 
 Keep a copy of the vault keys outside the server: without them no stored credential can be read.
 
+**The rule checker (beta WP-26).** The image builds `reflexo-policy-check` (Rust) and carries the cvc5 solver
+(checksum pinned in the `Dockerfile`), so the first build after WP-26 takes a few minutes longer. Migration `0011`
+adds `policy_sets`; the API compiles each business's rules on the first decision. On a workstation the same binary
+runs through Docker: `make policy-check` builds `reflexo-policy-check:0.1.0`, and
+`REFLEXO_POLICY_CHECK_CMD=docker run --rm -i reflexo-policy-check:0.1.0`.
+
 **Domain:** add an A record for the host name pointing at the server, set `REFLEXO_DOMAIN` and
 `REFLEXO_PUBLIC_BASE_URL` in `.env`, and list earlier host names in `REFLEXO_REDIRECT_FROM`. Caddy issues the
 certificate on the first request.

@@ -14,16 +14,21 @@ like a real user before every release.
 | Forbidden patterns | `scripts/check_guards.py`: no `eval`/`exec`, no legacy names |
 | Check traceability | `scripts/check_traceability.py`: every check of a delivered work package has a test marked with its id (`docs/checks.yaml`, `docs/delivered.yaml`) |
 | Fixture privacy | `scripts/check_fixtures.py`: no real phone numbers, emails, addresses or names in fixtures and eval data |
+| No fixed sentences | `scripts/check_fixed_text.py`: no new sentence for people in code; messages are written by purpose and checked; the POC's remaining ones are in `docs/fixed_text_baseline.txt`, which may only shrink |
 | Coverage | `scripts/check_coverage.py` in CI: the safety core (output gate, automation validator, payment paths) at 90% branch coverage or more; total may not fall by more than 0.5 points |
 | Web app | TypeScript type check and production build |
 
-## 2. Tests: 612 passing
+## 2. Tests: 744 passing
 
 | Layer | What it covers |
 |---|---|
 | Unit (24 files) | Output gate rules, grounding, language detection and policy, rendering per channel, playbook conditions, automation language and read-backs, import parsing, voice gating, house style |
 | Integration (27 files) | Real Postgres (testcontainers) with row-level security, real Temporal test server, fake model provider: the full pipeline from signed webhook to sent message, turns and supersession, orders and payments, the learning loop, ask-the-owner, imports, automations, voice bridge and in-call events, admin and owner APIs, sign-up, the public demo |
 | Live (on demand) | Selected flows against the real model and providers |
+
+Decisions have their own tests: Cedar against the POC's reference evaluator on 10,000 generated requests and a
+Hypothesis property test (identical answers), the layering rules, the POC's own cases, `decide()` under 1 ms at
+p95, and the rule checker's examples and refusals with the real solver.
 
 Schema guards run as tests: every table has row-level security forced, every table with a `business_id` has a
 tenant policy, the app role without a tenant sees no rows, and the Postgres enums match the Python enums.
@@ -44,6 +49,7 @@ not ship.
 | `owner_commands` | Plain-language owner instructions become the right changes | 85% | 14/15 (93%) |
 | `builder` | Owner descriptions become valid automations | 7/8 | 8/8 (100%) |
 | `learning` | Decisions become correct rules; rules decide later cases | 80% | 8/8 (100%) |
+| `messages` | Owner messages written by purpose: every required name, number, code, amount and read-back present, nothing invented (9 purposes × 20 situations, three languages) | 100% | 180/180 (100%) |
 
 Each run writes a report to `evals/reports/<commit>.md` with per-case reasons and p50/p95 latency.
 

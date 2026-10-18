@@ -454,7 +454,7 @@ async def test_ask_owner_for_unknown(registry: Registry, db: Database, fake: age
             )
         ).one()
     assert (q.question, q.ai_guess, q.options) == ("Do we make sugar-free cakes?", "Not on the menu", ["Haan", "Nahi"])
-    assert "My guess: Not on the menu" in notes.sent[0][1]
+    assert "Not on the menu" in notes.sent[0][1]  # the assistant's guess reaches the owner (BETA_13 §6 purpose)
     assert len(await outbound_texts(db, handle.ref.conversation_id)) == 1  # the holding reply
 
 

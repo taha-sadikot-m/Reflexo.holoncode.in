@@ -20,9 +20,11 @@ from pydantic import BaseModel, Field
 import reflexo.approvals.api as approvals
 import reflexo.commerce.api as commerce
 import reflexo.knowledge.api as knowledge
-from reflexo.agent.capabilities import CAPABILITIES, PROPOSAL_KIND, Capability
+import reflexo.policy.api as policy
+from reflexo.agent import messages, rules
+from reflexo.agent.capabilities import CAPABILITIES, PROPOSAL_KIND, ActionRequest, Capability, decide
 from reflexo.agent.questions import relay_message
-from reflexo.common.contracts import ModelGatewayPort, OwnerNotifyPort, TurnScheduler
+from reflexo.common.contracts import ModelGatewayPort, TurnScheduler
 from reflexo.common.db import get_db
 from reflexo.common.enums import Desk, PipelineEventStatus, PriorityClass
 from reflexo.common.llm import CallCtx, ChatMessage, ModelError
@@ -57,12 +59,7 @@ class ProposalService:
             return "That action is no longer available."
         outcome: dict[str, Any]
         if approve:
-            try:
-                by = str(sub.get("by") or "customer")  # the customer asked; or the owner did it themselves
-                result = await cap.execute(business_id, {**sub["args"], "reason": sub.get("reason")}, by)
-                outcome = {"approved": True, "done": True, **result}
-            except commerce.CommerceError as exc:  # the world changed since the proposal (e.g. now delivered)
-                outcome = {"approved": True, "done": False, "reason": str(exc)}
+            outcome = await self._carry_out(business_id, cap, sub, member_id)
         else:
             outcome = {"approved": False}
         learnable = not sub.get("owner_initiated")  # the owner acting directly is not a decision to generalise
@@ -87,6 +84,35 @@ class ProposalService:
             return f"Couldn't do it: {outcome['reason']}. I'll let {name} know."
         refund = f" Refund due: {outcome['refund_due']}." if outcome.get("refund_due") else ""
         return f"Done ✅ {cap.label.lower()} {summary}.{refund} I'll tell {name}."
+
+    async def _carry_out(
+        self, business_id: UUID, cap: Capability, sub: dict[str, Any], member_id: UUID | None
+    ) -> dict[str, Any]:
+        """The owner said yes: decide() again with the owner's approval (the world may have changed since the
+        proposal, e.g. the order is now delivered), then run the stored action exactly as proposed."""
+        order_id = (sub.get("args") or {}).get("order_id")
+        decision = await decide(
+            ActionRequest(
+                capability=cap.name,
+                business_id=business_id,
+                requested_by="owner_turn",
+                desk="owner",
+                member_id=member_id,
+                customer_id=UUID(sub["customer_id"]) if sub.get("customer_id") else None,
+                resource=policy.EntityRef(type=cap.resource, id=str(order_id or business_id)),
+                conversation_id=UUID(sub["conversation_id"]) if sub.get("conversation_id") else None,
+                owner_approved=True,
+            )
+        )
+        if decision.effect != "act":
+            return {"approved": True, "done": False, "reason": decision.reason or decision.says or decision.effect}
+        try:
+            by = str(sub.get("by") or "customer")  # the customer asked; or the owner did it themselves
+            args = {**sub["args"], "reason": sub.get("reason")}
+            result = await cap.execute(business_id, args, by)  # type: ignore[misc]
+            return {"approved": True, "done": True, **result}
+        except commerce.CommerceError as exc:  # the world changed between the decision and the action
+            return {"approved": True, "done": False, "reason": str(exc)}
 
     async def _relay(self, business_id: UUID, a: approvals.Approval) -> None:
         """A turn on the customer's conversation that tells them the outcome (context: `# THE SHOP DECIDED`)."""
@@ -150,22 +176,24 @@ class ProposalService:
     async def _offer_to_learn(
         self, business_id: UUID, a: approvals.Approval, cap: Capability, learn: dict[str, Any], name: str
     ) -> None:
-        notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]
-        if notifier is None:
-            return
         rule = _draft_rule(cap, learn, "")
-        mine = "do this myself" if learn["effect"] == "allow" else "say no myself"
-        await notifier.notify(
-            business_id,
-            "learn",
-            f"💡 Next time, should I {mine}?\n“{rule.readback(cap.label)}”",
+        checked = await rules.review(business_id, rule)  # the read-back is only shown for a rule that can apply
+        if checked.status == "blocked":
+            log.info("learn_offer_blocked", business_id=str(business_id), problem=checked.problem)
+            return
+        await messages.notify_owner(
+            "owner.learn_offer",
+            business_id=business_id,
+            facts={"rule_readback": rule.readback(cap.label), "customer.name": name},
+            context={
+                "owner_decided": "yes" if learn["effect"] == "allow" else "no",
+                "differences": [d.model_dump() for d in checked.differences],
+                "checked": checked.status == "ok",
+            },
+            kind="learn",
             dedupe_key=f"learn:{a.id}",
             priority=PriorityClass.P2,
-            buttons=[
-                (f"lrn:{a.id}:g", "✅ Always"),
-                (f"lrn:{a.id}:c", f"Only for {name}"[:20]),
-                (f"lrn:{a.id}:o", "Just this once"),
-            ],
+            buttons={"always": f"lrn:{a.id}:g", "this_customer": f"lrn:{a.id}:c", "once": f"lrn:{a.id}:o"},
             ref={"approval_id": str(a.id)},
             about_conversation=UUID(a.subject["conversation_id"]) if a.subject.get("conversation_id") else None,
         )
@@ -184,11 +212,15 @@ class ProposalService:
         customer_id = UUID(a.subject["customer_id"]) if scope == "c" else None
         who = f" (only for {a.subject.get('customer_name', 'this customer')})" if customer_id else ""
         says = f"Learned from your decision on {a.preview.get('summary', '')}{who}"
-        rule = _draft_rule(cap, decision["learn"], says)
-        await knowledge.playbook.add_rule(
+        rule = _draft_rule(cap, decision["learn"], says).model_copy(
+            update={"scope": "customer" if customer_id else "global", "customer_id": customer_id}
+        )
+        checked = await rules.review(business_id, rule)
+        saved = rule.model_copy(update={"effect": checked.effect})
+        rule_id = await knowledge.playbook.add_rule(
             business_id,
             capability=cap.name,
-            effect=rule.effect,
+            effect=saved.effect,
             conditions=rule.conditions,
             says=says,
             source="owner_decision",
@@ -197,8 +229,21 @@ class ProposalService:
             summary=f"Playbook: {cap.label}",
             member_id=member_id,
         )
+        if checked.status == "unchecked":
+            await rules.schedule_recheck(business_id, rule_id, rule.effect, change_set_id=None, member_id=member_id)
         await approvals.record_outcome(business_id, approval_id, {**decision, "learned": scope})
-        return f"Got it ✅ From now on{who}: {rule.readback(cap.label)}. (/undo to remove)"
+        composed = await messages.compose(
+            "owner.rule_saved",
+            business_id=business_id,
+            recipient=messages.RecipientRef(kind="owner"),
+            facts={
+                "rule_readback": rule.readback(cap.label) + who,
+                "until_checked": saved.readback(cap.label) if checked.status != "ok" else None,
+                "undo": "/undo",
+            },
+            context={"checked": checked.status == "ok"},
+        )
+        return composed.text
 
 
 def _draft_rule(cap: Capability, learn: dict[str, Any], says: str) -> knowledge.playbook.PlaybookRule:

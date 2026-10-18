@@ -1,0 +1,54 @@
+// The Cedar schema for decide() (BETA_04 §7.2). Versioned with the code; reviewed like code.
+// Connector actions are generated per business into policy_sets.schema_fragment when tools are approved.
+namespace Reflexo {
+  entity Business;
+  entity Agent in [Business] { business: Business, desk: String };
+  entity Customer in [Business] { business: Business, orders_count: Long };
+  entity Order in [Business] {
+    business: Business, customer: Customer, status: String, payment_method: String,
+    payment_status: String, total_rupees: Long, categories: Set<String>
+  };
+  entity Comment in [Business] { business: Business, origin: String, channel: String };
+  entity ConnectorTool in [Business] {
+    business: Business, connector: String, name: String, risk: String, read_only: Bool
+  };
+  entity RiskClass;
+  entity Member in [Business] { business: Business, role: String, scopes: Set<String> };
+  entity Product in [Business] { business: Business, categories: Set<String> };
+  entity Shipment in [Business] { business: Business, order: Order, status: String };
+  entity Booking in [Business] { business: Business, customer: Customer };
+
+  type Ctx = {
+    requested_by: String, channel?: String, hours_until_delivery?: Long, hours_since_placed?: Long,
+    days_since_delivered?: Long, amount_rupees?: Long, topic?: String, customer_mode?: String,
+    unit?: String, unit_granted?: Bool,
+    owner_approved: Bool,
+    refunds_today_rupees?: Long, cancellations_this_week?: Long,
+    automated_messages_to_customer_today?: Long, tool_calls_today?: Long
+  };
+
+  action "routine", "commitment", "money";
+
+  // replies and messages
+  action "reply.answer" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Customer], context: Ctx };
+  action "message.send" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Customer], context: Ctx };
+  action "broadcast.send" in [Action::"commitment"] appliesTo { principal: [Agent], resource: [Business], context: Ctx };
+  action "call.place" in [Action::"commitment"] appliesTo { principal: [Agent, Member], resource: [Customer], context: Ctx };
+  action "customer.update" in [Action::"routine"] appliesTo { principal: [Agent, Member], resource: [Customer], context: Ctx };
+  action "webhook.call" in [Action::"commitment"] appliesTo { principal: [Agent], resource: [Business], context: Ctx };
+  // orders
+  action "order.confirm_by_customer" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Order], context: Ctx };
+  action "order.tag" in [Action::"routine"] appliesTo { principal: [Agent, Member], resource: [Order], context: Ctx };
+  action "order.cancel", "order.change" in [Action::"commitment"] appliesTo { principal: [Agent, Member], resource: [Order], context: Ctx };
+  action "return.request" in [Action::"commitment"] appliesTo { principal: [Agent, Member], resource: [Order], context: Ctx };
+  action "refund.request" in [Action::"money"] appliesTo { principal: [Agent, Member], resource: [Order], context: Ctx };
+  // payments, catalogue, shipping, bookings
+  action "payment.request" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Order], context: Ctx };
+  action "payment.confirm_manual" in [Action::"money"] appliesTo { principal: [Member], resource: [Order], context: Ctx };
+  action "stock.check" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Product], context: Ctx };
+  action "shipment.track" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Shipment], context: Ctx };
+  action "slot.find" in [Action::"routine"] appliesTo { principal: [Agent], resource: [Business], context: Ctx };
+  action "booking.create" in [Action::"commitment"] appliesTo { principal: [Agent, Member], resource: [Booking], context: Ctx };
+  // comments
+  action "comment.hide" in [Action::"commitment"] appliesTo { principal: [Agent, Member], resource: [Comment], context: Ctx };
+}

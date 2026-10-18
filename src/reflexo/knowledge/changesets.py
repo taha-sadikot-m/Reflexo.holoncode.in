@@ -24,7 +24,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
 from reflexo.common.money import format_inr
 from reflexo.common.ports import Registry
-from reflexo.knowledge import indexer
+from reflexo.knowledge import indexer, policysets
 from reflexo.knowledge.models import (
     BusinessProfile,
     ChangeConflict,
@@ -428,6 +428,8 @@ async def _apply_in(s: AsyncSession, cs: ChangeSet) -> None:
         text("UPDATE knowledge_change_sets SET status = 'applied', applied_at = now() WHERE id = :id"), {"id": cs.id}
     )
     await indexer.index_entities(s, cs.business_id, await _index_refs(s, cs.business_id, cs.items))
+    if any(i.entity_type == "playbook_rule" for i in cs.items):  # decisions never see rules and Cedar disagree
+        await policysets.rebuild(s, cs.business_id)
     writer = _registry.optional(DomainEventWriter) if _registry else None  # type: ignore[type-abstract]
     if writer is not None:
         await writer.append(
