@@ -3,6 +3,7 @@ import {
   Building2,
   ChevronDown,
   Clock3,
+  Compass,
   ExternalLink,
   Eye,
   Inbox,
@@ -21,32 +22,33 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { api, type ConversationItem, type OwnerWorkspace } from "../lib/api";
 import { useSession } from "../lib/session";
+import { startTour, useFirstVisitTour } from "../lib/tour";
 import { Logo } from "./brand";
 import { Button, cx } from "./ui";
 
-type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: "inbox" | "brain"; hint: string };
+type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: "inbox" | "brain"; hint: string; tour: string };
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Business",
     items: [
-      { to: "/", label: "Home", icon: LayoutDashboard, end: true, hint: "Today at a glance" },
-      { to: "/inbox", label: "Inbox", icon: Inbox, count: "inbox", hint: "Chats, calls and customers" },
-      { to: "/orders", label: "Orders", icon: Receipt, hint: "Orders, payments, capacity" },
-      { to: "/brain", label: "Brain", icon: Brain, count: "brain", hint: "Learning, rules, knowledge" },
+      { to: "/", label: "Home", icon: LayoutDashboard, end: true, hint: "Today at a glance", tour: "nav-home" },
+      { to: "/inbox", label: "Inbox", icon: Inbox, count: "inbox", hint: "Chats, calls and customers", tour: "nav-inbox" },
+      { to: "/orders", label: "Orders", icon: Receipt, hint: "Orders, payments, capacity", tour: "nav-orders" },
+      { to: "/brain", label: "Brain", icon: Brain, count: "brain", hint: "Learning, rules, knowledge", tour: "nav-brain" },
     ],
   },
   {
     title: "Engineering",
     items: [
-      { to: "/quality", label: "Quality", icon: ShieldCheck, hint: "Lab, X-ray, chaos, evals" },
-      { to: "/settings", label: "Settings", icon: Settings, hint: "Channels, reset, flags" },
+      { to: "/quality", label: "Quality", icon: ShieldCheck, hint: "Lab, X-ray, chaos, evals", tour: "nav-quality" },
+      { to: "/settings", label: "Settings", icon: Settings, hint: "Channels, reset, flags", tour: "nav-settings" },
     ],
   },
 ];
 
 // the owner's own phones: set the shop up by chat, test it as a customer
-const TRY_IT: Item = { to: "/setup", label: "Try & teach", icon: Smartphone, hint: "Set up and test by chat" };
+const TRY_IT: Item = { to: "/setup", label: "Try & teach", icon: Smartphone, hint: "Set up and test by chat", tour: "nav-try" };
 
 /** One page failing must never blank the panel: it shows what went wrong, the rest keeps working. */
 class PageBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
@@ -87,6 +89,8 @@ export function Layout() {
         items: [...s.items.slice(0, 1), TRY_IT, ...s.items.slice(1)],
       }));
   const scale = me?.demo_time_scale ?? 1;
+  const tour = operator ? "console" : "owner";
+  useFirstVisitTour(tour, !!me && !!business);
   const bid = business?.id ?? "";
   // the same queries the pages use (shared cache): how much needs a person, at a glance
   const convs = useQuery({
@@ -128,11 +132,12 @@ export function Layout() {
             <div key={section.title}>
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone">{section.title}</div>
               <div className="space-y-0.5">
-                {section.items.map(({ to, label, icon: Icon, end, count, hint }) => (
+                {section.items.map(({ to, label, icon: Icon, end, count, hint, tour: anchor }) => (
                   <NavLink
                     key={to}
                     to={to}
                     end={end}
+                    data-tour={anchor}
                     className={({ isActive }) =>
                       cx(
                         "group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] font-medium transition-colors",
@@ -177,7 +182,7 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-sand bg-white px-6">
           {operator ? (
-            <label className="relative flex items-center">
+            <label data-tour="business" className="relative flex items-center">
               <Building2 size={15} className="pointer-events-none absolute left-2.5 text-stone" />
               <select
                 aria-label="Business"
@@ -201,6 +206,13 @@ export function Layout() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            <button
+              data-tour="tour-button"
+              onClick={() => startTour(tour)}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] font-medium text-dusk hover:bg-bone hover:text-ink"
+            >
+              <Compass size={13} /> Take the tour
+            </button>
             {me?.read_only && (
               <span
                 className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-bone px-2.5 py-1 text-[12px] font-medium text-dusk ring-1 ring-inset ring-sand"

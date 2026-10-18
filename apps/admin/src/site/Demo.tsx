@@ -7,6 +7,7 @@ import {
   BookOpenCheck,
   Brain,
   Check,
+  Compass,
   Gauge,
   LayoutDashboard,
   Loader2,
@@ -27,6 +28,7 @@ import { CustomerPhone, OwnerPhone, useShopPhones } from "../components/shop-pho
 import { cx } from "../components/ui";
 import { api, ApiError, setCsrf, type Business, type Me, type TraceSummary } from "../lib/api";
 import { traceLabel } from "../lib/stages";
+import { startTour, useFirstVisitTour } from "../lib/tour";
 
 const NAME_KEY = "reflexo.demo.name";
 
@@ -297,6 +299,7 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
   const bid = shop.id;
   const [done, setDone] = useState<Set<string>>(new Set());
   const phones = useShopPhones(bid, readName() || "Guest");
+  useFirstVisitTour("demo");
 
   const onTry = (t: Try, key: string) => {
     setDone((d) => new Set(d).add(key));
@@ -320,6 +323,13 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => startTour("demo")}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium text-dusk hover:bg-bone hover:text-ink"
+            >
+              <Compass size={14} /> Take the tour
+            </button>
+            <button
+              data-tour="demo-restart"
               onClick={onRestart}
               disabled={restarting}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium text-dusk hover:bg-bone hover:text-ink disabled:opacity-50"
@@ -328,6 +338,7 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
               {restarting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Start over
             </button>
             <a
+              data-tour="demo-dashboard"
               href="/app"
               target="_blank"
               rel="noopener"
@@ -345,11 +356,19 @@ function Live({ shop, onRestart, restarting }: { shop: Business; onRestart: () =
             <h1 className="font-display text-[22px] font-bold tracking-tight text-ink">Try it from both sides</h1>
             <p className="mt-1 text-[13.5px] text-dusk">Tap a suggestion or type your own. Everything is live: the AI, the payments (test mode) and the learning.</p>
           </div>
-          <Guide onTry={onTry} done={done} />
-          <UnderTheHood businessId={bid} />
+          <div data-tour="demo-guide">
+            <Guide onTry={onTry} done={done} />
+          </div>
+          <div data-tour="demo-hood">
+            <UnderTheHood businessId={bid} />
+          </div>
         </aside>
-        <CustomerPhone className="order-1 xl:order-2" phones={phones} shopName={shop.name} label="The customer: you" />
-        <OwnerPhone className="order-2 xl:order-3" phones={phones} ownerName="Meera" label="The owner: Meera's phone" />
+        <div data-tour="demo-customer" className="order-1 min-w-0 self-start xl:order-2">
+          <CustomerPhone phones={phones} shopName={shop.name} label="The customer: you" />
+        </div>
+        <div data-tour="demo-owner" className="order-2 min-w-0 self-start xl:order-3">
+          <OwnerPhone phones={phones} ownerName="Meera" label="The owner: Meera's phone" />
+        </div>
       </main>
     </div>
   );
