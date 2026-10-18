@@ -9,3 +9,12 @@
 {$REFLEXO_REDIRECT_FROM} {
 	redir https://{$REFLEXO_DOMAIN}{uri} permanent
 }
+
+# REFLEXO_LEGAL_DOMAIN: a host for the public legal pages alone, as static files (scripts/render_legal.py writes
+# them into deploy/legal-site on the server), so they stay up whatever runs on the main host.
+{$REFLEXO_LEGAL_DOMAIN} {
+	encode zstd gzip
+	root * /srv/legal
+	try_files {path} {path}.html
+	file_server
+}

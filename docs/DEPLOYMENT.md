@@ -146,6 +146,13 @@ runs through Docker: `make policy-check` builds `reflexo-policy-check:0.1.0`, an
 `REFLEXO_PUBLIC_BASE_URL` in `.env`, and list earlier host names in `REFLEXO_REDIRECT_FROM`. Caddy issues the
 certificate on the first request.
 
+**Legal pages on their own host:** the privacy notice, terms, rights and data-deletion pages can be served as static
+files from a separate host name (for Meta's App Review), independent of what runs on the main host. Add an A record
+for it, set `REFLEXO_LEGAL_DOMAIN` in `.env`, and render the pages into `deploy/legal-site` with the deployment's
+legal settings (`REFLEXO_PRODUCT_NAME`, `REFLEXO_PROVIDER_NAME`, `REFLEXO_PROVIDER_ADDRESS`, ...):
+`uv run python scripts/render_legal.py deploy/legal-site`, run where those settings are, then copy the folder to the
+server. The rendered files name the provider's address and are git-ignored. Re-render after any change to `legal/`.
+
 **Provider webhooks:** WhatsApp `https://<domain>/webhooks/meta_whatsapp`; Razorpay
 `https://<domain>/integrations/webhooks/razorpay`; Telegram is set with `scripts/telegram_webhook.py set https://<domain>`.
 

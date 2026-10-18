@@ -27,14 +27,22 @@ _STYLE = (
 )
 
 
-def _page(markdown: str) -> HTMLResponse:
-    first = next((ln.lstrip("# ").strip() for ln in markdown.splitlines() if ln.startswith("# ")), "Reflexo")
-    body = _md.render(markdown)
-    return HTMLResponse(
+def page_title(markdown: str) -> str:
+    return next((ln.lstrip("# ").strip() for ln in markdown.splitlines() if ln.startswith("# ")), "")
+
+
+def page_html(markdown: str) -> str:
+    """A whole HTML page for a legal document (served here, and rendered to files by `scripts/render_legal.py`)."""
+    return (
         f"<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-        f"<meta name='viewport' content='width=device-width,initial-scale=1'><title>{html.escape(first)}</title>"
-        f"<style>{_STYLE}</style></head><body>{body}</body></html>"
+        f"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{html.escape(page_title(markdown))}</title>"
+        f"<style>{_STYLE}</style></head><body>{_md.render(markdown)}</body></html>"
     )
+
+
+def _page(markdown: str) -> HTMLResponse:
+    return HTMLResponse(page_html(markdown))
 
 
 @router.get("/privacy", include_in_schema=False)

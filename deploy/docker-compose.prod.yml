@@ -61,9 +61,11 @@ services:
       REFLEXO_DOMAIN: ${REFLEXO_DOMAIN}
       # none set: a local-only placeholder, so the redirect block never asks for a certificate
       REFLEXO_REDIRECT_FROM: ${REFLEXO_REDIRECT_FROM:-http://127.0.0.1:8081}
+      REFLEXO_LEGAL_DOMAIN: ${REFLEXO_LEGAL_DOMAIN:-http://127.0.0.1:8082}
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./legal-site:/srv/legal:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [api]

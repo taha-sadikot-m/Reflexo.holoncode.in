@@ -25,3 +25,4 @@ evals/reports/
 # private keys (SSH to servers): never in git or in an image
 *.pem
 coverage.json
+deploy/legal-site/
