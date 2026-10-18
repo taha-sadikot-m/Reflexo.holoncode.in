@@ -122,6 +122,13 @@ class Settings(BaseSettings):
     rights_response_days: int = 30
     privacy_email: str = "privacy@holoncode.in"
     legal_dir: str = "legal"
+    # who provides the product, as the legal pages name it (BETA_10 §14); address and contacts live only in .env
+    product_name: str = "Reflexo"  # the product's public name: one place, so a rename is one change
+    provider_name: str = "HolonCode"
+    provider_address: str = ""
+    legal_jurisdiction: str = ""
+    liability_floor: str = "₹10,000"
+    grievance_officer: str = ""
     operator_totp_required: bool = True
     operator_totp_secret: SecretStr = SecretStr("")  # base32; the operator's authenticator app
     customer_notice_enabled: bool = True  # the privacy notice in each new customer's first reply (off: dev only)
@@ -227,6 +234,9 @@ class Settings(BaseSettings):
             raise ValueError(
                 "REFLEXO_CUSTOMER_NOTICE_ENABLED and REFLEXO_OPERATOR_TOTP_REQUIRED may be off only in dev"
             )
+        missing = [n for n in ("provider_address", "legal_jurisdiction", "grievance_officer") if not getattr(self, n)]
+        if missing:  # the public legal pages must name who provides the service and where
+            raise ValueError(f"set {', '.join('REFLEXO_' + n.upper() for n in missing)}")
         if len(self.operator_totp_secret.get_secret_value()) < 16:
             raise ValueError("set REFLEXO_OPERATOR_TOTP_SECRET (base32, >= 16 characters)")
         return self

@@ -217,6 +217,9 @@ async def test_the_public_legal_pages_are_served(registry: Registry, db: Databas
     for path in ("/privacy", "/terms", "/data-deletion", "/rights"):
         page = await client.get(path)
         assert page.status_code == 200 and "Draft, not legally reviewed" in page.text, path
+        assert not re.search(r"\{[a-z_]+\}", page.text), path  # every placeholder filled from the settings
+    terms = (await client.get("/terms")).text
+    assert "1 Test Street, Testpur 000000" in terms and "courts of Testpur" in terms  # the provider, from settings
     notice = await client.get(f"/{biz.slug}/privacy")
     assert notice.status_code == 200 and "{shop_name}" not in notice.text
     assert biz.name.replace("'", "&#x27;") in notice.text or biz.name in notice.text

@@ -1,22 +1,22 @@
-# Deleting your data from Reflexo
+# Deleting your data from {product_name}
 
 **Draft, not legally reviewed.** Version `data-deletion-2026-10-18-draft1`.
 
 ---
 
-## If you connected a Facebook, Instagram or WhatsApp account to Reflexo
+## If you connected a Facebook, Instagram or WhatsApp account to {product_name}
 
 You can ask us to delete the data we hold about you in either of these ways:
 
-1. **From Facebook:** open Settings and privacy, then Settings, then Apps and websites. Find Reflexo, select
+1. **From Facebook:** open Settings and privacy, then Settings, then Apps and websites. Find {product_name}, select
    Remove, and choose to delete. Facebook sends us the request, and gives you a confirmation code and a link where
    you can follow its status.
-2. **By email:** write to `privacy@holoncode.in` from the email address on your account, and say "delete my data".
+2. **By email:** write to {privacy_email} from the email address on your account, and say "delete my data".
 
-## If you are a customer of a shop that uses Reflexo
+## If you are a customer of a shop that uses {product_name}
 
 Ask in the chat with the shop, in your own words, for example "delete my data". The shop approves it, and if it
-does not act within 7 days, Reflexo completes it for the shop.
+does not act within 7 days, {product_name} completes it for the shop.
 
 ## What happens
 

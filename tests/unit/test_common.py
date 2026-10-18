@@ -110,7 +110,14 @@ def test_demo_env_refuses_placeholder_secrets() -> None:
             admin_password="p" * 20,
             admin_session_secret="a" * 32,
         )
-    deployed = {"customer_notice_enabled": True, "operator_totp_required": True, "operator_totp_secret": "J" * 32}
+    deployed = {
+        "customer_notice_enabled": True,
+        "operator_totp_required": True,
+        "operator_totp_secret": "J" * 32,
+        "provider_address": "1 Test Street",
+        "legal_jurisdiction": "Testpur",
+        "grievance_officer": "T",
+    }
     ok = Settings(
         env="demo",
         media_url_secret="m" * 32,

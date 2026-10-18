@@ -4,19 +4,16 @@
 `/{slug}/privacy` is generated from this template and the shop's details. To be reviewed by a lawyer before the
 public launch (BETA_10 §14).
 
-Values filled in from the shop's records: `{shop_name}`, `{shop_contact}` (the shop's phone or email),
-`{slug}`.
-
 ---
 
 When you message **{shop_name}** on WhatsApp, Instagram, Facebook, Telegram or by phone, an assistant may answer
-for the shop. The assistant is provided by Reflexo.
+for the shop. The assistant is provided by {product_name}.
 
 ## Who is responsible
 
 **{shop_name}** decides how your messages and orders are used. Contact: {shop_contact}.
 
-Reflexo runs the assistant for {shop_name} and processes your data only on the shop's behalf.
+{product_name} runs the assistant for {shop_name} and processes your data only on the shop's behalf.
 
 ## What is used, and why
 
@@ -46,7 +43,7 @@ requires.
 You can ask to see your data, correct it, or delete it. Just ask in the chat (for example "delete my data" or "what
 do you have about me?"), or contact {shop_name} at {shop_contact}. You get an answer within **30 days**.
 
-If you are not satisfied, you can contact Reflexo's grievance officer at `privacy@holoncode.in`, and then the
+If you are not satisfied, you can contact {product_name}'s grievance officer at {privacy_email}, and then the
 Data Protection Board of India.
 
 ## Children

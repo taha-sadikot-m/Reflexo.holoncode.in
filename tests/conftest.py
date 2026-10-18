@@ -122,6 +122,10 @@ TEST_SECRETS = {
     # off for the suite (fixed scripted replies); the tests of CHK-SEC-8 and CHK-SEC-11 switch them on
     "REFLEXO_CUSTOMER_NOTICE_ENABLED": "false",
     "REFLEXO_OPERATOR_TOTP_REQUIRED": "false",
+    # the legal pages' provider details (fictional in tests)
+    "REFLEXO_PROVIDER_ADDRESS": "1 Test Street, Testpur 000000",
+    "REFLEXO_LEGAL_JURISDICTION": "Testpur",
+    "REFLEXO_GRIEVANCE_OFFICER": "Test Officer",
 }
 
 

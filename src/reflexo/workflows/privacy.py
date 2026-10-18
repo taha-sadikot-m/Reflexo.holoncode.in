@@ -190,8 +190,29 @@ CUSTOMER_NOTICE = "customer_notice_template.md"
 STATUS_WORDS = "deletion_status.yaml"
 
 
+def legal_values() -> dict[str, str]:
+    """What the legal pages fill in from the deployment's settings (the product can be renamed in one place)."""
+    s = get_settings()
+    pending = "to be published"
+    return {
+        "product_name": s.product_name,
+        "provider_name": s.provider_name,
+        "provider_address": s.provider_address or pending,
+        "jurisdiction": s.legal_jurisdiction or pending,
+        "liability_floor": s.liability_floor,
+        "grievance_officer": s.grievance_officer or pending,
+        "privacy_email": s.privacy_email,
+    }
+
+
+def _fill(text_: str, values: dict[str, str]) -> str:
+    for key, value in values.items():
+        text_ = text_.replace("{" + key + "}", value)
+    return text_
+
+
 def _legal(name: str) -> str:
-    return (Path(get_settings().legal_dir) / name).read_text(encoding="utf-8")
+    return _fill((Path(get_settings().legal_dir) / name).read_text(encoding="utf-8"), legal_values())
 
 
 def page_markdown(page: str) -> str | None:
@@ -214,11 +235,7 @@ async def shop_notice_markdown(slug: str) -> str | None:
         return None
     contact = (await knowledge.get_profile(row.id)).contact
     reach = contact.phone or contact.website or contact.address or get_settings().privacy_email
-    values = {"shop_name": row.name, "shop_contact": reach, "slug": slug}
-    body = _legal(CUSTOMER_NOTICE)
-    for key, value in values.items():
-        body = body.replace("{" + key + "}", str(value))
-    return body
+    return _fill(_legal(CUSTOMER_NOTICE), {"shop_name": str(row.name), "shop_contact": str(reach), "slug": slug})
 
 
 def legal_version(page: str) -> str:
