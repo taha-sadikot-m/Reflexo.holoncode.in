@@ -11,6 +11,7 @@ and does not fail it. npm audit filters by severity itself (`--audit-level=high`
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -68,7 +69,9 @@ def pip_findings() -> list[tuple[str, str, str]]:
 def main(which: str) -> int:
     if which == "npm":
         return subprocess.run(
-            ["npm", "audit", "--audit-level=high", "--omit=dev"], cwd=ROOT / "apps" / "admin", check=False
+            [shutil.which("npm") or "npm", "audit", "--audit-level=high", "--omit=dev"],
+            cwd=ROOT / "apps" / "admin",
+            check=False,
         ).returncode
     failing, unknown = classify(pip_findings())
     for line in unknown:

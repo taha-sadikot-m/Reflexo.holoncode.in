@@ -89,10 +89,18 @@ async def test_injection_blocked(registry: Registry, db: Database) -> None:
     assert all("90%" not in t and "90 %" not in t for t in texts)
 
 
-async def test_devanagari_reply(registry: Registry, db: Database) -> None:
+@pytest.mark.parametrize("policy", ["en", "auto"])
+async def test_a_hindi_message_is_answered_under_the_language_policy(
+    registry: Registry, db: Database, monkeypatch: pytest.MonkeyPatch, policy: str
+) -> None:
+    """Policy "en" (the default) answers in English whatever the customer writes; "auto" mirrors the script."""
+    from reflexo.common.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "language_policy", policy)
     _, pnid = await make_bakery(db)
     _run, texts, _ = await ask(registry, db, pnid, "919800009002", "क्या आप कोथरूड में डिलीवरी करते हैं?")
-    assert any(any("ऀ" <= ch <= "ॿ" for ch in t) for t in texts), texts
+    devanagari = any(any("ऀ" <= ch <= "ॿ" for ch in t) for t in texts)
+    assert texts and devanagari == (policy == "auto"), texts
 
 
 async def test_refund_handoff(registry: Registry, db: Database) -> None:
