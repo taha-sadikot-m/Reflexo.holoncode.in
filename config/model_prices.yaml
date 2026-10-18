@@ -1,0 +1,30 @@
+# Model and voice prices (BETA_12 §6.1). Prices change only by editing this file, in a reviewed change, with a new
+# `version`. Every model_calls row stores the version it was priced with, so history is never re-priced.
+# Units: USD. A model id is matched exactly, else by the longest key it starts with (aura-2-asteria-en -> aura-2).
+version: 2026-10-18
+providers:
+  gemini:
+    source: https://ai.google.dev/gemini-api/docs/pricing
+    checked: 2026-10-16
+    models:
+      gemini-2.5-flash-lite: {input_per_m: 0.10, cached_input_per_m: 0.01, output_per_m: 0.40, audio_input_per_m: 0.30}
+      gemini-2.5-flash:      {input_per_m: 0.30, cached_input_per_m: 0.03, output_per_m: 2.50, audio_input_per_m: 1.00}
+      gemini-3.5-flash-lite: {input_per_m: 0.30, cached_input_per_m: 0.03, output_per_m: 2.50, audio_input_per_m: 0.30}
+      gemini-2.5-pro:        {input_per_m: 1.25, cached_input_per_m: 0.125, output_per_m: 10.00}
+      gemini-embedding-001:  {input_per_m: 0.15}            # (verify)
+      gemini-3.5-transcribe: {audio_per_min: 0.003, text_out_per_min: 0.002}
+  deepgram:
+    source: https://deepgram.com/pricing
+    checked: 2026-10-18
+    models:
+      nova-3-prerecorded-mono:  {audio_per_min: 0.0043}
+      nova-3-prerecorded-multi: {audio_per_min: 0.0052}
+      nova-3-streaming-mono:    {audio_per_min: 0.0048}     # promotional rate (list price 0.0077), no end date given
+      nova-3-streaming-multi:   {audio_per_min: 0.0058}     # promotional rate (list price 0.0092), no end date given
+      aura-2:                   {per_1k_chars: 0.030}
+  livekit:
+    source: https://livekit.com/pricing
+    checked: 2026-10-17
+    models:
+      agent_session: {per_min: 0.01}
+      webrtc:        {per_min: 0.0005}

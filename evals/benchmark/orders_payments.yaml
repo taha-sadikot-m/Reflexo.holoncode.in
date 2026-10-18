@@ -1,0 +1,210 @@
+# Orders and payments (BETA_12 §9.1): complex turns with tools and capabilities. Payment links in the benchmark are
+# simulated (BETA_04 §15.10): `pay_last_link` pays through the signed webhook path. Orders are cancelled after each
+# conversation (scenario cleanup), so capacity never fills up across the run.
+group: orders_payments
+conversations:
+  # ---------------------------------------------------------------- order, confirm, pay (12)
+  - id: op-pay-01
+    steps:
+      - {actor: c, send_text: "I want a 1 kg chocolate truffle cake day after tomorrow, 4-8 pm, Kothrud 411038, not eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "Yes that's right, please confirm, I'll pay online"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-02
+    steps:
+      - {actor: c, send_text: "1 kg red velvet chahiye parso, 1pm-4pm, Warje 411058, eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "haan theek hai, confirm karo, online pay karunga"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-03
+    steps:
+      - {actor: c, send_text: "Order one pineapple cake 1 kg for day after tomorrow, 10am-1pm slot, Erandwane 411004, regular (not eggless)"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "Confirm please, send the payment link"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-04
+    steps:
+      - {actor: c, send_text: "2 box brownies chahiye parso shaam 4-8, Kothrud 411038"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "ok confirm, link bhejo"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-05
+    steps:
+      - {actor: c, send_text: "1 jar choco chip cookies, day after tomorrow 1pm-4pm, Deccan 411004"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "yes confirm, pay by link"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-06
+    steps:
+      - {actor: c, send_text: "500 g truffle cake parso 10am-1pm, Bavdhan 411021 ... wait, Bavdhan pincode 411021, not eggless"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-pay-07
+    steps:
+      - {actor: c, send_text: "1 kg truffle cake, eggless, message on cake 'Happy Birthday Champ', day after tomorrow 4pm-8pm, Kothrud 411038"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "Perfect, confirm it, I'll pay online"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-08
+    steps:
+      - {actor: c, send_text: "pineapple cake 1 kg parso 4-8 pm Shivajinagar 411016 eggless nahi chahiye"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "sahi hai, confirm kar do"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-pay-09
+    steps:
+      - {actor: c, send_text: "Please book a 1 kg red velvet for day after tomorrow afternoon 1-4 pm, Karve Nagar 411052, eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "Yes confirm. Online payment."}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-10
+    steps:
+      - {actor: c, send_text: "3 box brownies for a party, day after tomorrow 4-8 pm, Kothrud 411038"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "go ahead and confirm, send link"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-11
+    steps:
+      - {actor: c, send_text: "1 kg truffle aur 1 jar cookies parso 10am-1pm Warje 411058, cake eggless nahi"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "haan confirm, online"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  - id: op-pay-12
+    steps:
+      - {actor: c, send_text: "मुझे परसों शाम 4-8 बजे 1 किलो पाइनएप्पल केक चाहिए, कोथरूड 411038, एगलेस नहीं"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "हाँ, कन्फर्म करो, ऑनलाइन पेमेंट करूँगा"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+  # ---------------------------------------------------------------- details asked, then given (6)
+  - id: op-details-01
+    steps:
+      - {actor: c, send_text: "I want to order a chocolate truffle cake"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "1 kg, day after tomorrow, 4-8 pm, Kothrud 411038, not eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-details-02
+    steps:
+      - {actor: c, send_text: "red velvet order karna hai"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "parso 1-4 pm, Warje 411058, eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-details-03
+    steps:
+      - {actor: c, send_text: "Can I order brownies for day after tomorrow?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "2 boxes, evening slot, deliver to Deccan 411004"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-details-04
+    steps:
+      - {actor: c, send_text: "pineapple cake 1 kg chahiye"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "parso subah 10-1, pickup karunga, eggless nahi"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-details-05
+    steps:
+      - {actor: c, send_text: "I'd like cookies delivered"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "1 jar, day after tomorrow 1pm-4pm, Erandwane 411004"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-details-06
+    steps:
+      - {actor: c, send_text: "truffle cake order"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "500 gram, parso 4-8 pm, Kothrud 411038, eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  # ---------------------------------------------------------------- cash on delivery asked (off in this shop) (4)
+  - id: op-cod-01
+    steps:
+      - {actor: c, send_text: "1 kg truffle cake day after tomorrow 4-8 pm Kothrud 411038 not eggless, cash on delivery"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "ok confirm with cash on delivery"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-cod-02
+    steps:
+      - {actor: c, send_text: "COD milega? 2 box brownies parso shaam Warje 411058"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-cod-03
+    steps:
+      - {actor: c, send_text: "Can I pay cash when the cake arrives?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-cod-04
+    steps:
+      - {actor: c, send_text: "red velvet 1 kg parso 1-4 pm Deccan 411004 eggless, cash dunga delivery pe"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+      - {actor: c, send_text: "theek hai confirm karo"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  # ---------------------------------------------------------------- after paying: status questions (4)
+  - id: op-status-01
+    steps:
+      - {actor: c, send_text: "1 kg pineapple cake day after tomorrow 10am-1pm Kothrud 411038 not eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "confirm, online payment"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+      - {actor: c, send_text: "Is my order confirmed?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-status-02
+    steps:
+      - {actor: c, send_text: "2 box brownies parso 4-8 pm Warje 411058"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "confirm karo, link bhejo"}
+      - {wait_for: {payment_link_created: true}, timeout_s: 90}
+      - {pay_last_link: c}
+      - {wait_for: {order_status: confirmed}, timeout_s: 60}
+      - {actor: c, send_text: "mera order kab aayega?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-status-03
+    steps:
+      - {actor: c, send_text: "What's the status of my order?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-status-04
+    steps:
+      - {actor: c, send_text: "1 jar cookies day after tomorrow 1pm-4pm Deccan 411004"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "did I pay already?"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  # ---------------------------------------------------------------- changes while ordering (4)
+  - id: op-change-01
+    steps:
+      - {actor: c, send_text: "1 kg truffle cake day after tomorrow 4-8 pm Kothrud 411038 not eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "Actually make it eggless please"}
+      - {wait_for: {reply_contains: ["total", "Total", "1,050", "1050"]}, timeout_s: 90}
+  - id: op-change-02
+    steps:
+      - {actor: c, send_text: "red velvet 1 kg parso 4-8 Warje 411058 eggless"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "slot 1-4 pm kar do"}
+      - {wait_for: {replied: true}, timeout_s: 90}
+  - id: op-change-03
+    steps:
+      - {actor: c, send_text: "1 box brownies day after tomorrow 10am-1pm Deccan 411004"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "add one jar of cookies too"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+  - id: op-change-04
+    steps:
+      - {actor: c, send_text: "pineapple cake 1 kg parso 1-4 pm Kothrud 411038 eggless nahi"}
+      - {wait_for: {reply_contains: ["total", "Total"]}, timeout_s: 90}
+      - {actor: c, send_text: "address change: Karve Nagar 411052"}
+      - {wait_for: {replied: true}, timeout_s: 90}

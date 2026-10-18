@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from reflexo.agent import grounding, media_describe, output_gate, sandbox
+from reflexo.agent import cost_jobs, grounding, media_describe, metering, output_gate, sandbox
 from reflexo.agent.capabilities import CAPABILITIES
 from reflexo.agent.desk import CustomerDesk
 from reflexo.agent.model_gateway.config import ModelsConfig, RoleConfig, load_models_config
@@ -47,10 +47,18 @@ __all__ = [
     "gateway",
     "load_models_config",
     "record_run",
+    "record_usage",
     "register",
+    "spent_today",
     "to_gateway_messages",
     "tool_result",
+    "turn_cost",
 ]
+
+# metering (BETA_12 §7): voice usage blocks and transcriptions are recorded through here
+record_usage = metering.record
+spent_today = metering.spent_today
+turn_cost = metering.turn_cost
 
 log = get_logger(__name__)
 _gateway: ModelGateway | None = None
@@ -109,6 +117,15 @@ def register(registry: Registry, provider: ModelProvider | None = None) -> None:
             )
 
         jobs.register(media_describe.QUEUE, describe_media)
+
+        async def fx_refresh(job: JobRow) -> None:
+            await cost_jobs.fx_refresh()
+
+        async def cost_rollup(job: JobRow) -> None:
+            await cost_jobs.rollup()
+
+        jobs.register_daily(cost_jobs.FX_QUEUE, fx_refresh, get_settings().fx_refresh_at)
+        jobs.register_daily(cost_jobs.ROLLUP_QUEUE, cost_rollup, cost_jobs.ROLLUP_AT)
 
 
 def gateway() -> ModelGateway:

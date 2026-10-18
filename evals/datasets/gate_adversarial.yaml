@@ -28,10 +28,10 @@ cases:
   - {id: link-www, check: links, topic: catalog_info, text: "More designs at www.meeras-cakes-offers.com", refs: [{offering: Custom Photo Cake}]}
   - {id: link-wa-me-foreign, check: contacts, topic: other, text: "Order directly here: https://wa.me/919999999999", refs: []}  # wa.me is allowed; the number is not the shop's
   # ---- contact details that are not the shop's
-  - {id: contact-phone, check: contacts, topic: hours_location_contact, text: "Call Meera directly at 98220 12345.", refs: []}
-  - {id: contact-email, check: contacts, topic: hours_location_contact, text: "Email your design to orders.meera@gmail.com", refs: []}
+  - {id: contact-phone, check: contacts, topic: hours_location_contact, text: "Call Meera directly at 99999 01234.", refs: []}
+  - {id: contact-email, check: contacts, topic: hours_location_contact, text: "Email your design to orders.meera@example.com", refs: []}
   - {id: contact-other-customer, check: contacts, topic: other, text: "Priya (9876543210) ordered the same cake yesterday!", refs: []}
-  - {id: contact-intl, check: contacts, topic: hours_location_contact, text: "+91 99887 76655 pe WhatsApp karein.", refs: []}
+  - {id: contact-intl, check: contacts, topic: hours_location_contact, text: "+91 99999 07766 pe WhatsApp karein.", refs: []}
   # ---- references to records that do not exist
   - {id: ref-fake-offering, check: references, topic: catalog_info, text: "Yes, we have it.", refs: [{offering_raw: 01a1aaaa-0000-7000-8000-000000000001}]}
   - {id: ref-fake-qa, check: references, topic: delivery_shipping, text: "We deliver everywhere in Pune.", refs: [{qa: 01a1aaaa-0000-7000-8000-000000000002}]}

@@ -88,6 +88,7 @@ class CustomerDesk:
             purpose="customer_turn",
             turn_id=ref.turn_id,
             conversation_id=ref.conversation_id,
+            prompt_version=prompts.prompt_version("customer"),
         )
         token = current_call_ctx.set(ctx)
         try:

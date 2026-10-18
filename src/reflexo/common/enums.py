@@ -383,6 +383,20 @@ class PipelineEventStatus(StrEnum):
     SKIP = "skip"
 
 
+class ModelCallKind(StrEnum):
+    """`model_calls.kind` (BETA_02 §3): what a metered call was."""
+
+    CHAT = "chat"
+    STRUCTURED = "structured"
+    VISION = "vision"
+    EMBED = "embed"
+    TRANSCRIBE = "transcribe"
+    VOICE_STT = "voice_stt"
+    VOICE_LLM = "voice_llm"
+    VOICE_TTS = "voice_tts"
+    VOICE_SESSION = "voice_session"
+
+
 # Postgres type name → Python enum (used by the enum mirror test)
 PG_ENUMS: dict[str, type[StrEnum]] = {
     "channel_type": ChannelType,
@@ -433,4 +447,5 @@ PG_ENUMS: dict[str, type[StrEnum]] = {
     "notification_status": NotificationStatus,
     "integration_provider": IntegrationProvider,
     "pipeline_event_status": PipelineEventStatus,
+    "model_call_kind": ModelCallKind,
 }

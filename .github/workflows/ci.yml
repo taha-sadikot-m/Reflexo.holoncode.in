@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --python 3.12
-      - run: uv run python tasks.py lint
+      - run: uv run python tasks.py lint        # ruff, format, boundaries, guards, traceability (CHK-Q-1), fixtures (CHK-Q-6)
       - run: uv run python tasks.py typecheck
 
   test:
@@ -19,4 +19,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --python 3.12
-      - run: uv run python tasks.py test   # integration tests use testcontainers (Docker is available on ubuntu runners)
+      # integration tests use testcontainers (Docker is available on ubuntu runners)
+      - run: uv run python -m pytest --cov=reflexo --cov-branch --cov-report=json:coverage.json --cov-report=term:skip-covered
+      - run: uv run python scripts/check_coverage.py coverage.json   # CHK-Q-2: safety core >= 90%, ratchet 0.5 points

@@ -1,0 +1,7 @@
+# Work packages that are done (BETA_09 §5), and the "every WP that ..." checks they trigger. The traceability check
+# (scripts/check_traceability.py, CHK-Q-1) requires a test or a live-check entry for every check they deliver.
+work_packages:
+  - WP-00   # order-flow fix (no check ids; regression tests in tests/unit/test_invalid_args.py and others)
+  - WP-01   # model-call tracing, cost, the benchmark baseline
+checks:
+  - CHK-DB-13   # every WP with a migration: WP-01 adds 0008

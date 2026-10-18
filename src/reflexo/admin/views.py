@@ -152,6 +152,61 @@ def _summarize(trace_id: str, events: list[Any]) -> dict[str, Any]:
     }
 
 
+async def _turn_costs(s: Any, business_id: UUID, turn_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
+    """Metered totals per turn, straight from `model_calls` (so X-ray always equals the rows, CHK-PC-3)."""
+    if not turn_ids:
+        return {}
+    rows = (
+        await s.execute(
+            text("""SELECT turn_id, count(*) AS calls, sum(cost_micro_inr) AS cost, sum(input_tokens) AS inp,
+                           sum(cached_input_tokens) AS cached, sum(output_tokens) AS out
+                    FROM model_calls WHERE business_id = :b AND turn_id = ANY(:t) GROUP BY turn_id"""),
+            {"b": business_id, "t": turn_ids},
+        )
+    ).all()
+    return {
+        r.turn_id: {
+            "metered_calls": int(r.calls),
+            "cost_micro_inr": int(r.cost or 0),
+            "input_tokens": int(r.inp or 0),
+            "cached_input_tokens": int(r.cached or 0),
+            "output_tokens": int(r.out or 0),
+            "cached_share": round(int(r.cached or 0) / int(r.inp), 3) if r.inp else 0.0,
+        }
+        for r in rows
+    }
+
+
+def _turn_summary(turn_id: UUID, events: list[Any], cost: dict[str, Any]) -> dict[str, Any]:
+    """BETA_12 §2: total time, time per stage, model calls, tokens in / cached / out, cost, database queries."""
+    mine = [e for e in events if e.turn_id == turn_id]
+    by_stage: dict[str, int] = {}
+    for e in mine:
+        if e.duration_ms is not None and e.stage not in ("turn_finished", "reply"):
+            by_stage[e.stage] = by_stage.get(e.stage, 0) + int(e.duration_ms)
+    finished = next((e for e in reversed(mine) if e.stage == "turn_finished"), None)
+    started = next((e for e in mine if e.stage == "turn_started"), None)
+    attrs = (finished.attrs or {}) if finished else {}
+    return {
+        "turn_id": str(turn_id),
+        "total_ms": finished.duration_ms if finished else None,
+        "stages_ms": by_stage,
+        "model_calls": sum(1 for e in mine if e.stage == "model_call"),
+        "db_queries": attrs.get("db_queries"),
+        "db_ms": attrs.get("db_ms"),
+        "coalesce_wait_ms": (started.attrs or {}).get("coalesce_wait_ms") if started else None,
+        **{
+            "metered_calls": 0,
+            "cost_micro_inr": 0,
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+            "cached_share": 0.0,
+        },
+        **cost,
+    }
+
+
 async def traces(business_id: UUID, limit: int = 50) -> list[dict[str, Any]]:
     async with get_db().service_session(ServiceReason.ADMIN) as s:
         ids = [
@@ -186,6 +241,7 @@ async def traces(business_id: UUID, limit: int = 50) -> list[dict[str, Any]]:
                 )
             ).all()
         }
+        costs = await _turn_costs(s, business_id, turn_ids)
     grouped: dict[str, list[Any]] = {}
     for r in rows:
         grouped.setdefault(r.trace_id, []).append(r)
@@ -195,6 +251,7 @@ async def traces(business_id: UUID, limit: int = 50) -> list[dict[str, Any]]:
         turn = summary["turn_id"]
         text_ = snippets.get(UUID(turn)) if turn else None
         summary["snippet"] = mask_phone_numbers(text_[:120]) if text_ else None
+        summary["cost_micro_inr"] = costs.get(UUID(turn), {}).get("cost_micro_inr", 0) if turn else 0
         out.append(summary)
     return out
 
@@ -229,6 +286,7 @@ async def trace_detail(business_id: UUID, trace_id: str) -> dict[str, Any] | Non
                 {"b": business_id, "t": turn_ids},
             )
         ).all()
+        costs = await _turn_costs(s, business_id, turn_ids)
     t0 = min(r.created_at.timestamp() * 1000 - (r.duration_ms or 0) for r in rows)
     events = [
         {
@@ -245,6 +303,7 @@ async def trace_detail(business_id: UUID, trace_id: str) -> dict[str, Any] | Non
     ]
     return {
         "summary": _summarize(trace_id, list(rows)),
+        "turns": [_turn_summary(t, list(rows), costs.get(t, {})) for t in turn_ids],
         "events": events,
         "runs": [{k: (str(v) if isinstance(v, UUID) else v) for k, v in r._mapping.items()} for r in runs],
         "outbound": [

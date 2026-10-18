@@ -1,0 +1,48 @@
+# Product questions (BETA_12 §9.1): simple turns on catalogue, prices, delivery, hours and payment facts of
+# eval-bakes (the Meera's Bakes seed). Shorthand: `say` is one customer message, `expect` the outcome condition
+# (BETA_13 §7.3) the reply must meet. 14 English, 16 Hinglish, 10 Hindi.
+group: product_questions
+conversations:
+  # ---------------------------------------------------------------- English
+  - {id: pq-en-01, say: "How much is the chocolate truffle cake?", expect: {reply_contains: ["550", "950"]}}
+  - {id: pq-en-02, say: "What's the price of a 1 kg red velvet cake?", expect: {reply_contains: ["1,100", "1100"]}}
+  - {id: pq-en-03, say: "Do you have pineapple cake? How much?", expect: {reply_contains: ["750"]}}
+  - {id: pq-en-04, say: "How much is a box of brownies?", expect: {reply_contains: ["420"]}}
+  - {id: pq-en-05, say: "What do the choco chip cookies cost?", expect: {reply_contains: ["350"]}}
+  - {id: pq-en-06, say: "Can I get the truffle cake eggless? Is it extra?", expect: {reply_contains: ["50", "eggless"]}}
+  - {id: pq-en-07, say: "Do you deliver to Karve Nagar?", expect: {reply_contains: ["50", "deliver"]}}
+  - {id: pq-en-08, say: "What are your opening hours on Sunday?", expect: {reply_contains: ["11", "6"]}}
+  - {id: pq-en-09, say: "How early do I need to order a cake?", expect: {reply_contains: ["24"]}}
+  - {id: pq-en-10, say: "How can I pay for an order?", expect: {reply_contains: ["UPI", "link", "card"]}}
+  - {id: pq-en-11, say: "Is delivery free for big orders?", expect: {reply_contains: ["1,500", "1500", "free"]}}
+  - {id: pq-en-12, say: "Can I pick up the cake myself?", expect: {reply_contains: ["pickup", "pick up", "Kothrud"]}}
+  - {id: pq-en-13, say: "What cakes do you have?", expect: {reply_contains: ["Truffle", "Velvet", "Pineapple"]}}
+  - {id: pq-en-14, say: "Can I cancel an order if my plans change?", expect: {reply_contains: ["24", "cancel"]}}
+  # ---------------------------------------------------------------- Hinglish
+  - {id: pq-hl-01, say: "chocolate truffle cake kitne ka hai?", expect: {reply_contains: ["550", "950"]}}
+  - {id: pq-hl-02, say: "red velvet 1 kg ka rate kya hai", expect: {reply_contains: ["1,100", "1100"]}}
+  - {id: pq-hl-03, say: "pineapple cake milega? price batao", expect: {reply_contains: ["750"]}}
+  - {id: pq-hl-04, say: "brownies ka box kitne ka hai", expect: {reply_contains: ["420"]}}
+  - {id: pq-hl-05, say: "cookies jar ka price kya hai?", expect: {reply_contains: ["350"]}}
+  - {id: pq-hl-06, say: "eggless cake banate ho kya? extra lagta hai?", expect: {reply_contains: ["50", "eggless"]}}
+  - {id: pq-hl-07, say: "Warje mein delivery hoti hai?", expect: {reply_contains: ["50", "deliver"]}}
+  - {id: pq-hl-08, say: "Saturday ko kab tak khula hai?", expect: {reply_contains: ["9", "21"]}}
+  - {id: pq-hl-09, say: "kitne din pehle order karna padega?", expect: {reply_contains: ["24"]}}
+  - {id: pq-hl-10, say: "UPI chalega payment ke liye?", expect: {reply_contains: ["UPI"]}}
+  - {id: pq-hl-11, say: "delivery charge kitna hai?", expect: {reply_contains: ["50"]}}
+  - {id: pq-hl-12, say: "khud aake le sakte hai kya cake?", expect: {reply_contains: ["pickup", "pick up", "Kothrud"]}}
+  - {id: pq-hl-13, say: "500 gram wala truffle cake kitne ka hai", expect: {reply_contains: ["550"]}}
+  - {id: pq-hl-14, say: "photo wala custom cake banta hai?", expect: {replied: true}}
+  - {id: pq-hl-15, say: "sugar free cake milta hai kya?", expect: {replied: true}}
+  - {id: pq-hl-16, say: "aaj ka order aaj mil sakta hai?", expect: {reply_contains: ["24"]}}
+  # ---------------------------------------------------------------- Hindi
+  - {id: pq-hi-01, say: "चॉकलेट ट्रफल केक कितने का है?", expect: {reply_contains: ["550", "950"]}}
+  - {id: pq-hi-02, say: "रेड वेलवेट केक की कीमत क्या है?", expect: {reply_contains: ["1,100", "1100"]}}
+  - {id: pq-hi-03, say: "पाइनएप्पल केक मिलेगा क्या?", expect: {reply_contains: ["750"]}}
+  - {id: pq-hi-04, say: "कुकीज़ कितने की हैं?", expect: {reply_contains: ["350"]}}
+  - {id: pq-hi-05, say: "क्या आप कर्वे नगर में डिलीवरी करते हैं?", expect: {reply_contains: ["50", "deliver"]}}
+  - {id: pq-hi-06, say: "रविवार को दुकान कब खुलती है?", expect: {reply_contains: ["11"]}}
+  - {id: pq-hi-07, say: "केक कितने दिन पहले ऑर्डर करना होगा?", expect: {reply_contains: ["24"]}}
+  - {id: pq-hi-08, say: "पेमेंट कैसे करना है?", expect: {reply_contains: ["UPI", "link", "card"]}}
+  - {id: pq-hi-09, say: "क्या एगलेस केक मिलता है?", expect: {reply_contains: ["50", "eggless", "Eggless"]}}
+  - {id: pq-hi-10, say: "ब्राउनी का डिब्बा कितने का है?", expect: {reply_contains: ["420"]}}

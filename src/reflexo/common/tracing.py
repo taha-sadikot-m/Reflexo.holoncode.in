@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, ClassVar
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
@@ -15,6 +15,33 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ParentBasedTraceIdRatio
 
 _configured = False
+
+
+class GENAI:
+    """OpenTelemetry GenAI semantic-convention attribute names (BETA_12 §7). The conventions are still in
+    "Development", so the names are pinned here and changed deliberately. Message content never goes on a span."""
+
+    OPERATION = "gen_ai.operation.name"  # chat | embeddings | generate_content
+    PROVIDER = "gen_ai.provider.name"  # gcp.gemini | deepgram | livekit
+    REQUEST_MODEL = "gen_ai.request.model"
+    RESPONSE_MODEL = "gen_ai.response.model"
+    INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    CACHED_INPUT_TOKENS = "gen_ai.usage.cache_read.input_tokens"
+    REASONING_TOKENS = "gen_ai.usage.reasoning.output_tokens"
+    CONVERSATION_ID = "gen_ai.conversation.id"
+    COST_MICRO_INR = "reflexo.cost.micro_inr"
+    PURPOSE = "reflexo.purpose"
+    PROMPT_VERSION = "reflexo.prompt_version"
+    FEATURE = "reflexo.feature"
+    ROUTE = "reflexo.route"
+
+    PROVIDER_NAMES: ClassVar[dict[str, str]] = {
+        "gemini": "gcp.gemini",
+        "deepgram": "deepgram",
+        "livekit": "livekit",
+        "fake": "fake",
+    }
 
 
 def configure_tracing(service: str, endpoint: str | None, env: str, sampling_ratio: float = 1.0) -> None:

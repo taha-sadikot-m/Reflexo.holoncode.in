@@ -9,12 +9,16 @@ Two roles:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import contextvars
+import time
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from reflexo.common.config import get_settings
@@ -37,6 +41,43 @@ class ServiceReason(StrEnum):
     SEED = "seed"
     HEALTH = "health"
     ACCOUNTS = "accounts"  # owner sign-up and log-in (owner_accounts is service-only)
+    COSTS = "costs"  # BETA_02 §6 uses 11 and 14: the fx rate, the nightly cost rollup, the benchmark runner
+
+
+@dataclass
+class DbStats:
+    """Database work done inside one measured scope (a turn): statements and their time (BETA_12 §2)."""
+
+    queries: int = 0
+    ms: float = 0.0
+
+
+_db_stats: contextvars.ContextVar[DbStats | None] = contextvars.ContextVar("reflexo_db_stats", default=None)
+
+
+@contextmanager
+def measure_db() -> Iterator[DbStats]:
+    """Count the statements run (on any engine of this process) inside the block, in this task."""
+    stats = DbStats()
+    token = _db_stats.set(stats)
+    try:
+        yield stats
+    finally:
+        _db_stats.reset(token)
+
+
+def _count_statements(engine: AsyncEngine) -> None:
+    @event.listens_for(engine.sync_engine, "before_cursor_execute")
+    def _before(conn: Any, cursor: Any, statement: str, params: Any, context: Any, executemany: bool) -> None:
+        conn.info.setdefault("reflexo_t0", []).append(time.perf_counter())
+
+    @event.listens_for(engine.sync_engine, "after_cursor_execute")
+    def _after(conn: Any, cursor: Any, statement: str, params: Any, context: Any, executemany: bool) -> None:
+        started = conn.info.get("reflexo_t0", []).pop() if conn.info.get("reflexo_t0") else None
+        stats = _db_stats.get()
+        if stats is not None and started is not None:
+            stats.queries += 1
+            stats.ms += (time.perf_counter() - started) * 1000
 
 
 class Database:
@@ -52,6 +93,8 @@ class Database:
         )
         self._app_sessions = async_sessionmaker(self.app_engine, expire_on_commit=False)
         self._service_sessions = async_sessionmaker(self.service_engine, expire_on_commit=False)
+        _count_statements(self.app_engine)
+        _count_statements(self.service_engine)
 
     @asynccontextmanager
     async def tenant_session(self, business_id: UUID) -> AsyncIterator[AsyncSession]:

@@ -1,0 +1,18 @@
+# Values that may appear in fixtures and eval datasets (CHK-Q-6, scripts/check_fixtures.py). Everything here is
+# synthetic: simulator number ranges, obvious dummies, the seed shops' own public details and scenario actors.
+phone_prefixes:
+  - "+9199999"      # simulated customers and owners (Lab, demo, evals)
+  - "9199999"
+  - "+919811"       # test customers in integration tests and datasets
+  - "919811"
+  - "+919800000000" # test WhatsApp display number
+phones:
+  - "9876543210"    # the usual dummy
+  - "919999999999"
+email_domains: ["example.com", "example.org", "reflexo.test", "test", "invalid"]
+names:              # seed owners and scenario actors
+  - Meera
+  - Rahul
+  - Priya
+  - Aman
+  - Eval

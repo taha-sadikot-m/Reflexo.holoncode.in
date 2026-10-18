@@ -12,6 +12,9 @@ like a real user before every release.
 | Types | mypy `--strict` over the whole package |
 | Module boundaries | `scripts/check_boundaries.py`: a module may import another only through its `api.py`, and only along allowed edges |
 | Forbidden patterns | `scripts/check_guards.py`: no `eval`/`exec`, no legacy names |
+| Check traceability | `scripts/check_traceability.py`: every check of a delivered work package has a test marked with its id (`docs/checks.yaml`, `docs/delivered.yaml`) |
+| Fixture privacy | `scripts/check_fixtures.py`: no real phone numbers, emails, addresses or names in fixtures and eval data |
+| Coverage | `scripts/check_coverage.py` in CI: the safety core (output gate, automation validator, payment paths) at 90% branch coverage or more; total may not fall by more than 0.5 points |
 | Web app | TypeScript type check and production build |
 
 ## 2. Tests: 612 passing
@@ -44,6 +47,17 @@ not ship.
 
 Each run writes a report to `evals/reports/<commit>.md` with per-case reasons and p50/p95 latency.
 
+## 3b. Speed and cost, measured
+
+Every model call, embedding and voice-usage block writes a `model_calls` row with its cost in micro-rupees, priced
+from `config/model_prices.yaml` at the day's rupee rate (refreshed daily; history is never re-priced). X-ray shows
+each turn's cost, tokens, cached share, database queries and coalescing wait, read from those rows.
+
+The benchmark (`evals/benchmark/`, `make benchmark`) runs fixed conversations through the real pipeline with real
+models and reads every measure from stored data afterwards: reply time, cost per turn, model calls, cached share,
+database queries, the split-burst rate. A run can be capped in rupees. The gate compares the median of the runs
+with the accepted baseline (`evals/benchmark/baseline.json`) and fails on a regression beyond 10% plus the noise band.
+
 ## 4. Chaos lab
 
 From the ops console, each action breaks something on purpose using a simulated customer through the real
@@ -69,7 +83,10 @@ example (no phrase lists, no special cases).
 | A Hinglish customer suddenly got English replies | The detector called a mixed message English whenever Hindi evidence was weak, ignoring the customer's established language | Weigh Hindi and English function words; when unclear, keep the established language |
 | The voice agent promised "I'll check with the owner" but no one was asked | The voice agent had no tool to ask, and nothing checked promises against facts | Ask-the-owner is a voice tool; at hang-up, promises are reconciled against what happened and unbacked ones become owner questions |
 | A typed menu was ignored during set-up | Imports only accepted files; the new tool was missing from the desk's bound tool list | Typed lists are an import source with price verification; a test keeps tagged tools and bound lists equal |
-| Every onboarding preview answer said "I'd check with you first" | The model omitted one required schema field, so correct answers were rejected twice and fell back | The schema infers the field when the content is unambiguous; still rejects when it is not |
+| Every onboarding preview answer said "I'd check with you first" | The model omitted one required schema field, so correct answers were rejected twice and fell back | First patched by inferring the field; replaced in the beta (below) by fixing the cause: tool calls held to the schema and a full repair message |
+| Live: after starting an order, the customer got "One moment please" (beta WP-00) | Tool calls were decoded without the schema, so the model invented a buttons block shape; the one repair round named one missing field without the shape, and the model repeated itself | Tool calls use Gemini's validated mode; a repair lists every problem with the expected shape; the two single-shape patches were removed |
+| Live: Razorpay returned 429 and orders fell back (beta WP-00) | Not a rate: a test account makes 30 payment links in its life, and simulated orders had used them up | Simulated conversations use a simulated payment provider; a real provider failure is a decline handed to the owner |
+| The cost of an empty model answer was invisible (beta WP-01) | Usage was dropped when the provider raised on an empty or blocked answer, which still bills its input | Every attempt that reports usage writes a row; the error carries the usage |
 | Correct prices were blocked by the gate | Grounding ignored price modifiers (eggless +₹50) and facts returned by tools in the same turn | Grounding includes modifiers and this turn's tool results |
 | The AI stayed silent forever after the owner replied once from the dashboard | "Reply as team" started a human takeover with no way back | The owner is alerted and can hand back to the AI; waiting messages get answered |
 | A page of the dashboard went blank | An effect returned a Promise, which React called as a cleanup | Effects never return values; every page sits in an error boundary |

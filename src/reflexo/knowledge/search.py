@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from reflexo.common.config import get_settings
 from reflexo.common.contracts import EmbedderPort
 from reflexo.common.db import get_db
+from reflexo.common.llm import CallCtx, current_call_ctx
 from reflexo.common.logging import get_logger
 from reflexo.common.redis import RedisUnavailable, get_redis
 from reflexo.knowledge import profile as profile_mod
@@ -73,7 +74,21 @@ def _tsquery(terms: Sequence[str]) -> str:
 # ---------------------------------------------------------------- query embeddings
 
 
-async def _query_vector(query: str, embedder: EmbedderPort | None, *, allow_remote: bool) -> list[float] | None:
+def _embedding_ctx(business_id: UUID) -> CallCtx:
+    """A query embedded during a turn is part of that turn's cost (BETA_01 §7.1)."""
+    turn = current_call_ctx.get()
+    same = turn is not None and turn.business_id == business_id
+    return CallCtx(
+        business_id=business_id,
+        purpose="embedding",
+        turn_id=turn.turn_id if same and turn else None,
+        conversation_id=turn.conversation_id if same and turn else None,
+    )
+
+
+async def _query_vector(
+    business_id: UUID, query: str, embedder: EmbedderPort | None, *, allow_remote: bool
+) -> list[float] | None:
     if embedder is None or not query:
         return None
     key = "cache:emb:" + hashlib.sha1(f"{embedder.model}\n{query}".encode()).hexdigest()  # noqa: S324 - cache key
@@ -86,7 +101,9 @@ async def _query_vector(query: str, embedder: EmbedderPort | None, *, allow_remo
     if not allow_remote:
         return None
     try:
-        [vec] = await asyncio.wait_for(embedder.embed([query], task="query"), EMBED_TIMEOUT_S)
+        [vec] = await asyncio.wait_for(
+            embedder.embed([query], task="query", ctx=_embedding_ctx(business_id)), EMBED_TIMEOUT_S
+        )
     except Exception as exc:  # a slow/failed embedder degrades search to lexical, never fails it
         log.warning("query_embedding_failed", error=type(exc).__name__)
         return None
@@ -206,7 +223,7 @@ async def search_catalog(
     pq = parse_query(query)
     max_price = max_price_paise if max_price_paise is not None else pq.max_price_paise
     limit = k or get_settings().search_k
-    vector = await _query_vector(pq.normalized, embedder, allow_remote=allow_remote_embedding)
+    vector = await _query_vector(business_id, pq.normalized, embedder, allow_remote=allow_remote_embedding)
     async with get_db().tenant_session(business_id) as s:
         if pq.text:
             ranked = await _ranked(s, business_id, pq, ["offering"], vector, ARM_LIMIT * (2 if max_price else 1))
@@ -256,7 +273,7 @@ async def search_knowledge(
     allow_remote_embedding: bool = True,
 ) -> list[KnowledgeHit]:
     pq = parse_query(query)
-    vector = await _query_vector(pq.normalized, embedder, allow_remote=allow_remote_embedding)
+    vector = await _query_vector(business_id, pq.normalized, embedder, allow_remote=allow_remote_embedding)
     async with get_db().tenant_session(business_id) as s:
         ranked = await _ranked(s, business_id, pq, ["qa", "profile"], vector, ARM_LIMIT)
         qa_ids = [eid for et, eid, _ in ranked if et == "qa"]

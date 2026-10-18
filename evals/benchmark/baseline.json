@@ -1,0 +1,149 @@
+{
+  "set_version": "d545506f79f1",
+  "measures": {
+    "cached_share": {
+      "median": null,
+      "p95": null,
+      "mean": 0.66,
+      "n": 111
+    },
+    "chat_reply_ms": {
+      "median": 6704.916499999999,
+      "p95": 10689.804,
+      "mean": 6732.748564814815,
+      "n": 110
+    },
+    "one_call_turns": {
+      "median": null,
+      "p95": null,
+      "mean": 0.2793,
+      "n": 111
+    },
+    "owner_reply_ms": {
+      "median": 5422.202,
+      "p95": 6569.638999999999,
+      "mean": 5336.391799999999,
+      "n": 20
+    },
+    "coalesce_wait_ms": {
+      "median": 1713.0,
+      "p95": 2562.0,
+      "mean": 1683.6846846846847,
+      "n": 111
+    },
+    "split_burst_rate": {
+      "median": null,
+      "p95": null,
+      "mean": 0.0,
+      "n": 111
+    },
+    "db_queries_per_turn": {
+      "median": 83.0,
+      "p95": 160.0,
+      "mean": 106.64864864864865,
+      "n": 111
+    },
+    "model_calls_per_turn": {
+      "median": 2.0,
+      "p95": 3.0,
+      "mean": 1.972972972972973,
+      "n": 111
+    },
+    "input_tokens_per_call": {
+      "median": 5752.5,
+      "p95": 6249.666666666667,
+      "mean": 5852.039789789789,
+      "n": 111
+    },
+    "output_tokens_per_turn": {
+      "median": 224.0,
+      "p95": 535.0,
+      "mean": 270.2882882882883,
+      "n": 111
+    },
+    "cost_per_chat_turn_micro_inr": {
+      "median": 183539.0,
+      "p95": 404638.0,
+      "mean": 201327.73873873873,
+      "n": 111
+    }
+  },
+  "feature_cost": {
+    "chat": {
+      "micro_inr_per_turn": 230313.56756756757
+    },
+    "embedding": {
+      "micro_inr_per_turn": 101.89189189189189
+    }
+  },
+  "not_available": {
+    "typing_ms": "WP-03 (typing on real channels; the simulator has no typing call)",
+    "comment_to_dm_ms": "WP-03",
+    "voice_call_ready_ms": "WP-16",
+    "voice_start_speaking_ms": "WP-16",
+    "cost_per_voice_minute_micro_inr": "WP-16"
+  },
+  "groups": {
+    "bursts": {
+      "conversations": 15,
+      "passed": 15,
+      "failed": [],
+      "skipped_budget": 0
+    },
+    "owner_commands": {
+      "conversations": 20,
+      "passed": 20,
+      "failed": [],
+      "skipped_budget": 0
+    },
+    "orders_payments": {
+      "conversations": 30,
+      "passed": 30,
+      "failed": [],
+      "skipped_budget": 0
+    },
+    "product_questions": {
+      "conversations": 40,
+      "passed": 40,
+      "failed": [],
+      "skipped_budget": 0
+    }
+  },
+  "excluded_turns": {
+    "asked_owner": 1
+  },
+  "spent_micro_inr": 80679390,
+  "unmetered_turns": 0,
+  "regressions": [],
+  "targets_missed": [],
+  "noise_pct": {
+    "cached_share.mean": 3.82,
+    "chat_reply_ms.median": 3.26,
+    "chat_reply_ms.p95": 12.04,
+    "chat_reply_ms.mean": 3.4,
+    "one_call_turns.mean": 0.0,
+    "owner_reply_ms.median": 11.13,
+    "owner_reply_ms.p95": 6.22,
+    "owner_reply_ms.mean": 14.48,
+    "coalesce_wait_ms.median": 3.1,
+    "coalesce_wait_ms.p95": 1.95,
+    "coalesce_wait_ms.mean": 6.86,
+    "db_queries_per_turn.median": 1.2,
+    "db_queries_per_turn.p95": 0.63,
+    "db_queries_per_turn.mean": 1.1,
+    "model_calls_per_turn.median": 0.0,
+    "model_calls_per_turn.p95": 0.0,
+    "model_calls_per_turn.mean": 4.65,
+    "input_tokens_per_call.median": 1.02,
+    "input_tokens_per_call.p95": 2.12,
+    "input_tokens_per_call.mean": 0.31,
+    "output_tokens_per_turn.median": 5.96,
+    "output_tokens_per_turn.p95": 8.06,
+    "output_tokens_per_turn.mean": 4.06,
+    "cost_per_chat_turn_micro_inr.median": 6.71,
+    "cost_per_chat_turn_micro_inr.p95": 1.28,
+    "cost_per_chat_turn_micro_inr.mean": 7.93
+  },
+  "runs": 3,
+  "provisional": true
+}

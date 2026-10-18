@@ -97,6 +97,19 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     models_config: str = "config/models.yaml"
 
+    # speed and cost (BETA_12 §6, §8.3, §9, §11)
+    model_prices: str = "config/model_prices.yaml"
+    fx_primary_url: str = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR"
+    fx_fallback_url: str = "https://open.er-api.com/v6/latest/USD"
+    fx_refresh_at: str = "06:00"  # IST, daily
+    fx_alert_after_days: int = 3  # the rate kept from an older day this many days in a row -> operator alert
+    cost_cap_daily_inr: float = 30.0
+    cost_cap_degrade_pct: int = 100
+    cost_cap_pause_pct: int = 150
+    turn_max_db_queries: int = 60  # warning threshold in X-ray
+    benchmark_runs_release: int = 3
+    benchmark_regression_pct: float = 10.0
+
     # admin panel (POC_07 §1)
     admin_user: str = "admin"
     admin_password: SecretStr = SecretStr("admin-dev-password")

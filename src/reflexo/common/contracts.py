@@ -174,6 +174,8 @@ JobHandler = Callable[[JobRow], Awaitable[None]]
 class JobHandlerRegistry(Protocol):
     def register(self, queue: str, handler: JobHandler) -> None: ...
 
+    def register_daily(self, queue: str, handler: JobHandler, at: str) -> None: ...  # at: "HH:MM" IST
+
     def get(self, queue: str) -> JobHandler | None: ...
 
 
@@ -353,7 +355,9 @@ class EmbedderPort(Protocol):
 
     model: str
 
-    async def embed(self, texts: list[str], *, task: str) -> list[list[float]]: ...  # task: "query" | "document"
+    async def embed(  # task: "query" | "document"; ctx attributes the cost (model_calls, BETA_12 §7)
+        self, texts: list[str], *, task: str, ctx: CallCtx | None = None
+    ) -> list[list[float]]: ...
 
 
 class CommerceViewsPort(Protocol):

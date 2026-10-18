@@ -18,6 +18,7 @@ from reflexo.common.contracts import EmbedderPort, JobEnqueuer
 from reflexo.common.db import get_db
 from reflexo.common.enums import PriorityClass
 from reflexo.common.ids import new_id
+from reflexo.common.llm import CallCtx
 from reflexo.common.logging import get_logger
 from reflexo.knowledge import profile as profile_mod
 
@@ -189,7 +190,8 @@ async def embed_pending(business_id: UUID, embedder: EmbedderPort | None) -> int
             ).all()
         if not rows:
             return done
-        vectors = await embedder.embed([f"{r.title}\n{r.content}" for r in rows], task="document")
+        ctx = CallCtx(business_id=business_id, purpose="embedding", run_ref=f"reindex:{business_id}")
+        vectors = await embedder.embed([f"{r.title}\n{r.content}" for r in rows], task="document", ctx=ctx)
         if len(vectors) != len(rows):
             raise RuntimeError(f"embedder returned {len(vectors)} vectors for {len(rows)} documents")
         async with get_db().tenant_session(business_id) as s:

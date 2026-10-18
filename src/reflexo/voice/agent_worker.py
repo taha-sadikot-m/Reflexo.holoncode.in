@@ -81,6 +81,7 @@ async def entrypoint(job: Any) -> None:
     from reflexo.voice.agent import GOODBYE, ReflexoVoiceAgent, record_turn
     from reflexo.voice.context import SessionNotLive, start_session
     from reflexo.voice.in_call import InCallChat
+    from reflexo.voice.metering import VoiceUsageMeter
     from reflexo.voice.summary import send_summary
 
     _ensure_bootstrap()
@@ -100,6 +101,8 @@ async def entrypoint(job: Any) -> None:
 
     session = _session(job.proc.userdata.get("vad"))
     tasks: set[asyncio.Task[None]] = set()
+    meter = VoiceUsageMeter(ctx.business_id, call_session_id, ctx.conversation_id)  # BETA_12 §6.3
+    meter_stop = asyncio.Event()
 
     def spawn(coro: Any) -> None:
         t = asyncio.create_task(coro)
@@ -124,6 +127,10 @@ async def entrypoint(job: Any) -> None:
                     )
                 )
 
+    @session.on("metrics_collected")  # type: ignore[untyped-decorator]
+    def on_metrics(ev: Any) -> None:
+        meter.add(getattr(ev, "metrics", None))
+
     @session.on("user_state_changed")  # type: ignore[untyped-decorator]
     def on_user_state(ev: Any) -> None:
         if getattr(ev, "new_state", None) == "away":  # silence for voice_silence_hangup_s
@@ -147,6 +154,7 @@ async def entrypoint(job: Any) -> None:
 
     async def on_shutdown(reason: str = "") -> None:
         in_call.stop.set()
+        meter_stop.set()  # the meter writes the call's last minute of usage
         if tasks:
             await asyncio.wait(tasks, timeout=3)
         # our own shutdowns carry a reason ("agent_end:done", "silence"); anything else means the room went away
@@ -173,6 +181,7 @@ async def entrypoint(job: Any) -> None:
     job.add_shutdown_callback(on_shutdown)
     await session.start(agent=voice_agent, room=job.room)
     spawn(in_call.run())  # photos/text/location sent in the WhatsApp chat during the call
+    spawn(meter.run(meter_stop))
 
 
 def main() -> None:

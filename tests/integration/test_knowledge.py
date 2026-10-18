@@ -36,7 +36,7 @@ class HashEmbedder:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def embed(self, texts: list[str], *, task: str) -> list[list[float]]:
+    async def embed(self, texts: list[str], *, task: str, ctx: object = None) -> list[list[float]]:
         self.calls += 1
         out = []
         for t in texts:
@@ -452,7 +452,7 @@ async def test_failing_embedder_degrades_to_lexical(registry: Registry, db: Data
     class Broken:
         model = "broken"
 
-        async def embed(self, texts: list[str], *, task: str) -> list[list[float]]:
+        async def embed(self, texts: list[str], *, task: str, ctx: object = None) -> list[list[float]]:
             raise TimeoutError("model down")
 
     bid = await make_shop(db)

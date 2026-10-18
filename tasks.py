@@ -7,6 +7,7 @@ Tasks:
   seed          load seeds (default mode: onboarding); `seed --full`
   demo-reset    wipe + reseed the demo businesses; `demo-reset --full`
   eval          eval suites with real Gemini (POC_08 §4); `eval tool_selection grounding`
+  benchmark     the benchmark set (BETA_12 §9); `benchmark run --budget-inr 200`, `benchmark accept <ids>`
   api           run the HTTP API with reload
   worker        run the pipeline worker (all pools)
   voice-bridge  run the voice-bridge (WhatsApp WebRTC <-> LiveKit)
@@ -15,7 +16,7 @@ Tasks:
   admin-build   build the admin panel into apps/admin/dist (served at http://localhost:8080/admin/)
   dev           up + migrate + api
   test          pytest (unit + integration; integration needs Docker)
-  lint          ruff check + ruff format --check + module boundaries + guards
+  lint          ruff check + ruff format --check + module boundaries + guards + traceability + fixture scan
   typecheck     mypy
   check         lint + typecheck + test
 """
@@ -68,6 +69,8 @@ def main(argv: list[str]) -> None:
         run(py, "scripts/seed.py", "reset", *args)
     elif task == "eval":
         run(py, "scripts/eval.py", *args)
+    elif task == "benchmark":
+        run(py, "scripts/benchmark.py", *args)
     elif task == "api":
         run(py, "-m", "uvicorn", "reflexo.api.main:app", "--reload", "--port", "8080")
     elif task == "worker":
@@ -92,6 +95,8 @@ def main(argv: list[str]) -> None:
         run(py, "-m", "ruff", "format", "--check", ".")
         run(py, "scripts/check_boundaries.py")
         run(py, "scripts/check_guards.py")
+        run(py, "scripts/check_traceability.py")  # CHK-Q-1
+        run(py, "scripts/check_fixtures.py")  # CHK-Q-6
     elif task == "typecheck":
         run(py, "-m", "mypy")
     elif task == "check":

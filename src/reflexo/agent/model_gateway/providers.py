@@ -48,6 +48,17 @@ def _b64(data: bytes | None) -> str | None:
     return base64.b64encode(data).decode() if data else None
 
 
+def _usage_counts(usage: Any) -> dict[str, int]:
+    """Gemini's usage report as our counts. Output includes the reasoning ("thoughts") tokens, billed as output."""
+    reasoning = int(getattr(usage, "thoughts_token_count", 0) or 0)
+    return {
+        "input_tokens": int(getattr(usage, "prompt_token_count", 0) or 0),
+        "cached_input_tokens": int(getattr(usage, "cached_content_token_count", 0) or 0),
+        "output_tokens": int(getattr(usage, "candidates_token_count", 0) or 0) + reasoning,
+        "reasoning_tokens": reasoning,
+    }
+
+
 # Validation-only keywords. Gemini compiles tool schemas into a constrained-decoding grammar; with these kept the
 # customer tool set fails in ANY mode ("too many states for serving") and the model drifts into prose in AUTO mode.
 # Our own Pydantic validation of every tool call stays authoritative (invalid args → repair round).
@@ -255,21 +266,22 @@ class GeminiProvider:
             raise
         except Exception as exc:
             raise self._map_error(exc, attempt.model) from exc
+        counts = _usage_counts(usage)
         if finish in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"):
-            raise ModelError("BLOCKED", f"finish_reason={finish}", model=attempt.model, retryable=False)
+            raise ModelError("BLOCKED", f"finish_reason={finish}", model=attempt.model, retryable=False, usage=counts)
         if not texts and not calls:
-            raise ModelError("INVALID_OUTPUT", f"empty response (finish_reason={finish})", model=attempt.model)
+            raise ModelError(
+                "INVALID_OUTPUT", f"empty response (finish_reason={finish})", model=attempt.model, usage=counts
+            )
         return ChatResult(
             text="".join(texts),
             tool_calls=calls,
             model=attempt.model,
             latency_ms=int((time.perf_counter() - started) * 1000),
             ttft_ms=ttft,
-            input_tokens=int(getattr(usage, "prompt_token_count", 0) or 0),
-            output_tokens=int(getattr(usage, "candidates_token_count", 0) or 0)
-            + int(getattr(usage, "thoughts_token_count", 0) or 0),
             finish_reason=finish,
             text_meta=text_meta,
+            **counts,
         )
 
     async def embed(self, model: str, texts: list[str], *, task: str, dimensions: int) -> list[list[float]]:
@@ -301,6 +313,7 @@ class FakeReply:
     error: ModelError | None = None
     input_tokens: int = 10
     output_tokens: int = 5
+    cached_input_tokens: int = 0
 
 
 Script = Callable[[Attempt], FakeReply | Awaitable[FakeReply]]
@@ -362,6 +375,7 @@ class FakeProvider:
             latency_ms=int((time.perf_counter() - started) * 1000),
             ttft_ms=ttft,
             input_tokens=r.input_tokens,
+            cached_input_tokens=r.cached_input_tokens,
             output_tokens=r.output_tokens,
             finish_reason="STOP",
         )

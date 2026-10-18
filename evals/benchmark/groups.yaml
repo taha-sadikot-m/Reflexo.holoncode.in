@@ -1,0 +1,17 @@
+# The benchmark set (BETA_12 §9.1; BETA_13 §7.5): 200 fixed conversations in the scenario format, run through the
+# real ingress with real models on a freshly reseeded eval-bakes. No timing expectations: speed and cost are read
+# from stored data afterwards. A group runs only once its feature exists; its baseline is accepted when its work
+# package lands. Conversations are synthetic (CHK-Q-6): no real names, numbers or addresses.
+version: 1
+groups:
+  - {id: product_questions, title: "Product questions (English, Hindi, Hinglish)", conversations: 40, file: product_questions.yaml, available_from: WP-01}
+  - {id: orders_payments, title: "Orders and payments", conversations: 30, file: orders_payments.yaml, available_from: WP-01}
+  - {id: comments_mentions, title: "Comments and mentions", conversations: 20, file: null, available_from: WP-03}
+  - {id: voice_notes, title: "Voice notes", conversations: 20, file: null, available_from: WP-06}
+  - {id: bursts, title: "Multi-message bursts", conversations: 15, file: bursts.yaml, available_from: WP-01}
+  - {id: owner_commands, title: "Owner commands", conversations: 20, file: owner_commands.yaml, available_from: WP-01}
+  - {id: automation_builds, title: "Automation builds", conversations: 15, file: null, available_from: WP-13}
+  - {id: screens, title: "Screens (forms)", conversations: 10, file: null, available_from: WP-18}
+  - {id: voice_calls, title: "Voice calls (scripted audio through a browser call)", conversations: 10, file: null, available_from: WP-16}
+  - {id: shadow_turns, title: "Shadow mode turns", conversations: 10, file: null, available_from: WP-19}
+  - {id: connector_tools, title: "Connector tools", conversations: 10, file: null, available_from: WP-17}

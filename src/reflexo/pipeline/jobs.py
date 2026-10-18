@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from datetime import date, datetime, timedelta
+from datetime import time as time_of_day
 from typing import Any
 from uuid import UUID
 
@@ -20,6 +22,7 @@ from reflexo.common.db import ServiceReason, get_db
 from reflexo.common.enums import PriorityClass
 from reflexo.common.ids import new_id
 from reflexo.common.logging import get_logger
+from reflexo.common.timeutil import IST, utcnow
 from reflexo.common.tracing import current_trace_context
 
 log = get_logger(__name__)
@@ -29,11 +32,29 @@ def backoff_s(attempts: int) -> int:
     return int(min(2**attempts, 60))
 
 
+def _local_now() -> datetime:
+    return utcnow().astimezone(IST)
+
+
+def _daily_key(queue: str, day: date) -> str:
+    return f"{queue}:{day.isoformat()}"
+
+
+def _next_run(at: time_of_day, *, after_today: bool) -> datetime:
+    """The next run time of a daily job: today at `at` unless it already ran or `after_today`, then tomorrow."""
+    now = _local_now()
+    today_at = datetime.combine(now.date(), at, tzinfo=IST)
+    if after_today:
+        return today_at + timedelta(days=1)
+    return today_at if today_at > now else now
+
+
 class Jobs:
     """Implements `JobEnqueuer` and `JobHandlerRegistry`."""
 
     def __init__(self) -> None:
         self._handlers: dict[str, JobHandler] = {}
+        self._daily: dict[str, time_of_day] = {}  # queue -> local time (IST) of its daily run
 
     # -- registry
     def register(self, queue: str, handler: JobHandler) -> None:
@@ -43,6 +64,41 @@ class Jobs:
 
     def get(self, queue: str) -> JobHandler | None:
         return self._handlers.get(queue)
+
+    def register_daily(self, queue: str, handler: JobHandler, at: str) -> None:
+        """A job that runs once a day at `at` (HH:MM, IST); each run enqueues the next one (BETA_12 §6.2)."""
+        hh, mm = (int(x) for x in at.split(":"))
+        self._daily[queue] = time_of_day(hh, mm)
+
+        async def run_then_schedule(job: JobRow) -> None:
+            try:
+                await handler(job)
+            finally:
+                await self._enqueue_daily(queue, _next_run(self._daily[queue], after_today=True))
+
+        self.register(queue, run_then_schedule)
+
+    async def ensure_daily(self) -> None:
+        """At worker start: today's run if it has not happened yet (at once, if its time has passed), else
+        tomorrow's. The dedupe key per run date keeps restarts and several workers from doubling a run."""
+        for queue, at in self._daily.items():
+            today = _local_now().date()
+            async with get_db().service_session(ServiceReason.QUEUE_CLAIM) as s:
+                status = (
+                    await s.execute(
+                        text("SELECT status FROM jobs WHERE queue = :q AND dedupe_key = :k ORDER BY created_at DESC"),
+                        {"q": queue, "k": _daily_key(queue, today)},
+                    )
+                ).scalar()
+            if status is None:
+                await self._enqueue_daily(queue, _next_run(at, after_today=False))
+            elif str(status) not in ("pending", "running"):  # today's run is over: tomorrow's
+                await self._enqueue_daily(queue, _next_run(at, after_today=True))
+
+    async def _enqueue_daily(self, queue: str, when: datetime) -> None:
+        delay = max((when - _local_now()).total_seconds(), 0.0)
+        await self.enqueue(queue, {"run_date": when.date().isoformat()}, dedupe_key=_daily_key(queue, when.date()),
+                           delay_s=delay, priority=PriorityClass.P3)  # fmt: skip
 
     def queues(self) -> list[str]:
         return sorted(self._handlers)

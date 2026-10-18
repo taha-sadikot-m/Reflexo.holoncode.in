@@ -54,6 +54,7 @@ dev = [
   "ruff>=0.6",
   "mypy>=1.11",
   "types-PyYAML>=6.0",
+  "pytest-cov>=5.0",
 ]
 
 [build-system]
@@ -100,6 +101,9 @@ testpaths = ["tests"]
 markers = [
   "integration: needs Docker (Postgres/Redis testcontainers)",
   "live: calls real external providers; opt-in with --live",
+  "check(*ids): the BETA_08 check ids this test proves (traceability, CHK-Q-1)",
+  "slow: loads a real local model or the rule-checker binary",
+  "r2: release 2",
 ]
 addopts = "-ra"
 pythonpath = [".", "src"]

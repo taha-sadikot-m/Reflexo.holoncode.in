@@ -69,7 +69,9 @@ class ChatResult(BaseModel):
     latency_ms: int = 0
     ttft_ms: int | None = None
     input_tokens: int = 0
-    output_tokens: int = 0
+    cached_input_tokens: int = 0  # part of input_tokens served from the provider's cache
+    output_tokens: int = 0  # includes reasoning tokens
+    reasoning_tokens: int = 0
     finish_reason: str | None = None
     text_meta: dict[str, Any] = {}  # provider data for the text part (e.g. thought signature)
 
@@ -78,11 +80,21 @@ class ModelError(Exception):
     """Gateway failure with a registry code: TIMEOUT | RATE_LIMITED | PROVIDER_UNAVAILABLE | CREDENTIAL_INVALID |
     INVALID_OUTPUT | BLOCKED | PROVIDER_ERROR."""
 
-    def __init__(self, code: str, message: str = "", *, model: str | None = None, retryable: bool = True) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str = "",
+        *,
+        model: str | None = None,
+        retryable: bool = True,
+        usage: dict[str, int] | None = None,
+    ) -> None:
         super().__init__(f"{code}: {message}" if message else code)
         self.code = code
         self.model = model
         self.retryable = retryable
+        # what the provider billed for a failed attempt (an empty or blocked answer still costs its input)
+        self.usage = usage or {}
 
 
 @dataclass
@@ -122,6 +134,10 @@ class CallCtx:
     turn_id: UUID | None = None
     conversation_id: UUID | None = None
     stats: RunStats = field(default_factory=RunStats)
+    # metering (model_calls, BETA_02 §4.7): feature defaults from the purpose; run_ref names a non-turn run
+    feature: str | None = None
+    prompt_version: str | None = None
+    run_ref: str | None = None
 
 
 # The desk sets this before running its graph so the LangChain adapter can account calls to the right run.

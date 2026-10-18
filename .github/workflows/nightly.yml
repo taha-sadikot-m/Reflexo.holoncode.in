@@ -1,0 +1,62 @@
+# Nightly benchmark (BETA_08 §12, BETA_12 §9.2): one run of every available group through the real pipeline with
+# real models, gated against the accepted baseline. Needs repository secrets REFLEXO_GOOGLE_API_KEY (and, once their
+# groups exist, the Deepgram and LiveKit keys). The rupee cap keeps a broken run from spending more than a night's
+# budget. Never put seller data, vault keys or Meta tokens in Actions.
+name: nightly
+on:
+  schedule:
+    - cron: "30 21 * * *"   # 03:00 IST
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: reflexo_owner
+          POSTGRES_PASSWORD: owner_ci
+          POSTGRES_DB: reflexo
+        ports: ["5442:5432"]
+        options: --health-cmd "pg_isready -U reflexo_owner" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6390:6379"]
+    env:
+      REFLEXO_ENV: test
+      REFLEXO_DATABASE_URL: postgresql+asyncpg://reflexo_app:app_ci@localhost:5442/reflexo
+      REFLEXO_DATABASE_SERVICE_URL: postgresql+asyncpg://reflexo_service:service_ci@localhost:5442/reflexo
+      REFLEXO_DATABASE_OWNER_URL: postgresql+asyncpg://reflexo_owner:owner_ci@localhost:5442/reflexo
+      REFLEXO_REDIS_URL: redis://localhost:6390/0
+      REFLEXO_TEMPORAL_ADDRESS: localhost:7233
+      REFLEXO_OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      REFLEXO_GOOGLE_API_KEY: ${{ secrets.REFLEXO_GOOGLE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --python 3.12
+      - name: Database roles
+        run: |
+          PGPASSWORD=owner_ci psql -h localhost -p 5442 -U reflexo_owner -d reflexo -v ON_ERROR_STOP=1 -c "
+            CREATE ROLE reflexo_app LOGIN PASSWORD 'app_ci' NOSUPERUSER NOBYPASSRLS;
+            CREATE ROLE reflexo_service LOGIN PASSWORD 'service_ci' NOSUPERUSER NOBYPASSRLS;
+            GRANT CONNECT ON DATABASE reflexo TO reflexo_app, reflexo_service;"
+      - name: Temporal dev server
+        run: |
+          curl -sSf https://temporal.download/cli.sh | sh -s -- --dir "$HOME/.temporalio"
+          "$HOME/.temporalio/bin/temporal" server start-dev --headless --port 7233 &
+      - run: uv run python tasks.py migrate
+      - run: uv run python tasks.py seed --full
+      - name: Pipeline and Temporal workers
+        run: |
+          uv run python -m reflexo.pipeline.worker > worker.log 2>&1 &
+          uv run python -m reflexo.workflows.worker > temporal-worker.log 2>&1 &
+          sleep 10
+      - run: uv run python scripts/benchmark.py run --budget-inr 60
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-logs
+          path: "*.log"

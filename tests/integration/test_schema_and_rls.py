@@ -24,7 +24,8 @@ async def test_every_table_has_forced_rls(db: Database) -> None:
             WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'alembic_version'""")
             )
         ).all()
-    assert len(rows) == 55  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
+    assert len(rows) == 60  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
+    # + model_calls, cost_daily, cost_caps, fx_rates, benchmark_runs (0008)
     missing = [r.relname for r in rows if not (r.relrowsecurity and r.relforcerowsecurity)]
     assert missing == [], f"tables without forced RLS: {missing}"
 

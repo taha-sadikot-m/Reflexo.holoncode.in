@@ -1,0 +1,25 @@
+# Owner commands (BETA_12 §9.1): the owner desk, from the shop's simulated owner phone. Every command here is
+# read-only or stops at its read-back (nothing is confirmed), so the run never changes eval-bakes.
+# Shorthand: `owner_says` is one owner message, `expect` the outcome on the owner's phone.
+group: owner_commands
+conversations:
+  - {id: oc-01, owner_says: "Aaj ke orders dikhao", expect: {replied: true}}
+  - {id: oc-02, owner_says: "How many orders this week?", expect: {replied: true}}
+  - {id: oc-03, owner_says: "Koi customer ka sawal pending hai kya?", expect: {replied: true}}
+  - {id: oc-04, owner_says: "Red velvet 1 kg ka price 1200 kar do", expect: {owner_message_contains: "YES"}}
+  - {id: oc-05, owner_says: "Change the pineapple cake price to 800", expect: {owner_message_contains: "YES"}}
+  - {id: oc-06, owner_says: "Naya item add karo: Butterscotch cake 1 kg ₹800", expect: {owner_message_contains: "YES"}}
+  - {id: oc-07, owner_says: "Add to the FAQ: every cake comes with free candles", expect: {owner_message_contains: "YES"}}
+  - {id: oc-08, owner_says: "Customers ko batana ki hum Sunday ko delivery nahi karte", expect: {owner_message_contains: "YES"}}
+  - {id: oc-09, owner_says: "What's my best selling cake?", expect: {replied: true}}
+  - {id: oc-10, owner_says: "Show me unpaid orders", expect: {replied: true}}
+  - {id: oc-11, owner_says: "Kal ke liye kitne cakes hai?", expect: {replied: true}}
+  - {id: oc-12, owner_says: "Mark cookies as out of stock", expect: {owner_message_contains: "YES"}}
+  - {id: oc-13, owner_says: "Brownies ka price 450 kar do", expect: {owner_message_contains: "YES"}}
+  - {id: oc-14, owner_says: "What are my shop hours set to?", expect: {replied: true}}
+  - {id: oc-15, owner_says: "Never change a paid order for a customer without asking me first", expect: {owner_message_contains: "YES"}}
+  - {id: oc-16, owner_says: "Delivery charge 60 rupees kar do", expect: {owner_message_contains: "YES"}}
+  - {id: oc-17, owner_says: "How much did I earn today?", expect: {replied: true}}
+  - {id: oc-18, owner_says: "Kitne customers ne is hafte order kiya?", expect: {replied: true}}
+  - {id: oc-19, owner_says: "Show the last 5 orders", expect: {replied: true}}
+  - {id: oc-20, owner_says: "Agar delivery mein 2 din se zyada baaki ho toh customer khud cancel kar sakta hai, mujhse mat poochna", expect: {owner_message_contains: "YES"}}

@@ -36,7 +36,7 @@ from reflexo.common.contracts import (
     TurnRef,
     TurnRunnerPort,
 )
-from reflexo.common.db import ServiceReason, get_db, plain_dsn
+from reflexo.common.db import ServiceReason, get_db, measure_db, plain_dsn
 from reflexo.common.enums import PipelineEventStatus, TurnOutcome
 from reflexo.common.flags import business_killed
 from reflexo.common.ids import new_id
@@ -100,6 +100,8 @@ class Worker:
             "worker_start", worker=self.id, pools=list(self.pools), warm_ms=int((time.perf_counter() - started) * 1000)
         )
         await self._listen()
+        if "jobs" in self.pools:
+            await self.jobs.ensure_daily()  # the next run of every daily job (fx refresh, cost rollup)
         loops = [asyncio.create_task(self._pool_loop(p)) for p in self.pools]
         loops.append(asyncio.create_task(self._sweeper()))
         loops.append(asyncio.create_task(self._heartbeat()))
@@ -210,6 +212,7 @@ class Worker:
         with (
             resume_trace(ref.trace_context),
             tracer().start_as_current_span("reflexo.turn", attributes={"reflexo.turn_id": str(ref.turn_id)}),
+            measure_db() as db_stats,  # BETA_12 §2: database work per turn
         ):
             await emit(
                 "turn_started",
@@ -218,6 +221,7 @@ class Worker:
                 conversation_id=ref.conversation_id,
                 turn_id=ref.turn_id,
                 attempt=ref.attempts,
+                coalesce_wait_ms=await self._coalesce_wait_ms(ref),
             )
             try:
                 await runner.run_turn(handle)
@@ -250,6 +254,7 @@ class Worker:
                     error=type(exc).__name__,
                 )
                 return
+            limit = get_settings().turn_max_db_queries
             await emit(
                 "turn_finished",
                 PipelineEventStatus.OK,
@@ -257,7 +262,24 @@ class Worker:
                 conversation_id=ref.conversation_id,
                 turn_id=ref.turn_id,
                 duration_ms=int((time.perf_counter() - started) * 1000),
+                db_queries=db_stats.queries,
+                db_ms=round(db_stats.ms, 1),
+                db_over_limit=db_stats.queries > limit,
             )
+
+    async def _coalesce_wait_ms(self, ref: TurnRef) -> int | None:
+        """From the turn's last inbound message to its start: how long coalescing held it (BETA_12 §2)."""
+        try:
+            async with get_db().tenant_session(ref.business_id) as s:
+                last = (
+                    await s.execute(
+                        text("SELECT max(created_at) FROM messages WHERE id = ANY(:ids)"),
+                        {"ids": list(ref.message_ids)},
+                    )
+                ).scalar_one_or_none()
+        except Exception:  # measurement never blocks a turn
+            return None
+        return max(int((utcnow() - last).total_seconds() * 1000), 0) if last else None
 
     async def _fallback(self, runner: TurnRunnerPort, ref: TurnRef, reason: str) -> None:
         try:

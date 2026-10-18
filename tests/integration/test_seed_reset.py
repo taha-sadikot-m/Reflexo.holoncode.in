@@ -50,7 +50,7 @@ async def test_reset_onboarding_then_full_is_repeatable(db: Database) -> None:
     await reset(db, "full")  # idempotent: same shape after a second reset
     assert (await _counts(db, "meeras-bakes"))["offerings"] == 6
     evalb = await _counts(db, "eval-bakes")
-    assert evalb["offerings"] == 6 and evalb["connections"] == 1
+    assert evalb["offerings"] == 6 and evalb["connections"] == 2  # simulator + simulated WhatsApp (benchmark)
 
 
 async def test_seeded_businesses_are_searchable(db: Database) -> None:

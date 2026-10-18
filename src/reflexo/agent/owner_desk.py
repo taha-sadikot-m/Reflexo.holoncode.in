@@ -367,7 +367,11 @@ class OwnerDesk:
         ref = handle.ref
         started = time.perf_counter()
         ctx = CallCtx(
-            business_id=ref.business_id, purpose="owner_turn", turn_id=ref.turn_id, conversation_id=ref.conversation_id
+            business_id=ref.business_id,
+            purpose="owner_turn",
+            turn_id=ref.turn_id,
+            conversation_id=ref.conversation_id,
+            prompt_version=prompts.prompt_version("owner"),
         )
         token = current_call_ctx.set(ctx)
         try:

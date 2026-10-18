@@ -1,0 +1,20 @@
+# Multi-message bursts (BETA_12 §9.1): several messages sent back to back, as people type on WhatsApp. They exercise
+# coalescing; the split-burst rate (a second turn within 5 s of a reply to the same customer) is read from data.
+# Shorthand: `burst` is the messages sent without waiting, `expect` the outcome after the last one.
+group: bursts
+conversations:
+  - {id: bu-01, burst: ["Hi", "do you have red velvet?", "how much for 1 kg"], expect: {reply_contains: ["1,100", "1100"]}}
+  - {id: bu-02, burst: ["hello", "truffle cake ka price?"], expect: {reply_contains: ["550", "950"]}}
+  - {id: bu-03, burst: ["I need a cake", "for day after tomorrow", "chocolate truffle 1 kg"], expect: {replied: true}}
+  - {id: bu-04, burst: ["delivery hoti hai?", "Warje", "411058"], expect: {reply_contains: ["50", "deliver"]}}
+  - {id: bu-05, burst: ["Hi!", "What time do you close on Saturday?"], expect: {reply_contains: ["9", "21"]}}
+  - {id: bu-06, burst: ["cookies hai?", "kitne ki", "jar wali"], expect: {reply_contains: ["350"]}}
+  - {id: bu-07, burst: ["Do you make eggless cakes", "is it extra"], expect: {reply_contains: ["50", "eggless"]}}
+  - {id: bu-08, burst: ["brownies", "box of 6 price?"], expect: {reply_contains: ["420"]}}
+  - {id: bu-09, burst: ["namaste", "pineapple cake milega", "1 kg"], expect: {reply_contains: ["750"]}}
+  - {id: bu-10, burst: ["how do I pay", "is UPI ok"], expect: {reply_contains: ["UPI"]}}
+  - {id: bu-11, burst: ["hey", "can I pick up", "from your place"], expect: {reply_contains: ["pickup", "pick up", "Kothrud"]}}
+  - {id: bu-12, burst: ["कितने दिन पहले", "ऑर्डर करना होगा"], expect: {reply_contains: ["24"]}}
+  - {id: bu-13, burst: ["menu bhejo", "cakes kaun kaun se hai"], expect: {reply_contains: ["Truffle", "Velvet", "Pineapple"]}}
+  - {id: bu-14, burst: ["Hi", "Is delivery free above some amount?", "thanks"], expect: {reply_contains: ["1,500", "1500", "free"]}}
+  - {id: bu-15, burst: ["red velvet 1 kg", "parso", "eggless"], expect: {replied: true}}

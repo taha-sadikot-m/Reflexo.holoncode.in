@@ -80,7 +80,9 @@ def eval_seed(meera: dict[str, Any]) -> dict[str, Any]:
             "external_account_id": "sim-eval-bakes",
             "display_name": "Eval Bakes (Simulator)",
             "roles": ["customer", "owner"],
-        }
+        },
+        # the benchmark (BETA_12 §9) runs through the WhatsApp path, all of it simulated: a fake phone number id
+        *simulated_whatsapp("eval-bakes", "Eval Bakes"),
     ]
     return seed
 
@@ -154,6 +156,12 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
         "INSERT INTO business_profiles (business_id, version, profile) VALUES (:b, 1, CAST(:p AS jsonb))",
         b=bid,
         p=_j(seed["profile"]),
+    )
+    await _exec(  # BETA_02 §8: every seeded business starts at the default daily AI cost cap
+        s,
+        "INSERT INTO cost_caps (business_id, daily_cap_micro_inr) VALUES (:b, :cap)",
+        b=bid,
+        cap=int(settings.cost_cap_daily_inr * 1_000_000),
     )
     await _exec(
         s,

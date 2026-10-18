@@ -6,8 +6,8 @@ and marks the step. Progress lives in memory (one API process) and is polled by 
 
 Step verbs: send_text, tap_option, pay_last_link, owner_answer_last_question, reply_with_last_short_code,
 wait_for, assert, skip_waits, chaos, sleep_ms.
-Conditions (wait_for / assert): reply_contains, reply_has_options, owner_message_contains, order_status,
-payment_status, payment_link_created.
+Conditions (wait_for / assert): replied, reply_contains, reply_has_options, owner_message_contains, order_status,
+payment_status, payment_link_created, order_changed.
 """
 
 from __future__ import annotations
@@ -93,20 +93,30 @@ def _label(step: dict[str, Any]) -> str:
     return f"{who}{verb.replace('_', ' ')} {value}".strip()
 
 
+def new_run(scenario: dict[str, Any], business_id: UUID) -> ScenarioRun:
+    """A run of `scenario` with fresh simulated customers (no state leaks between runs)."""
+    customers = [name for name, a in (scenario.get("actors") or {}).items() if a.get("role") == "customer"]
+    return ScenarioRun(
+        id=new_id().hex,
+        scenario_id=scenario["id"],
+        title=scenario.get("title", scenario["id"]),
+        business_id=str(business_id),
+        steps=[StepState(i, _label(s)) for i, s in enumerate(scenario["steps"])],
+        actors={name: 1000 + secrets.randbelow(8999) for name in customers},
+    )
+
+
+async def execute(run: ScenarioRun, scenario: dict[str, Any], business_id: UUID) -> None:
+    """Run every step in order in this task (the benchmark awaits it; the Lab runs it in the background)."""
+    await _execute(run, scenario, business_id)
+
+
 def start(scenario_id: str, business_id: UUID) -> ScenarioRun:
     found = load(scenario_id)
     if not found:
         raise LookupError(f"unknown scenario {scenario_id}")
     scenario = found[0]
-    customers = [name for name, a in (scenario.get("actors") or {}).items() if a.get("role") == "customer"]
-    run = ScenarioRun(
-        id=new_id().hex,
-        scenario_id=scenario_id,
-        title=scenario.get("title", scenario_id),
-        business_id=str(business_id),
-        steps=[StepState(i, _label(s)) for i, s in enumerate(scenario["steps"])],
-        actors={name: 1000 + secrets.randbelow(8999) for name in customers},  # fresh customers every run
-    )
+    run = new_run(scenario, business_id)
     _runs[run.id] = run
     task = asyncio.create_task(_execute(run, scenario, business_id), name=f"scenario:{run.id}")
     _tasks[run.id] = task
@@ -345,6 +355,9 @@ class _Context:
             needle = str(cond["owner_message_contains"]).lower()
             return any(needle in t.lower() for t in texts), (texts[-1] if texts else "")
         who = self.actor(step)
+        if "replied" in cond:  # the business answered this actor (or the owner) since the latest action
+            texts = [sim.payload_text(p) for p in await self.replies(who)]
+            return bool(texts) == bool(cond["replied"]), (texts[-1] if texts else "")
         if "reply_contains" in cond:
             texts = [sim.payload_text(p) for p in await self.replies(who)]
             needles = cond["reply_contains"] if isinstance(cond["reply_contains"], list) else [cond["reply_contains"]]
