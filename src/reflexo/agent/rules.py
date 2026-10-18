@@ -26,6 +26,7 @@ from reflexo.common.contracts import JobEnqueuer
 from reflexo.common.db import get_db
 from reflexo.common.enums import PriorityClass
 from reflexo.common.logging import get_logger
+from reflexo.common.timeutil import utcnow
 
 log = get_logger(__name__)
 RECHECK_QUEUE = "playbook.recheck"
@@ -101,6 +102,19 @@ async def review(
     )
 
 
+def record(result: Review, asked_effect: str, *, tries: int = 0) -> knowledge.playbook.RuleCheckRecord:
+    """What is stored on the rule (`playbook_rules.check_result`) so the Rules page can show the check."""
+    return knowledge.playbook.RuleCheckRecord(
+        status=result.status,
+        asked_effect=asked_effect,
+        differences=[d.model_dump() for d in result.differences],
+        shadowed_by=result.shadowed_by,
+        problem=result.problem,
+        checked_at=utcnow(),
+        tries=tries,
+    )
+
+
 async def schedule_recheck(
     business_id: UUID, rule_id: UUID, asked_effect: str, *, change_set_id: UUID | None, member_id: UUID | None,
     tries: int = 0,
@@ -148,6 +162,7 @@ async def recheck(payload: dict[str, Any]) -> None:
     asked = rule.model_copy(update={"effect": payload["asked_effect"]})
     result = await review(bid, asked, replaces=[rule.id])
     await knowledge.policysets.record_analysis(bid, result.analysis)
+    await knowledge.playbook.record_check(bid, rule_id, record(result, asked.effect, tries=tries + 1))
     if result.status == "unchecked":
         await again()
         return

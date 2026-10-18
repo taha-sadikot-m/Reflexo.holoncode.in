@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated, Any
+from datetime import date, datetime
+from typing import Annotated, Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -577,6 +578,76 @@ async def evals_run(_: OperatorMutating, suite: str | None = None) -> dict[str, 
     if not admin.evals.start(suites):
         raise problem(409, "BUSY", "an eval run is already in progress")
     return {"started": True, "suites": suites or admin.evals.ORDER}
+
+
+# ---------------------------------------------------------------- costs, benchmarks, access logs (BETA_13 §3, §4)
+
+
+async def scoped(s: admin.Session, business_id: UUID | None) -> list[UUID] | None:
+    """Which businesses a cross-business operator page may show: all (None) for the operator; for the read-only
+    reviewer only the showcase shops, never sign-ups or demo sandboxes."""
+    if business_id is not None:
+        if str(business_id) not in {b["id"] for b in await visible_businesses(s)}:
+            raise problem(404, "NOT_FOUND", "unknown business")
+        return [business_id]
+    return [UUID(b["id"]) for b in await visible_businesses(s)] if s.read_only else None
+
+
+@router.get("/costs")
+async def costs_view(
+    s: Operator,
+    business_id: UUID | None = None,
+    since: Annotated[date | None, Query(alias="from")] = None,
+    until: Annotated[date | None, Query(alias="to")] = None,
+    group_by: Literal["day", "business", "feature", "model", "route"] = "day",
+) -> dict[str, Any]:
+    try:
+        window = admin.costs.window(since, until, datetime.now(ZoneInfo("Asia/Kolkata")).date())
+    except ValueError as exc:
+        raise problem(422, "INVALID", str(exc)) from exc
+    return await admin.costs.overview(await scoped(s, business_id), *window, group_by)
+
+
+class CostCapBody(BaseModel):
+    daily_cap_inr: float = Field(ge=admin.costs.CAP_MIN_INR, le=admin.costs.CAP_MAX_INR)
+
+
+@router.patch("/cost-caps/{business_id}")
+async def cost_cap(business_id: UUID, body: CostCapBody, s: OperatorMutating) -> dict[str, Any]:
+    await scoped(s, business_id)
+    return await admin.costs.set_cap(business_id, body.daily_cap_inr)
+
+
+@router.get("/benchmarks")
+async def benchmarks(_: Operator) -> dict[str, Any]:
+    return await admin.benchmark.history()
+
+
+class AcceptBody(BaseModel):
+    reason: str = Field(min_length=10, max_length=500)  # BETA_12 §9.3: a trade is accepted with its reason
+    with_: list[UUID] = Field(default_factory=list, alias="with", max_length=10)
+
+
+@router.post("/benchmarks/{run_id}/accept")
+async def benchmark_accept(run_id: UUID, body: AcceptBody, s: OperatorMutating) -> dict[str, Any]:
+    try:
+        baseline_id, result = await admin.benchmark.accept_baseline(
+            [run_id, *body.with_], reason=body.reason.strip(), accepted_by=s.user, write_file=False
+        )
+    except ValueError as exc:
+        raise problem(422, "INVALID", str(exc)) from exc
+    return {"id": str(baseline_id), "results": result.model_dump(mode="json")}
+
+
+@router.get("/access-log")
+async def access_log(
+    s: Operator,
+    kind: Literal["operator", "credential"] = "operator",
+    business_id: UUID | None = None,
+    before: datetime | None = None,
+) -> dict[str, Any]:
+    rows = await admin.access_entries(kind, businesses=await scoped(s, business_id), before=before)
+    return {"kind": kind, "items": rows, "next_before": rows[-1]["at"] if len(rows) == 100 else None}
 
 
 @router.get("/onboarding")

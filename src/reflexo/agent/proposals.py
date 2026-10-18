@@ -228,6 +228,7 @@ class ProposalService:
             source_ref=approval_id,
             summary=f"Playbook: {cap.label}",
             member_id=member_id,
+            check=rules.record(checked, rule.effect),
         )
         if checked.status == "unchecked":
             await rules.schedule_recheck(business_id, rule_id, rule.effect, change_set_id=None, member_id=member_id)

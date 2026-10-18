@@ -1,6 +1,6 @@
 // The two areas with sub-pages: Brain (how the employee thinks) and Quality (prove it works).
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Bomb, BookOpenCheck, FlaskConical, Gauge, GraduationCap, History, Library, Workflow } from "lucide-react";
+import { Activity, Bomb, BookOpenCheck, Coins, FlaskConical, Gauge, GraduationCap, History, Library, TrendingUp, Workflow } from "lucide-react";
 
 import { Section } from "../components/section";
 import { api, type OwnerWorkspace, type PlaybookProposal, type PlaybookRuleRow } from "../lib/api";
@@ -45,12 +45,14 @@ export function QualitySection() {
   return (
     <Section
       title="Quality"
-      description="Prove it works: simulate customers and the owner, watch every message through the pipeline, break things on purpose, and score the build."
+      description="Prove it works: simulate customers and the owner, watch every message through the pipeline, break things on purpose, score the build, and see what it costs and how fast it is."
       tabs={[
         { to: "lab", label: "Simulation Lab", icon: FlaskConical },
         { to: "xray", label: "Pipeline X-ray", icon: Activity },
         { to: "chaos", label: "Chaos", icon: Bomb },
         { to: "evals", label: "Evals", icon: Gauge },
+        { to: "costs", label: "Costs", icon: Coins },
+        { to: "benchmarks", label: "Benchmarks", icon: TrendingUp },
       ]}
     />
   );

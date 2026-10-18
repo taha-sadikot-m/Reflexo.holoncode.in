@@ -118,13 +118,13 @@ const TOURS: Record<TourName, Step[]> = {
     {
       target: "nav-quality",
       title: "Quality",
-      text: "The simulation lab, X-ray traces of every message, chaos tests and the evaluation suites.",
+      text: "The simulation lab, X-ray traces of every message, chaos tests, the evaluation suites, costs and benchmarks.",
       side: "right",
     },
     {
       target: "nav-settings",
       title: "Settings",
-      text: "Channels, the demo reset and runtime flags.",
+      text: "Channels, the demo reset, runtime flags and the access logs.",
       side: "right",
     },
     {

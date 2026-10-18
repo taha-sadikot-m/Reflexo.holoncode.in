@@ -52,6 +52,7 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
 export const api = {
   get: <T>(path: string, params?: Record<string, string>) => request<T>("GET", path, undefined, params),
   post: <T>(path: string, body?: unknown, params?: Record<string, string>) => request<T>("POST", path, body ?? {}, params),
+  patch: <T>(path: string, body?: unknown, params?: Record<string, string>) => request<T>("PATCH", path, body ?? {}, params),
   upload: <T>(path: string, file: Blob, params?: Record<string, string>) => request<T>("POST", path, file, params),
 };
 
@@ -340,6 +341,17 @@ export interface PlaybookRuleRow {
   change_set_id: string | null;
   created_at: string;
   updated_at: string;
+  check: RuleCheck | null; // the rule checker's last result (null: saved before the checker)
+  asked_readback: string | null; // the rule as the owner asked for it, while it is saved differently
+}
+export interface RuleCheck {
+  status: "ok" | "unchecked" | "blocked";
+  asked_effect: "allow" | "deny" | "propose";
+  differences: { kind: string; when: string; line: string }[];
+  shadowed_by: string | null;
+  problem: string | null;
+  checked_at: string;
+  tries: number;
 }
 export interface PlaybookProposal {
   id: string;
@@ -442,4 +454,86 @@ export interface CustomerView {
   merged_from: { id: string; name: string | null; created_at: string }[];
   orders: { id: string; order_number: string; status: string; total_rupees: number | null; channel: string | null; created_at: string }[];
   history: { at: string; direction: string; author: string; text: string; channel: string; conversation_id: string }[];
+}
+
+// ---------------------------------------------------------------- costs, benchmarks, access logs (operator)
+
+export type CostGroup = "day" | "business" | "feature" | "model" | "route";
+export interface CostCap {
+  business_id: string;
+  name: string;
+  daily_cap_micro_inr: number;
+  default_cap: boolean;
+  alert_at_pct: number;
+  alerted_on: string | null;
+  today_micro_inr: number;
+}
+export interface CostOverview {
+  from: string;
+  to: string;
+  group_by: CostGroup;
+  totals: {
+    cost_micro_inr: number;
+    calls: number;
+    chat_turns: number;
+    conversations: number;
+    cost_per_turn_micro_inr: number | null;
+    cost_per_conversation_micro_inr: number | null;
+    cached_share: number | null;
+  };
+  rows: { key: string; label: string; cost_micro_inr: number; calls: number; input_tokens: number; cached_input_tokens: number }[];
+  fx: { usd_inr: number; day: string; source: string } | null;
+  price_version: string;
+  caps: CostCap[];
+}
+
+export interface BenchMeasure {
+  median: number | null;
+  p95: number | null;
+  mean: number | null;
+  n: number;
+}
+export interface BenchResults {
+  set_version: string;
+  measures: Record<string, BenchMeasure>;
+  groups: Record<string, { conversations: number; passed: number; failed: string[]; skipped_budget: number }>;
+  regressions: { measure: string; delta_pct: number; allowed: number }[];
+  targets_missed: { measure: string; value: number; target: number }[];
+  noise_pct: Record<string, number>;
+  spent_micro_inr: number;
+  runs: number;
+  provisional: boolean;
+  accepted_reason?: string | null;
+  accepted_by?: string | null;
+}
+export interface BenchRun {
+  id: string;
+  git_sha: string;
+  set_version: string;
+  started_at: string;
+  finished_at: string | null;
+  is_baseline: boolean;
+  compared_to: string | null;
+  passed: boolean | null;
+  results: BenchResults | null;
+}
+export interface BenchmarksPage {
+  set_version: string;
+  gated: Record<string, string[]>;
+  targets: Record<string, Record<string, number>>;
+  higher_is_better: string[];
+  allowed_pct: number;
+  baseline: { id: string | null; source: "database" | "file"; results: BenchResults } | null;
+  runs: BenchRun[];
+}
+
+export interface AccessEntry {
+  at: string;
+  business_id: string;
+  business: string;
+  who: string;
+  what: string;
+  object_id: string | null;
+  detail: string;
+  ok: boolean;
 }

@@ -62,7 +62,7 @@ _SCHEMA = {
 
 _PLAYBOOK_RULE = {
     "capability": None, "effect": None, "conditions": "jsonb", "says": None, "scope": "answer_scope",
-    "customer_id": "uuid", "source": None, "source_ref": "uuid", "status": "record_status",
+    "customer_id": "uuid", "source": None, "source_ref": "uuid", "status": "record_status", "check_result": "jsonb",
 }  # fmt: skip
 
 

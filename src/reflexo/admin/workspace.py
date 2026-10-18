@@ -371,7 +371,7 @@ async def playbook(business_id: UUID) -> dict[str, Any]:
             await s.execute(
                 text("""
             SELECT r.id, r.capability, r.effect, r.conditions, r.says, r.scope, r.customer_id, r.source,
-                   r.source_ref, r.status, r.created_at, r.updated_at, cu.display_name, cu.phone_e164,
+                   r.source_ref, r.status, r.created_at, r.updated_at, r.check_result, cu.display_name, cu.phone_e164,
                    ap.preview AS source_preview, ap.decided_at AS source_decided_at,
                    (SELECT i.change_set_id FROM knowledge_change_items i JOIN knowledge_change_sets cs
                           ON cs.id = i.change_set_id
@@ -404,6 +404,9 @@ async def playbook(business_id: UUID) -> dict[str, Any]:
             says=r.says,
             source=r.source,
         )
+        check = r.check_result
+        asked = (check or {}).get("asked_effect") or r.effect
+        label = labels.get(r.capability, r.capability)
         rules.append(
             {
                 "id": str(r.id),
@@ -425,6 +428,12 @@ async def playbook(business_id: UUID) -> dict[str, Any]:
                 "change_set_id": str(r.change_set_id) if r.change_set_id else None,
                 "created_at": _iso(r.created_at),
                 "updated_at": _iso(r.updated_at),
+                # the rule checker's last result (BETA_04 §7.6); while unchecked the rule asks first, so the page
+                # also shows the rule as the owner asked for it
+                "check": check,
+                "asked_readback": rule.model_copy(update={"effect": asked}).readback(label)
+                if asked != r.effect
+                else None,
             }
         )
     proposals = []

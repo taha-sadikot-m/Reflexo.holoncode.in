@@ -3,7 +3,8 @@
 Admin API, X-ray stream, Simulation Lab scenarios, chaos endpoints, evals. Spec: POC_07, POC_08 §4.
 """
 
-from reflexo.admin import accounts, chaos, demo, evals, scenarios, sim, workspace
+from reflexo.admin import accounts, benchmark, chaos, costs, demo, evals, scenarios, sim, workspace
+from reflexo.admin.access import entries as access_entries
 from reflexo.admin.access import log_access
 from reflexo.admin.actions import demo_reset, reply_as_team, set_takeover
 from reflexo.admin.auth import (
@@ -31,7 +32,9 @@ __all__ = [
     "OWNER_COOKIE",
     "SURFACE_HEADER",
     "Session",
+    "access_entries",
     "accounts",
+    "benchmark",
     "businesses",
     "chaos",
     "check_credentials",
@@ -39,6 +42,7 @@ __all__ = [
     "check_totp",
     "conversation_thread",
     "conversations",
+    "costs",
     "demo",
     "demo_reset",
     "evals",

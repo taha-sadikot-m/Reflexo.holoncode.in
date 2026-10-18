@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, ToggleLeft } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Json, PageHeader, StatusBadge } from "../components/bits";
 import { Badge, Button, Card, Empty, ErrorNote, Mono, Skeleton } from "../components/ui";
@@ -67,7 +68,16 @@ export function Settings() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Settings">Demo reset, channel connections and runtime flags.</PageHeader>
+      <PageHeader
+        title="Settings"
+        actions={
+          <Link to="/settings/access" className="text-[13px] font-medium text-signal hover:underline">
+            Access logs →
+          </Link>
+        }
+      >
+        Demo reset, channel connections and runtime flags.
+      </PageHeader>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card title="Demo reset">
           <div className="space-y-3">

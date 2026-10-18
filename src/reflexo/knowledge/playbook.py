@@ -9,6 +9,7 @@ transaction. Before a new rule is read back to the owner, the rule checker verif
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -93,9 +94,11 @@ async def add_rule(
     source_ref: UUID | None = None,
     summary: str = "Playbook rule",
     member_id: UUID | None = None,
+    check: RuleCheckRecord | None = None,
 ) -> UUID:
     """Create an active rule through a change set (so `/undo` reverts it like any other knowledge change)."""
     rule_id = new_id()
+    checked = {"check_result": check.model_dump(mode="json")} if check else {}
     await apply_now(
         business_id,
         "learning",
@@ -115,6 +118,7 @@ async def add_rule(
                     "source": source,
                     "source_ref": str(source_ref) if source_ref else None,
                     "status": "active",
+                    **checked,
                 },
             )
         ],
@@ -124,6 +128,28 @@ async def add_rule(
 
 
 # ---------------------------------------------------------------- the rule checker before the read-back
+
+
+class RuleCheckRecord(BaseModel):
+    """`playbook_rules.check_result` (BETA_02 §4.11): the checker's last result on one rule, shown on the Rules page.
+    Checker output, not knowledge: it is not part of the policy set's source hash."""
+
+    status: Literal["ok", "unchecked", "blocked"]
+    asked_effect: Effect  # while unchecked the rule is saved as `propose`
+    differences: list[dict[str, str]] = Field(default_factory=list)  # [{kind, when, line}]
+    shadowed_by: str | None = None
+    problem: str | None = None
+    checked_at: datetime
+    tries: int = 0  # re-checks made while unchecked
+
+
+async def record_check(business_id: UUID, rule_id: UUID, record: RuleCheckRecord) -> None:
+    """A re-check's result on a saved rule (the save itself writes the first one through its change set)."""
+    async with get_db().tenant_session(business_id) as s:
+        await s.execute(
+            text("UPDATE playbook_rules SET check_result = CAST(:c AS jsonb) WHERE id = :id AND business_id = :b"),
+            {"c": record.model_dump_json(), "id": rule_id, "b": business_id},
+        )
 
 
 class RuleExample(BaseModel):

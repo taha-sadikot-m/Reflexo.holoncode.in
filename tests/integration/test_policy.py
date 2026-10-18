@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import text
 
+import reflexo.admin.api as admin
 import reflexo.agent.api as agent
 import reflexo.knowledge.api as knowledge
 import reflexo.policy.api as policy
@@ -122,15 +123,29 @@ async def test_with_the_checker_missing_a_rule_asks_first_until_checked(
     [rule] = await knowledge.playbook.rules(shop.bid)
     assert rule.effect == "propose"  # saved as "ask me first", whatever was asked
 
+    async def stored() -> dict[str, Any]:  # what the Rules page shows (playbook_rules.check_result)
+        [row] = await q(db, "SELECT check_result FROM playbook_rules WHERE id = :r", r=rule.id)
+        return dict(row.check_result)
+
+    first = await stored()
+    assert (first["status"], first["asked_effect"], first["tries"]) == ("unchecked", "allow", 0)
+    await rules.recheck(dict(job.payload) | {"tries": 1})  # still missing an hour later: the try is counted
+    assert ((await stored())["status"], (await stored())["tries"]) == ("unchecked", 2)
+    [view] = (await admin.workspace.playbook(shop.bid))["rules"]
+    assert view["check"]["status"] == "unchecked" and "I do it myself" in view["asked_readback"]
+
     monkeypatch.setenv("REFLEXO_POLICY_CHECK_CMD", working)  # the checker is back: the hourly re-check passes
     get_settings.cache_clear()
     await rules.recheck(dict(job.payload))
+    assert (await stored())["status"] == "ok"  # checked; the rule still asks first until the owner confirms
     note = str((await owner_messages(db, shop))[-1])
     approval = re.search(r"apv:([0-9a-f-]{36}):a", note).group(1)  # type: ignore[union-attr]
     assert "I do it myself when hours left until delivery is at least 24" in note
     await owner_says(registry, db, shop, callback=f"apv:{approval}:a")
     [rule] = await knowledge.playbook.rules(shop.bid)
     assert rule.effect == "allow"
+    [view] = (await admin.workspace.playbook(shop.bid))["rules"]
+    assert view["check"]["status"] == "ok" and view["asked_readback"] is None  # saved as asked
 
 
 async def _paid_order(db: Database, shop: Bakery, total_rupees: int) -> tuple[UUID, UUID]:

@@ -8,8 +8,11 @@ import { Layout } from "./components/Layout";
 import { ApiError, SURFACE } from "./lib/api";
 import { SessionProvider, useSession } from "./lib/session";
 import { BrainSection, QualitySection } from "./pages/Sections";
+import { AccessLogs } from "./pages/AccessLogs";
 import { Automations } from "./pages/Automations";
+import { Benchmarks } from "./pages/Benchmarks";
 import { Chaos } from "./pages/Chaos";
+import { Costs } from "./pages/Costs";
 import { Inbox } from "./pages/Inbox";
 import { Evals } from "./pages/Evals";
 import { History } from "./pages/History";
@@ -82,8 +85,11 @@ function App() {
               <Route path="xray" element={<Xray />} />
               <Route path="chaos" element={<Chaos />} />
               <Route path="evals" element={<Evals />} />
+              <Route path="costs" element={<Costs />} />
+              <Route path="benchmarks" element={<Benchmarks />} />
             </Route>
             <Route path="settings" element={<Settings />} />
+            <Route path="settings/access" element={<AccessLogs />} />
           </>
         )}
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, Brain, MessageSquareQuote, Undo2 } from "lucide-react";
+import { BookOpenCheck, Brain, MessageSquareQuote, ShieldCheck, Undo2 } from "lucide-react";
 
 import { PageHeader, StatusBadge, fmtWhen } from "../components/bits";
 import { Badge, Button, Card, Empty, ErrorNote, Skeleton, cx } from "../components/ui";
@@ -11,6 +11,44 @@ const EFFECT: Record<string, { tone: "good" | "bad" | "warn"; label: string }> =
   deny: { tone: "bad", label: "Declines" },
   propose: { tone: "warn", label: "Asks first" },
 };
+
+// the rule checker's verdict on this rule (BETA_04 §7.6, BETA_13 §2.1)
+const PROBLEM: Record<string, string> = {
+  impossible: "its conditions can never all be true",
+  may_error: "it could fail to evaluate for some orders",
+  invalid: "it could not be read safely",
+};
+
+function RuleCheck({ r }: { r: PlaybookRuleRow }) {
+  const c = r.check;
+  if (!c || r.status !== "active") return null; // a retired rule no longer waits on any check
+  const waiting = c.status === "ok" && r.asked_readback;
+  return (
+    <div className="mt-2 space-y-1 rounded-md bg-parchment px-2.5 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <ShieldCheck size={12} className="text-signal" />
+        {c.status === "ok" && !waiting && <Badge tone="good">Checked</Badge>}
+        {waiting && <Badge tone="info">Checked · waiting for the owner's OK</Badge>}
+        {c.status === "unchecked" && <Badge tone="warn">I'll ask first until this is checked</Badge>}
+        {c.status === "blocked" && <Badge tone="bad">Can't apply as asked</Badge>}
+        <span className="text-stone">
+          {fmtWhen(c.checked_at)}
+          {c.status === "unchecked" && c.tries > 0 && ` · tried ${c.tries} time${c.tries === 1 ? "" : "s"} since`}
+        </span>
+      </div>
+      {r.asked_readback && <div className="text-dusk">As asked: “{r.asked_readback}”</div>}
+      {c.status === "blocked" && c.problem && <div className="text-dusk">Not applied, because {PROBLEM[c.problem] ?? c.problem}.</div>}
+      {c.differences.length > 0 && (
+        <ul className="list-inside list-disc text-dusk">
+          {c.differences.map((d) => (
+            <li key={d.kind + d.when}>{d.line}</li>
+          ))}
+        </ul>
+      )}
+      {c.shadowed_by && <div className="text-dusk">An earlier rule decides these cases first: “{c.shadowed_by}”</div>}
+    </div>
+  );
+}
 
 function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; busy: boolean }) {
   const effect = EFFECT[r.effect] ?? { tone: "warn" as const, label: r.effect };
@@ -43,6 +81,7 @@ function Rule({ r, onUndo, busy }: { r: PlaybookRuleRow; onUndo: () => void; bus
           </>
         )}
       </div>
+      <RuleCheck r={r} />
     </li>
   );
 }

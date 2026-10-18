@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Loader2, Lock, Play, ServerCrash, ShieldAlert, Skull, Timer, Zap, type LucideIcon } from "lucide-react";
+import { Copy, Loader2, Lock, Play, Scale, ServerCrash, ShieldAlert, Skull, Timer, Zap, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -16,12 +16,14 @@ const ACTIONS: Record<string, { label: string; icon: LucideIcon }> = {
   redis_down: { label: "Redis down · 60 s", icon: ServerCrash },
   prompt_injection: { label: "Prompt injection", icon: ShieldAlert },
   cross_business_read: { label: "Cross-business read", icon: Lock },
+  policy_checker_missing: { label: "Rule checker missing · 60 s", icon: Scale },
 };
 
 const FLAG_LABEL: Record<string, string> = {
   slow_model: "Primary model slowed",
   redis_disabled: "Redis disabled",
   kill_after_tool: "Worker kill armed",
+  policy_checker_hidden: "Rule checker hidden",
 };
 
 const HIDDEN_CHECKS = new Set(["actor"]);

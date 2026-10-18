@@ -41,8 +41,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Engineering",
     items: [
-      { to: "/quality", label: "Quality", icon: ShieldCheck, hint: "Lab, X-ray, chaos, evals", tour: "nav-quality" },
-      { to: "/settings", label: "Settings", icon: Settings, hint: "Channels, reset, flags", tour: "nav-settings" },
+      { to: "/quality", label: "Quality", icon: ShieldCheck, hint: "Lab, X-ray, chaos, evals, costs", tour: "nav-quality" },
+      { to: "/settings", label: "Settings", icon: Settings, hint: "Channels, reset, flags, access", tour: "nav-settings" },
     ],
   },
 ];

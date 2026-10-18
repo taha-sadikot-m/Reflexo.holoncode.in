@@ -736,6 +736,7 @@ async def playbook_change(ctx: ToolContext, args: PlaybookChangeArgs, s: AsyncSe
             "scope": "global",
             "source": "owner_instruction",
             "status": "active",
+            "check_result": rules.record(checked, args.effect).model_dump(mode="json"),
         },
     )
     lines.append(f"➕ {saved.readback(cap.label)}")

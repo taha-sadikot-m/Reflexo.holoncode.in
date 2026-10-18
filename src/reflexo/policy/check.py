@@ -23,6 +23,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from reflexo.common.config import get_settings
+from reflexo.common.flags import flag
 from reflexo.common.logging import get_logger
 from reflexo.policy import reference
 from reflexo.policy.compile import compile_rules
@@ -32,6 +33,7 @@ from reflexo.policy.schema import PROBE_CONNECTOR_ACTION, full_schema, layer_tex
 
 log = get_logger(__name__)
 Command = Literal["compare", "lint", "never-errors", "implies"]
+HIDDEN_FLAG = "policy_checker_hidden"  # chaos `policy_checker_missing` (BETA_13 §7.6): behave as if not installed
 View = Literal["acts", "declines"]
 
 
@@ -97,6 +99,9 @@ def _call(argv: list[str], body: bytes, timeout_s: float) -> subprocess.Complete
 async def run(command: Command, payload: dict[str, Any]) -> CheckReport:
     """Call the binary; never raises. An unavailable checker is a report with `available = False`. Runs in a
     worker thread, so it works under any event loop."""
+    if await flag(HIDDEN_FLAG, False):
+        log.warning("policy_check_unavailable", command=command, error="hidden by chaos")
+        return CheckReport(command=command, available=False, error="hidden by chaos")
     s = get_settings()
     argv = [*shlex.split(s.policy_check_cmd, posix=True), command]
     body = json.dumps({"command": command, **payload}).encode()

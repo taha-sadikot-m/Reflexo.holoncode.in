@@ -164,3 +164,23 @@ async def test_disarm_clears_only_chaos_flags(db: Database) -> None:
     assert await admin.chaos.clear_flag("redis_disabled") is False
     with pytest.raises(ValueError):
         await admin.chaos.clear_flag("kill_switch")
+
+
+async def test_the_hidden_checker_flag_makes_every_check_unavailable_without_running_it(
+    db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chaos `policy_checker_missing` (BETA_13 §7.6): while the flag is set the bridge reports the checker as not
+    installed, so a new rule is saved as "ask me first"; the binary is never started."""
+    import reflexo.policy.api as policy
+    from reflexo.policy import check
+
+    started: list[Any] = []
+    monkeypatch.setattr(check, "_call", lambda *a: started.append(a))
+    assert "policy_checker_missing" in admin.chaos.KINDS
+    await admin.chaos.set_flag(admin.chaos.CHECKER_FLAG, True, 30)
+    try:
+        report = await policy.check("lint", set="")
+        assert report.available is False and report.error == "hidden by chaos" and not started
+    finally:
+        assert await admin.chaos.clear_flag(admin.chaos.CHECKER_FLAG) is True  # the panel can disarm it
+    assert check.HIDDEN_FLAG == admin.chaos.CHECKER_FLAG  # the console sets the flag the bridge reads

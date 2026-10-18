@@ -93,6 +93,8 @@ class BenchmarkResult(BaseModel):
     noise_pct: dict[str, float] = Field(default_factory=dict)  # baselines only: measure.stat -> band
     runs: int = 1  # baselines: how many runs were combined
     provisional: bool = False  # a baseline of fewer than 5 runs (BETA_12 §9.3)
+    accepted_reason: str | None = None  # baselines accepted in the console: why (also written to _PROGRESS.md)
+    accepted_by: str | None = None
 
 
 # ---------------------------------------------------------------- the set
@@ -426,11 +428,63 @@ async def current_baseline() -> tuple[UUID | None, BenchmarkResult] | None:
     return None
 
 
-async def accept_baseline(run_ids: list[UUID]) -> tuple[UUID, BenchmarkResult]:
-    """Combine runs into the accepted baseline. The reason is written to `_PROGRESS.md` by the operator (§9.3)."""
-    combined = combine(await load_runs(run_ids))
-    BASELINE_FILE.write_text(combined.model_dump_json(indent=2) + "\n", encoding="utf-8")
+async def accept_baseline(
+    run_ids: list[UUID], *, reason: str | None = None, accepted_by: str | None = None, write_file: bool = True
+) -> tuple[UUID, BenchmarkResult]:
+    """Combine runs into the accepted baseline. The reason is written to `_PROGRESS.md` by the operator (§9.3).
+    The console stores it with the baseline too, and never writes the file (`scripts/benchmark.py` does, for git)."""
+    runs = await load_runs(run_ids)
+    if len(runs) != len(set(run_ids)):
+        raise ValueError("unknown benchmark run")
+    if any(r.runs > 1 for r in runs):
+        raise ValueError("a baseline cannot be combined again; pick the runs it was made from")
+    combined = combine(runs).model_copy(update={"accepted_reason": reason, "accepted_by": accepted_by})
+    if write_file:
+        BASELINE_FILE.write_text(combined.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return await _store(combined, started_at=utcnow(), is_baseline=True), combined
+
+
+async def history(limit: int = 50) -> dict[str, Any]:
+    """The Benchmarks page (BETA_12 §8.1): the accepted baseline and the latest runs with their verdicts."""
+    found = await current_baseline()
+    async with get_db().service_session(ServiceReason.COSTS) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT id, git_sha, set_version, started_at, finished_at, results, is_baseline, compared_to,
+                               passed FROM benchmark_runs ORDER BY started_at DESC LIMIT :n"""),
+                {"n": limit},
+            )
+        ).all()
+    baseline = None
+    if found is not None:
+        baseline_id, result = found
+        baseline = {
+            "id": str(baseline_id) if baseline_id else None,
+            "source": "database" if baseline_id else "file",
+            "results": result.model_dump(mode="json"),
+        }
+    return {
+        "set_version": set_version(),
+        "gated": {name: list(stats) for name, stats in GATED.items()},
+        "targets": TARGETS,
+        "higher_is_better": sorted(HIGHER_IS_BETTER),
+        "allowed_pct": get_settings().benchmark_regression_pct,
+        "baseline": baseline,
+        "runs": [
+            {
+                "id": str(r.id),
+                "git_sha": r.git_sha,
+                "set_version": r.set_version,
+                "started_at": r.started_at.isoformat(),
+                "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+                "is_baseline": r.is_baseline,
+                "compared_to": str(r.compared_to) if r.compared_to else None,
+                "passed": r.passed,
+                "results": r.results,
+            }
+            for r in rows
+        ],
+    }
 
 
 async def compare(run_ids: list[UUID], *, release: bool = False) -> Verdict | None:
