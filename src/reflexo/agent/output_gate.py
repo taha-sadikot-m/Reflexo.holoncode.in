@@ -14,6 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from reflexo.agent import names
 from reflexo.agent.schemas import (
     CAPABILITY_TOPICS,
     GROUNDED_TOPICS,
@@ -308,6 +309,25 @@ def check(output: AgentOutput, records: GroundingRecords) -> GateResult:
                 passed=not bad_urls,
                 detail=("links not allowed: " + ", ".join(bad_urls)) if bad_urls else None,
                 guidance="Do not write URLs; use a payment_link block for payments." if bad_urls else None,
+            )
+        )
+
+    # 4b. facts this reply must carry: the privacy notice in a customer's first reply (BETA_10 §6, CHK-SEC-8)
+    if output.action == "send" and records.required_facts:
+        missing = [
+            f"{key} = {value}"
+            for key, value in records.required_facts.items()
+            if not (names.appears(value, text) if key.endswith("name") else value in text)
+        ]
+        checks.append(
+            GateCheck(
+                name="notice",
+                passed=not missing,
+                detail=("missing: " + "; ".join(missing)) if missing else None,
+                guidance="This is your first reply to this customer: say briefly that you are the shop's assistant "
+                "and include the privacy link exactly as given."
+                if missing
+                else None,
             )
         )
 

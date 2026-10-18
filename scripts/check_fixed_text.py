@@ -67,9 +67,16 @@ def _literal(node: ast.AST) -> str | None:
 _PATTERN = re.compile(r"\\[bdswBDSW]|\(\?|\{\{.*\}\}$|^\s*[\w.]+\s*(==|!=|<|>)|::")  # regexes, CEL, Cedar
 
 
+_TAG = re.compile(r"<[^>]*>")
+_CSS = re.compile(r"[a-z-]+:[^;{}]+;")
+
+
 def is_sentence(text: str) -> bool:
     if _PATTERN.search(text) or text.lstrip().startswith("#"):  # patterns; prompt section headers
         return False
+    if len(_CSS.findall(text)) >= 2:  # a style sheet
+        return False
+    text = _TAG.sub(" ", text)  # markup: only the words a person sees count
     words = _WORD.findall(text)
     if len(words) < 3 or " " not in text.strip():
         return False

@@ -312,6 +312,7 @@ SIGNUP = {
     "owner_name": "Ravi",
     "category": "sweet shop",
     "area": "Indore",
+    "accept_terms": True,
 }
 
 
@@ -345,6 +346,15 @@ async def test_signup_creates_a_shop_in_onboarding_and_signs_the_owner_in(
         ).all()
     assert shop.slug.startswith("sharma-sweets-") and shop.prefix == "SS"
     assert welcome and all(w.simulated for w in welcome)  # the AI greets on the owner's (simulated) phone
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        [consent] = (
+            await s.execute(
+                text("SELECT purpose, granted, method, evidence FROM consent_records WHERE business_id = :b"),
+                {"b": UUID(business_id)},
+            )
+        ).all()
+    assert (consent.purpose, consent.granted, consent.method) == ("service_terms", True, "signup_terms")
+    assert consent.evidence["seller_terms"].startswith("seller-terms-")  # the version the owner accepted
 
     again = await client.post("/api/accounts/signup", json=SIGNUP | {"email": "owner@sharma-sweets.in"})
     assert again.status_code == 409  # emails are case-insensitive
@@ -354,6 +364,12 @@ async def test_signup_creates_a_shop_in_onboarding_and_signs_the_owner_in(
     assert wrong.status_code == 401
     ok = await client.post("/api/accounts/login", json={"email": "owner@sharma-sweets.in", "password": "laddoo-2026"})
     assert ok.status_code == 200 and ok.json()["business_id"] == business_id
+
+
+async def test_signup_needs_the_terms_accepted(client: httpx.AsyncClient) -> None:
+    admin.accounts._signups.clear()
+    resp = await client.post("/api/accounts/signup", json=SIGNUP | {"email": "a@terms.in", "accept_terms": False})
+    assert resp.status_code == 422 and "Seller Terms" in resp.text
 
 
 async def test_signup_validates_and_limits(

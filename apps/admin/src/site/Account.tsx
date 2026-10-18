@@ -76,6 +76,7 @@ function Submit({ busy, children }: { busy: boolean; children: ReactNode }) {
 
 export function Signup() {
   const [form, setForm] = useState({ business_name: "", category: "", area: "", owner_name: "", email: "", password: "" });
+  const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -84,7 +85,7 @@ export function Signup() {
     setBusy(true);
     setError(null);
     try {
-      await post("/api/accounts/signup", form);
+      await post("/api/accounts/signup", { ...form, accept_terms: accepted });
       window.location.href = "/app/setup";
     } catch (err) {
       setError((err as Error).message);
@@ -146,6 +147,20 @@ export function Signup() {
           onChange={set("password")}
           hint="At least 8 characters."
         />
+        <label className="flex items-start gap-2.5 text-[13px] text-dusk">
+          <input type="checkbox" required className="mt-0.5" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+          <span>
+            I accept the{" "}
+            <a href="/terms" target="_blank" rel="noreferrer" className="font-medium text-signal hover:underline">
+              Seller Terms
+            </a>{" "}
+            and the{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-signal hover:underline">
+              Privacy Notice
+            </a>
+            .
+          </span>
+        </label>
         {error && <div className="rounded-xl bg-ember-l px-3.5 py-2.5 text-[13.5px] text-ember">{error}</div>}
         <Submit busy={busy}>
           Create my AI employee <ArrowRight size={17} />

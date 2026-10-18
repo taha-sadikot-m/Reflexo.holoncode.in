@@ -233,6 +233,7 @@ async def gate_node(state: CustomerState, config: RunnableConfig) -> dict[str, A
         capability_decided=p.shop_decided
         or any(isinstance(m, ToolMessage) and m.name in ACTION_TOOLS for m in state["messages"]),
         tool_backed=any(_answered(m) for m in state["messages"]),
+        required_facts=p.notice,
     )
     result: GateResult = output_gate.check(output, records)
     await emit(

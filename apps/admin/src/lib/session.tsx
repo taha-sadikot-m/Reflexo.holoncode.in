@@ -6,7 +6,7 @@ import { api, ApiError, setCsrf, type Business, type Me } from "./api";
 interface SessionValue {
   me: Me | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, totp?: string) => Promise<void>;
   logout: () => Promise<void>;
   businesses: Business[];
   business: Business | null;
@@ -62,8 +62,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setBusinessIdState(id);
         qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "me" && q.queryKey[0] !== "businesses" });
       },
-      login: async (username, password) => {
-        const res = await api.post<{ csrf: string }>("/login", { username, password });
+      login: async (username, password, totp) => {
+        const res = await api.post<{ csrf: string }>("/login", { username, password, totp: totp || undefined });
         setCsrf(res.csrf);
         await qc.invalidateQueries({ queryKey: ["me"] });
       },

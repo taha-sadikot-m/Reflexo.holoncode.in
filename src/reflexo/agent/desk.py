@@ -224,6 +224,11 @@ class CustomerDesk:
                 )
             if action == "handoff":
                 await gateway.mark_needs_attention(s, ref.conversation_id)
+            if prepared.notice and action == "send" and blocks:  # the gate held this reply to carry the notice
+                await s.execute(
+                    text("UPDATE customers SET notice_shown_at = now() WHERE id = :c AND notice_shown_at IS NULL"),
+                    {"c": customer.id},
+                )
             if draft is not None:
                 question = await create_owner_question(
                     s,

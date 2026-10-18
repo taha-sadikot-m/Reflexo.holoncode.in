@@ -12,6 +12,11 @@ jobs:
       - run: uv sync --python 3.12
       - run: uv run python tasks.py lint        # ruff, format, boundaries, guards, traceability (CHK-Q-1), fixtures (CHK-Q-6), fixed text (CHK-MSG-4)
       - run: uv run python tasks.py typecheck
+      - run: uv run python scripts/check_audit.py pip   # CHK-SEC-12: high or critical Python findings fail
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.18"
+      - run: npm ci --no-fund --prefix apps/admin && python scripts/check_audit.py npm   # CHK-SEC-12: npm high findings fail
 
   test:
     runs-on: ubuntu-latest

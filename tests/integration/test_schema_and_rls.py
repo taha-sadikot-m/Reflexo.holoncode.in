@@ -25,10 +25,11 @@ async def test_every_table_has_forced_rls(db: Database) -> None:
             WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'alembic_version'""")
             )
         ).all()
-    assert len(rows) == 66  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
+    assert len(rows) == 69  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
     # + model_calls, cost_daily, cost_caps, fx_rates, benchmark_runs (0008)
     # + organizations, platform_connections, credential_vault, credential_access_log, connect_flows (0009)
     # + policy_sets (0011)
+    # + consent_records, data_requests, operator_access_log (0012)
     missing = [r.relname for r in rows if not (r.relrowsecurity and r.relforcerowsecurity)]
     assert missing == [], f"tables without forced RLS: {missing}"
 
@@ -110,3 +111,23 @@ async def test_platform_tables_invisible_to_app_role(db: Database) -> None:
         )
     async with db.tenant_session(t.business_id) as s:
         assert (await s.execute(text("SELECT count(*) FROM inbox_events"))).scalar_one() == 0
+
+
+@pytest.mark.check("CHK-SEC-1")
+async def test_every_personal_looking_column_is_tagged_or_reviewed(db: Database) -> None:
+    from reflexo.common import personal_data
+
+    async with db.service_session(ServiceReason.ADMIN) as s:
+        rows = (
+            await s.execute(
+                text("""SELECT c.table_name, c.column_name FROM information_schema.columns c
+                        JOIN information_schema.tables t ON t.table_name = c.table_name AND t.table_schema = 'public'
+                        WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+                          AND c.data_type IN ('text', 'character varying', 'jsonb', 'json', 'ARRAY', 'bytea')""")
+            )
+        ).all()
+    columns = {(r.table_name, r.column_name) for r in rows}
+    assert personal_data.tagged() <= columns  # every tagged column exists
+    known = personal_data.tagged() | set(personal_data.not_personal())
+    untagged = sorted(c for c in columns if personal_data.looks_personal(c[1]) and c not in known)
+    assert untagged == [], "tag them in reflexo.common.personal_data and run scripts/data_inventory.py"

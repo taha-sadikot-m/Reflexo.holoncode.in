@@ -284,6 +284,22 @@ class ShopProceduresPort(Protocol):
     async def waiting_on(self, business_id: UUID, customer_id: UUID | None) -> list[str]: ...
 
 
+class DataRequestPort(Protocol):
+    """Provided by workflows (BETA_10 §7): record a data-subject request (export, deletion, correction) with the
+    published response period. The work itself runs in `workflows.privacy` (WP-22b)."""
+
+    async def record_request(
+        self,
+        business_id: UUID,
+        *,
+        subject_type: str,
+        subject_id: UUID,
+        kind: str,
+        via: str | None = None,
+        notes: str | None = None,
+    ) -> UUID: ...
+
+
 class ProposalPort(Protocol):
     """Provided by agent (ADR-015): carry out the owner's decision on an action the agent proposed — exactly the
     stored action, no new LLM decision — tell the customer, and offer to learn a rule. Returns the owner-facing

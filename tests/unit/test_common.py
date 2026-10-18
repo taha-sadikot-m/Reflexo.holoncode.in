@@ -110,13 +110,21 @@ def test_demo_env_refuses_placeholder_secrets() -> None:
             admin_password="p" * 20,
             admin_session_secret="a" * 32,
         )
+    deployed = {"customer_notice_enabled": True, "operator_totp_required": True, "operator_totp_secret": "J" * 32}
     ok = Settings(
         env="demo",
         media_url_secret="m" * 32,
         simulator_secret="s" * 32,
         admin_password="p" * 20,
         admin_session_secret="a" * 32,
+        **deployed,
     )
+    strong = {"media_url_secret": "m" * 32, "simulator_secret": "s" * 32, "admin_password": "p" * 20,
+              "admin_session_secret": "a" * 32}  # fmt: skip
+    with pytest.raises(ValidationError, match="may be off only in dev"):  # BETA_10 §6, §13
+        Settings(env="demo", **strong, **(deployed | {"customer_notice_enabled": False}))
+    with pytest.raises(ValidationError, match="REFLEXO_OPERATOR_TOTP_SECRET"):
+        Settings(env="demo", **strong, **(deployed | {"operator_totp_secret": ""}))
     with pytest.raises(ValidationError, match="REFLEXO_ADMIN_PASSWORD"):
         Settings(
             env="demo",

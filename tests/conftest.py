@@ -119,6 +119,9 @@ TEST_SECRETS = {
     "REFLEXO_POLICY_CHECK_CMD": "docker run --rm -i reflexo-policy-check:0.1.0",
     # the messages role on its own model, so tests can script it apart from the desks (tests/fake_writer.py)
     "REFLEXO_MODEL_MESSAGES": "gemini-2.5-flash-lite",
+    # off for the suite (fixed scripted replies); the tests of CHK-SEC-8 and CHK-SEC-11 switch them on
+    "REFLEXO_CUSTOMER_NOTICE_ENABLED": "false",
+    "REFLEXO_OPERATOR_TOTP_REQUIRED": "false",
 }
 
 

@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 import reflexo.gateway.api as gateway
 import reflexo.owner.api as owner
+import reflexo.workflows.api as workflows
 from reflexo.admin import seeding
 from reflexo.admin.limits import Window
 from reflexo.common.config import get_settings
@@ -120,7 +121,15 @@ async def _signups_today() -> int:
 
 
 async def signup(
-    *, email: str, password: str, business_name: str, owner_name: str, category: str, area: str, client: str
+    *,
+    email: str,
+    password: str,
+    business_name: str,
+    owner_name: str,
+    category: str,
+    area: str,
+    client: str,
+    accept_terms: bool = False,
 ) -> Account:
     settings = get_settings()
     email = email.strip().lower()
@@ -133,6 +142,8 @@ async def signup(
         raise SignupRefused("Use a password of at least 8 characters.")
     if len(business_name) < 2 or len(owner_name) < 1:
         raise SignupRefused("Tell us your shop's name and your name.")
+    if not accept_terms:
+        raise SignupRefused("Please accept the Seller Terms and the Privacy Notice.")
     async with _lock:
         wait = _signups.wait(client)
         if wait is not None:
@@ -161,6 +172,18 @@ async def signup(
                 {"id": new_id(), "e": email, "h": hash_password(password), "b": business_id, "m": member_id},
             )
         _signups.hit(client)
+    await workflows.privacy.record_consent(  # BETA_10 §6: the versions the owner accepted
+        business_id,
+        subject_type="owner",
+        subject_id=member_id,
+        purpose="service_terms",
+        granted=True,
+        method="signup_terms",
+        evidence={
+            "seller_terms": workflows.privacy.legal_version("terms"),
+            "privacy_notice": workflows.privacy.legal_version("privacy"),
+        },
+    )
     gateway.clear_connection_cache()
     await _welcome(business_id, member_id)
     log.info("owner_signed_up", business_id=str(business_id))

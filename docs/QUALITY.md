@@ -14,11 +14,13 @@ like a real user before every release.
 | Forbidden patterns | `scripts/check_guards.py`: no `eval`/`exec`, no legacy names |
 | Check traceability | `scripts/check_traceability.py`: every check of a delivered work package has a test marked with its id (`docs/checks.yaml`, `docs/delivered.yaml`) |
 | Fixture privacy | `scripts/check_fixtures.py`: no real phone numbers, emails, addresses or names in fixtures and eval data |
+| Dependency audit | `scripts/check_audit.py` in CI: a high or critical finding in the Python dependencies (pip-audit, severity from OSV) or the web app (npm audit) fails the build |
+| Data inventory | `config/personal_data.yaml` tags every column holding personal data; `docs/data_inventory.md` is generated from it, and a schema test fails on an untagged column whose name looks personal |
 | No fixed sentences | `scripts/check_fixed_text.py`: no new sentence for people in code; messages are written by purpose and checked; the POC's remaining ones are in `docs/fixed_text_baseline.txt`, which may only shrink |
 | Coverage | `scripts/check_coverage.py` in CI: the safety core (output gate, automation validator, payment paths) at 90% branch coverage or more; total may not fall by more than 0.5 points |
 | Web app | TypeScript type check and production build |
 
-## 2. Tests: 744 passing
+## 2. Tests: 766 passing
 
 | Layer | What it covers |
 |---|---|

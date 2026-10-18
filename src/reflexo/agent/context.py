@@ -27,6 +27,7 @@ from reflexo.agent.proposals import decided_block
 from reflexo.agent.tools.customer import card_json
 from reflexo.agent.tools.orders import STATUS_MEANING
 from reflexo.common import ports
+from reflexo.common.config import get_settings
 from reflexo.common.contracts import ShopProceduresPort, TurnRef
 from reflexo.common.db import get_db
 from reflexo.common.money import format_inr
@@ -56,6 +57,8 @@ class PreparedContext:
     # customer's own words, the owner's relayed answer). The output gate trusts amounts from here; never from
     # the customer's messages or from the rules prompt's illustrative examples.
     trusted_facts: str = ""
+    # the privacy notice is due (the customer has never had it): {shop_name, privacy_link}, required in the reply
+    notice: dict[str, str] | None = None
 
 
 def _fmt_message(m: gateway.MessageView, tz: str) -> str:
@@ -107,6 +110,7 @@ async def prepare(ref: TurnRef) -> PreparedContext:
                 {"c": ref.conversation_id},
             )
         ).first()
+        notice = await _notice_due(s, ref.business_id, conv)
     prepared = await build_context(
         ref.business_id,
         conv,
@@ -116,9 +120,27 @@ async def prepare(ref: TurnRef) -> PreparedContext:
         pending=pending,
         started=started,
         shop_blocks=await _shop_blocks(ref, conv.customer.id if conv.customer else None),
+        notice=notice,
     )
     prepared.shop_decided = bool(ref.hints.get("proposal_id"))
     return prepared
+
+
+async def _notice_due(s: Any, business_id: UUID, conv: gateway.ConversationView) -> dict[str, str] | None:
+    """The privacy notice (purpose `customer.notice`, BETA_10 §6) goes in the first AI reply a customer ever gets."""
+    if not get_settings().customer_notice_enabled or conv.customer is None:
+        return None
+    row = (
+        await s.execute(
+            text("""SELECT b.name, b.slug, c.notice_shown_at FROM businesses b
+                    JOIN customers c ON c.business_id = b.id WHERE b.id = :b AND c.id = :c"""),
+            {"b": business_id, "c": conv.customer.id},
+        )
+    ).first()
+    if row is None or row.notice_shown_at is not None:
+        return None
+    base = get_settings().public_base_url.rstrip("/")
+    return {"shop_name": str(row.name), "privacy_link": f"{base}/{row.slug}/privacy"}
 
 
 async def build_context(
@@ -131,6 +153,7 @@ async def build_context(
     pending: Any = None,
     shop_blocks: list[str] | None = None,
     started: float | None = None,
+    notice: dict[str, str] | None = None,
 ) -> PreparedContext:
     """Lay out the prompt from loaded rows. Also used without a real conversation (onboarding preview sandbox)."""
     started = started if started is not None else time.perf_counter()
@@ -250,6 +273,15 @@ async def build_context(
             *([waiting_block] if waiting_block else []),
             *([relay_block] if relay_block else []),
             *(shop_blocks or []),
+            *(
+                [
+                    f"# FIRST REPLY TO THIS CUSTOMER: in a few words of your reply, say that you are "
+                    f"{notice['shop_name']}'s assistant and give this link to the shop's privacy notice, exactly: "
+                    f"{notice['privacy_link']}"
+                ]
+                if notice
+                else []
+            ),
             "# NOW: new message(s) from the customer\n" + "\n".join(_fmt_message(m, tz) for m in inbound),
             f"Current time: {now_local.strftime('%a %d %b %Y, %H:%M')} ({tz}). {_upcoming_days(now_local)}\n"
             "Reply by calling `reply`.",
@@ -269,6 +301,7 @@ async def build_context(
         open_order=order_view,
         open_question=open_question,
         relay=relay,
+        notice=notice,
         recent_lines=[_fmt_message(m, tz) for m in [*history, *inbound]][-6:],
         trusted_facts="\n".join(
             [

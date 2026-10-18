@@ -29,7 +29,8 @@ from reflexo.agent.capabilities import CAPABILITIES, ActionRequest, decide, desc
 from reflexo.agent.language import reply_language
 from reflexo.agent.tools.base import ToolContext, ToolError, tool
 from reflexo.common import ports
-from reflexo.common.contracts import QuestionAnswerPort, WorkflowPort
+from reflexo.common.config import get_settings
+from reflexo.common.contracts import DataRequestPort, QuestionAnswerPort, WorkflowPort
 from reflexo.common.db import get_db
 from reflexo.common.ids import new_id
 from reflexo.common.money import format_inr
@@ -388,10 +389,9 @@ class SendToCustomerArgs(BaseModel):
     send_now: bool = Field(default=False, description="True only if the owner explicitly said to send right away")
 
 
-@tool("send_to_customer", SendToCustomerArgs, desks=OWNER, side_effect=True)
-async def send_to_customer(ctx: ToolContext, args: SendToCustomerArgs, s: AsyncSession) -> dict[str, Any]:
-    """Send a message to a customer on their most recent channel. Read-back first unless the owner said 'send now'."""
-    ref = args.customer_ref.strip()
+async def _find_customer(s: AsyncSession, customer_ref: str) -> Any:
+    """One customer by name, phone or order number, with their most recent conversation; ToolError otherwise."""
+    ref = customer_ref.strip()
     rows = (
         await s.execute(
             text("""SELECT DISTINCT ON (cu.id) cu.id, cu.display_name, cu.phone_e164, cv.id AS conversation_id,
@@ -412,7 +412,13 @@ async def send_to_customer(ctx: ToolContext, args: SendToCustomerArgs, s: AsyncS
     if len(rows) > 1:
         names = ", ".join(f"{r.display_name or r.phone_e164}" for r in rows)
         raise ToolError("AMBIGUOUS_MATCH", "several customers match", guidance=f"Ask which one: {names}.")
-    c = rows[0]
+    return rows[0]
+
+
+@tool("send_to_customer", SendToCustomerArgs, desks=OWNER, side_effect=True)
+async def send_to_customer(ctx: ToolContext, args: SendToCustomerArgs, s: AsyncSession) -> dict[str, Any]:
+    """Send a message to a customer on their most recent channel. Read-back first unless the owner said 'send now'."""
+    c = await _find_customer(s, args.customer_ref)
     who, channel = c.display_name or c.phone_e164 or "customer", str(c.channel).replace("_", " ")
     decision = await decide(
         ActionRequest(
@@ -450,6 +456,35 @@ async def send_to_customer(ctx: ToolContext, args: SendToCustomerArgs, s: AsyncS
         [f"📤 To {who} ({channel}): “{args.message}”"],
         kind="outbound_draft",
     )
+
+
+class PrivacyRequestArgs(BaseModel):
+    customer_ref: str = Field(description="The customer the request is about: name, phone or order number")
+    kind: Literal["export", "deletion", "correction"] = Field(
+        description="export = they want a copy of their data; deletion = delete it; correction = fix something"
+    )
+    what: str = Field(default="", max_length=500, description="What they asked for, in the owner's words")
+
+
+@tool("privacy_request", PrivacyRequestArgs, desks=OWNER, side_effect=True)
+async def privacy_request(ctx: ToolContext, args: PrivacyRequestArgs, s: AsyncSession) -> dict[str, Any]:
+    """The owner passes on a customer's request about their data ("Rahul wants his data deleted", "she asked what
+    we keep about her"). Records it; it is answered within the published response period."""
+    c = await _find_customer(s, args.customer_ref)
+    port = ports.registry.require(DataRequestPort)  # type: ignore[type-abstract]
+    request_id = await port.record_request(
+        ctx.business_id, subject_type="customer", subject_id=c.id, kind=args.kind, via=str(c.channel),
+        notes=args.what or None,
+    )  # fmt: skip
+    due = (utcnow() + timedelta(days=get_settings().rights_response_days)).date().isoformat()
+    return {
+        "recorded": True,
+        "request_id": str(request_id),
+        "customer": c.display_name or c.phone_e164,
+        "kind": args.kind,
+        "due": due,
+        "next": "Tell the owner the request is recorded and will be answered by the due date.",
+    }
 
 
 class OrdersListArgs(BaseModel):
@@ -794,6 +829,7 @@ OWNER_TOOLS = [
     "undo",
     "files_search",
     "send_to_customer",
+    "privacy_request",
     "orders_list",
     "import_from_file",
     "import_from_text",

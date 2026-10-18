@@ -94,11 +94,30 @@ async def business(business_id: Annotated[UUID, Query()], s: Authed) -> UUID:
 
 
 Business = Annotated[UUID, Depends(business)]
+OBJECT_PARAMS = {"conversation_id": "conversation", "customer_id": "customer", "order_id": "order", "trace_id": "trace"}
+
+
+async def customer_data(request: Request, business_id: Business, s: Authed) -> UUID:
+    """A business's customer data: an operator's or reviewer's view is written to `operator_access_log`
+    (BETA_10 §13, CHK-SEC-11); owners looking at their own shop are not logged."""
+    if s.is_operator:
+        kind, raw = next(((OBJECT_PARAMS[k], v) for k, v in request.path_params.items() if k in OBJECT_PARAMS),
+                         (request.url.path.rsplit("/", 1)[-1], None))  # fmt: skip
+        try:
+            object_id = UUID(str(raw)) if raw else None
+        except ValueError:
+            object_id = None
+        await admin.log_access(business_id, s.user, kind, object_id, f"console {request.method} {request.url.path}")
+    return business_id
+
+
+CustomerData = Annotated[UUID, Depends(customer_data)]
 
 
 class LoginBody(BaseModel):
     username: str = Field(max_length=100)
     password: str = Field(max_length=200)
+    totp: str | None = Field(default=None, max_length=10)  # the operator's authenticator code
 
 
 @router.post("/login")
@@ -107,6 +126,9 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict[s
     if admin.login_throttled(client):
         raise problem(429, "RATE_LIMITED", "too many attempts; try again in a few minutes")
     if admin.check_credentials(body.username, body.password):
+        if get_settings().operator_totp_required and not admin.check_totp(body.totp):
+            admin.record_login_failure(client)
+            raise problem(401, "TOTP_REQUIRED", "enter the code from your authenticator app")
         token, s = admin.issue_session(body.username)
     elif admin.check_reviewer(body.username, body.password):
         token, s = admin.issue_session(body.username, read_only=True)
@@ -167,12 +189,14 @@ async def stream(_: Operator, business_id: Business) -> EventSourceResponse:
 
 
 @router.get("/traces")
-async def traces(_: Authed, business_id: Business, limit: Annotated[int, Query(ge=1, le=200)] = 50) -> dict[str, Any]:
+async def traces(
+    _: Authed, business_id: CustomerData, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> dict[str, Any]:
     return {"items": await admin.traces(business_id, limit)}
 
 
 @router.get("/traces/{trace_id}")
-async def trace_detail(trace_id: str, _: Authed, business_id: Business) -> dict[str, Any]:
+async def trace_detail(trace_id: str, _: Authed, business_id: CustomerData) -> dict[str, Any]:
     detail = await admin.trace_detail(business_id, trace_id)
     if detail is None:
         raise problem(404, "NOT_FOUND", "trace not found for this business")
@@ -185,7 +209,7 @@ async def trace_detail(trace_id: str, _: Authed, business_id: Business) -> dict[
 @router.get("/conversations")
 async def conversations(
     _: Authed,
-    business_id: Business,
+    business_id: CustomerData,
     cursor: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> dict[str, Any]:
@@ -194,7 +218,7 @@ async def conversations(
 
 
 @router.get("/conversations/{conversation_id}")
-async def conversation(conversation_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+async def conversation(conversation_id: UUID, _: Authed, business_id: CustomerData) -> dict[str, Any]:
     thread = await admin.conversation_thread(business_id, conversation_id)
     if thread is None:
         raise problem(404, "NOT_FOUND", "conversation not found")
@@ -206,7 +230,7 @@ class ReplyBody(BaseModel):
 
 
 @router.post("/conversations/{conversation_id}/reply")
-async def reply(conversation_id: UUID, body: ReplyBody, _: Mutating, business_id: Business) -> dict[str, Any]:
+async def reply(conversation_id: UUID, body: ReplyBody, _: Mutating, business_id: CustomerData) -> dict[str, Any]:
     try:
         return await admin.reply_as_team(business_id, conversation_id, body.text)
     except LookupError as exc:
@@ -214,7 +238,7 @@ async def reply(conversation_id: UUID, body: ReplyBody, _: Mutating, business_id
 
 
 @router.post("/conversations/{conversation_id}/takeover")
-async def takeover(conversation_id: UUID, _: Mutating, business_id: Business) -> dict[str, bool]:
+async def takeover(conversation_id: UUID, _: Mutating, business_id: CustomerData) -> dict[str, bool]:
     try:
         await admin.set_takeover(business_id, conversation_id, True)
     except LookupError as exc:
@@ -223,7 +247,7 @@ async def takeover(conversation_id: UUID, _: Mutating, business_id: Business) ->
 
 
 @router.post("/conversations/{conversation_id}/release")
-async def release(conversation_id: UUID, _: Mutating, business_id: Business) -> dict[str, bool]:
+async def release(conversation_id: UUID, _: Mutating, business_id: CustomerData) -> dict[str, bool]:
     try:
         await admin.set_takeover(business_id, conversation_id, False)
     except LookupError as exc:
@@ -409,7 +433,7 @@ async def scenario_stop(run_id: str, _: OperatorMutating) -> dict[str, bool]:
 @router.get("/orders")
 async def orders(
     _: Authed,
-    business_id: Business,
+    business_id: CustomerData,
     status: str | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> dict[str, Any]:
@@ -425,7 +449,7 @@ async def orders_capacity(_: Authed, business_id: Business) -> list[dict[str, An
 
 
 @router.get("/orders/{order_id}")
-async def order(order_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+async def order(order_id: UUID, _: Authed, business_id: CustomerData) -> dict[str, Any]:
     found = await admin.workspace.order_detail(business_id, order_id)
     if found is None:
         raise problem(404, "NOT_FOUND", "order not found")
@@ -524,12 +548,12 @@ async def demo_reset(
 
 
 @router.get("/customers")
-async def customers(_: Authed, business_id: Business) -> list[dict[str, Any]]:
+async def customers(_: Authed, business_id: CustomerData) -> list[dict[str, Any]]:
     return await admin.workspace.customers(business_id)
 
 
 @router.get("/customers/{customer_id}")
-async def customer(customer_id: UUID, _: Authed, business_id: Business) -> dict[str, Any]:
+async def customer(customer_id: UUID, _: Authed, business_id: CustomerData) -> dict[str, Any]:
     found = await admin.workspace.customer_detail(business_id, customer_id)
     if found is None:
         raise problem(404, "NOT_FOUND", "customer not found")

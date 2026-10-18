@@ -134,3 +134,5 @@ class GroundingRecords(BaseModel):
     # one of our tools answered this turn: the reply may rest on that answer even when it has no record to cite
     # (eval: "mera order kahan hai?" → order_status found none → "no order yet" fell back for lack of a ref)
     tool_backed: bool = False
+    # facts this reply must carry (the privacy notice in a customer's first reply: shop_name, privacy_link)
+    required_facts: dict[str, str] = Field(default_factory=dict)

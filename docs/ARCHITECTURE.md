@@ -38,8 +38,8 @@ build on any other import, and on dependencies the table below does not allow. C
 | `approvals` | Approval requests with short codes, decisions, Temporal signals |
 | `owner` | Owner timeline, file library, notifications, onboarding, deterministic owner commands (`/undo`, `YES 1234`) |
 | `integrations` | Razorpay client and webhook |
-| `workflows` | Temporal worker bootstrap and registry |
-| `admin` | Operator and owner APIs, the public demo (sandboxes), accounts, X-ray, simulation lab, chaos, evals |
+| `workflows` | Temporal worker bootstrap and registry; `workflows.privacy`: data requests, Meta's data-deletion and deauthorize callbacks, consent records, the public legal pages |
+| `admin` | Operator and owner APIs, the public demo (sandboxes), accounts, X-ray, simulation lab, chaos, evals, operator TOTP and the operator access log |
 | `api` | HTTP routes only |
 
 ## 3. The life of a message

@@ -5,5 +5,6 @@ work_packages:
   - WP-01   # model-call tracing, cost, the benchmark baseline
   - WP-02   # credential vault and per-business connections
   - WP-26   # policy engine on Cedar, the rule checker, messages written by purpose and checked
+  - WP-22a  # privacy basics (built; the drafts need Taha's details and the public URLs a deploy decision)
 checks:
   - CHK-DB-13   # every WP with a migration: WP-01 adds 0008

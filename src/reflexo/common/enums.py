@@ -431,8 +431,26 @@ class ConnectFlowStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class DataRequestKind(StrEnum):
+    """A data-subject request (BETA_10 §7)."""
+
+    EXPORT = "export"
+    DELETION = "deletion"
+    CORRECTION = "correction"
+
+
+class DataRequestStatus(StrEnum):
+    RECEIVED = "received"
+    VERIFYING = "verifying"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    REJECTED = "rejected"
+
+
 # Postgres type name → Python enum (used by the enum mirror test)
 PG_ENUMS: dict[str, type[StrEnum]] = {
+    "data_request_kind": DataRequestKind,
+    "data_request_status": DataRequestStatus,
     "channel_type": ChannelType,
     "channel_provider": ChannelProvider,
     "business_status": BusinessStatus,

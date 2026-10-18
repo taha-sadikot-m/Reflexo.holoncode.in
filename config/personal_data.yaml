@@ -1,0 +1,208 @@
+# Where personal data lives (BETA_10 §2; CHK-SEC-1). Tag every column that holds personal data here, in the
+# same change as its migration, then run scripts/data_inventory.py. A column whose name looks personal but is
+# not goes under not_personal with the reason. The schema test fails on any personal-looking column in neither.
+categories:
+- name: Owner and staff identity
+  purpose: Accounts, sign-in, routing owner messages
+  role: Fiduciary
+  retention: Account life + 1 year
+  columns:
+    team_members:
+    - display_name
+    - email
+    - phone_e164
+    owner_accounts:
+    - email
+    - password_hash
+    owner_channel_bindings:
+    - external_id
+    verification_codes:
+    - target
+    channel_connections:
+    - display_name
+    - external_account_id
+- name: Customer identity
+  purpose: Recognising a customer across messages and channels
+  role: Processor
+  retention: Last interaction + 24 months
+  columns:
+    customers:
+    - display_name
+    - email
+    - phone_e164
+    - tags
+    - summary
+    identity_map:
+    - external_id
+    - display_name
+- name: Conversations
+  purpose: 'The service: messages, replies, the owner''s questions and decisions about a customer'
+  role: Processor
+  retention: Last interaction + 24 months
+  columns:
+    conversations:
+    - summary
+    - thread_key
+    messages:
+    - content_text
+    - content_blocks
+    - attachments
+    - interactive_reply
+    outbound_messages:
+    - rendered_payload
+    media_objects:
+    - description
+    - storage_key
+    owner_questions:
+    - question
+    - answer
+    - ai_guess
+    approval_requests:
+    - subject
+    - preview
+    owner_notifications:
+    - payload
+    automation_run_steps:
+    - input
+    - output
+    automation_waits:
+    - correlation_key
+- name: Customer memory
+  purpose: Repeat orders, preferences
+  role: Processor
+  retention: Last interaction + 24 months
+  columns:
+    customers:
+    - memory
+- name: Orders and payments
+  purpose: The service; the seller's accounts
+  role: Processor
+  retention: 8 years from the order, customer identity anonymised after 24 months without contact
+  columns:
+    orders:
+    - address
+    - notes
+    - details
+    - cancel_reason
+    order_items:
+    - details
+    payment_links:
+    - provider_payment_id
+- name: Calls
+  purpose: Calls and call permission
+  role: Processor
+  retention: Last interaction + 24 months
+  columns:
+    call_sessions:
+    - caller_e164
+    - transcript
+    - summary
+    call_events:
+    - payload
+- name: Raw webhook payloads
+  purpose: Processing, replay of failures (redacted after processing)
+  role: Processor
+  retention: 7 days in inbox_events; 1 year in the archive
+  columns:
+    inbox_events:
+    - payload
+    - headers
+    integration_events_log:
+    - payload
+    domain_events:
+    - payload
+- name: Owner files
+  purpose: The owner's file library (menus, price lists)
+  role: Fiduciary
+  retention: Account life + 1 year
+  columns:
+    owner_files:
+    - filename
+    - description
+- name: Credentials
+  purpose: Connections
+  role: Fiduciary (own) or processor (seller's)
+  retention: Until revoked + 30 days
+  columns:
+    credential_vault:
+    - ciphertext
+    - label
+    - meta
+    connect_flows:
+    - sealed
+- name: Logs of processing
+  purpose: Security (Rule 6(e)), legal minimum (Rule 8(3)), cost
+  role: Both
+  retention: 1 year minimum, 400 days maximum
+  columns:
+    pipeline_events:
+    - attrs
+    credential_access_log:
+    - accessor
+    operator_access_log:
+    - operator
+    - reason
+- name: Consent and requests
+  purpose: Accountability
+  role: Both
+  retention: 7 years
+  columns:
+    consent_records:
+    - evidence
+    data_requests:
+    - notes
+not_personal:
+- column: businesses.name
+  why: a business's trading name
+- column: organizations.name
+  why: a business group's name
+- column: business_counters.name
+  why: a counter's key
+- column: business_profiles.profile
+  why: the shop's public profile
+- column: offerings.name
+  why: catalogue
+- column: offerings.description
+  why: catalogue
+- column: offering_variants.name
+  why: catalogue
+- column: order_detail_schemas.name
+  why: the shop's order form fields
+- column: automations.name
+  why: the owner's automation name
+- column: automations.description_nl
+  why: the owner's instruction, about the shop
+- column: qa_entries.question
+  why: the shop's FAQ
+- column: qa_entries.answer
+  why: the shop's FAQ
+- column: search_documents.content
+  why: catalogue and FAQ search text
+- column: knowledge_change_sets.summary
+  why: what changed in the shop's knowledge
+- column: platform_connections.display_name
+  why: Reflexo's own number and bot
+- column: platform_connections.external_account_id
+  why: Reflexo's own number and bot
+- column: call_sessions.end_reason
+  why: a status code
+- column: channel_connections.job_description
+  why: the owner's instruction for the channel
+- column: playbook_rules.says
+  why: the owner's rule, about the shop
+- column: order_items.name_snapshot
+  why: catalogue item name
+- column: knowledge_change_items.before
+  why: catalogue and FAQ versions
+- column: knowledge_change_items.after
+  why: catalogue and FAQ versions
+- column: consent_records.subject_type
+  why: 'a label: owner, customer or staff'
+- column: data_requests.subject_type
+  why: 'a label: owner, customer or staff'
+- column: jobs.payload
+  why: record ids and job parameters, never message text
+- column: orders.missing_details
+  why: names of the order form fields still needed
+- column: qa_entries.question_variants
+  why: the shop's FAQ

@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import secrets
+import struct
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -107,6 +108,28 @@ def check_credentials(user: str, password: str) -> bool:
     user_ok = hmac.compare_digest(user.encode(), s.admin_user.encode())
     pass_ok = hmac.compare_digest(password.encode(), s.admin_password.get_secret_value().encode())
     return user_ok and pass_ok
+
+
+TOTP_STEP_S = 30
+
+
+def totp(secret_b32: str, at: float | None = None) -> str:
+    """The 6-digit time-based code (RFC 6238, SHA-1, 30 s), as authenticator apps show it."""
+    key = base64.b32decode(secret_b32.replace(" ", "").upper() + "=" * (-len(secret_b32.replace(" ", "")) % 8))
+    counter = int((time.time() if at is None else at) // TOTP_STEP_S)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = (struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
+    return f"{value:06d}"
+
+
+def check_totp(code: str | None) -> bool:
+    """The operator's code, accepting one step of clock drift either way. No secret configured: always False."""
+    secret = get_settings().operator_totp_secret.get_secret_value()
+    if not secret or not code:
+        return False
+    now = time.time()
+    return any(hmac.compare_digest(code.strip(), totp(secret, now + d * TOTP_STEP_S)) for d in (-1, 0, 1))
 
 
 def check_reviewer(user: str, password: str) -> bool:

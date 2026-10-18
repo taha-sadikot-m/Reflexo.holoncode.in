@@ -44,6 +44,7 @@ dependencies = [
   "temporalio>=1.8",
   "cel-python>=0.2",
   "cedarpy==4.12.2",
+  "markdown-it-py==4.2.0",
 ]
 
 [dependency-groups]

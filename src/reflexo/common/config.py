@@ -118,6 +118,13 @@ class Settings(BaseSettings):
     messages_dir: str = "config/messages"
     message_repair_rounds: int = 1
     fallback_holding_per_day: int = 1
+    # privacy (BETA_10 §7, §13, §16)
+    rights_response_days: int = 30
+    privacy_email: str = "privacy@holoncode.in"
+    legal_dir: str = "legal"
+    operator_totp_required: bool = True
+    operator_totp_secret: SecretStr = SecretStr("")  # base32; the operator's authenticator app
+    customer_notice_enabled: bool = True  # the privacy notice in each new customer's first reply (off: dev only)
     model_messages: str = "gemini-2.5-flash"  # WP-26: the cheapest model that passes the `messages` suite
     fx_primary_url: str = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR"
     fx_fallback_url: str = "https://open.er-api.com/v6/latest/USD"
@@ -215,6 +222,13 @@ class Settings(BaseSettings):
         ]
         if weak:
             raise ValueError(f"set strong values (>= 16 chars) for: {', '.join('REFLEXO_' + w.upper() for w in weak)}")
+        # BETA_10 §6, §13: a deployed stack always shows the customer notice and asks operators for a TOTP code
+        if not self.customer_notice_enabled or not self.operator_totp_required:
+            raise ValueError(
+                "REFLEXO_CUSTOMER_NOTICE_ENABLED and REFLEXO_OPERATOR_TOTP_REQUIRED may be off only in dev"
+            )
+        if len(self.operator_totp_secret.get_secret_value()) < 16:
+            raise ValueError("set REFLEXO_OPERATOR_TOTP_SECRET (base32, >= 16 characters)")
         return self
 
 

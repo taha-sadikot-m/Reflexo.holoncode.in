@@ -11,6 +11,7 @@ export function Login() {
   const { login } = useSession();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +20,7 @@ export function Login() {
     setBusy(true);
     setError(null);
     try {
-      await login(username, password);
+      await login(username, password, totp);
     } catch (err) {
       setError(err);
     } finally {
@@ -49,6 +50,15 @@ export function Login() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             autoFocus
+          />
+          <label className="mb-1.5 block text-[13px] font-medium text-soot">Authenticator code</label>
+          <input
+            className={`${input} mb-5`}
+            value={totp}
+            onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="6 digits (operators)"
           />
           <ErrorNote error={error} />
           <Button type="submit" disabled={busy || !password} className="mt-2 h-10 w-full text-[14px]">

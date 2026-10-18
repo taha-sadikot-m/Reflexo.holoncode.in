@@ -46,6 +46,7 @@ class SignupBody(BaseModel):
     owner_name: str = Field(max_length=60)
     category: str = Field(default="", max_length=80)
     area: str = Field(default="", max_length=120)
+    accept_terms: bool = False  # the Seller Terms and the Privacy Notice (BETA_10 §6)
 
 
 @router.post("/signup")
@@ -59,6 +60,7 @@ async def signup(body: SignupBody, request: Request, response: Response) -> dict
             category=body.category,
             area=body.area,
             client=_client(request),
+            accept_terms=body.accept_terms,
         )
     except admin.accounts.SignupRefused as exc:
         headers = {"Retry-After": str(exc.retry_after_s)} if exc.retry_after_s else None
