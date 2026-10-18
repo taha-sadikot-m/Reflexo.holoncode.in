@@ -145,6 +145,14 @@ checks:
     - WP-15
     wp_text: WP-15
     release: 1
+  CHK-AU-19:
+    verified_by: A-i (`slow`, real encoder), A-u (guard)
+    kinds:
+    - automated
+    wps:
+    - WP-13
+    wp_text: WP-13
+    release: 1
   CHK-AU-2:
     verified_by: A-w, Eval
     kinds:
