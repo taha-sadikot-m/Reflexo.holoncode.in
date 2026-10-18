@@ -255,7 +255,7 @@ class Outbound:
                 conversation_id=row.conversation_id,
                 provider=conn.provider,
             )
-        return await self.adapters[conn.provider].send(row.rendered_payload, credentials(conn))
+        return await self.adapters[conn.provider].send(row.rendered_payload, await credentials(conn, purpose="send"))
 
     async def on_final_failure(self, row: OutboundRow, result: SendResult) -> None:
         notifier = self.registry.optional(OwnerNotifyPort)  # type: ignore[type-abstract]

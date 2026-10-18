@@ -27,6 +27,7 @@ from reflexo.common.ids import new_id
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.pipeline import api as pipeline_api
 from reflexo.pipeline.turns import _TURN_COLUMNS, PipelineTurnHandle, TurnService, _ref
+from tests.factories import vault_credential
 from tests.integration.test_customer_desk import PRIMARY, make_bakery, outbound_texts, reply, turn_for
 from tests.integration.test_gateway import deliver, wa_message
 
@@ -75,9 +76,14 @@ async def bakery(db: Database) -> Bakery:
     async with db.service_session(ServiceReason.SEED) as s:
         await s.execute(
             text("""INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id,
-                                                     display_name, credential_ref, roles)
-                    VALUES (:id, :b, 'telegram', 'telegram', :e, 'TG', 'REFLEXO_TELEGRAM', '{customer,owner}')"""),
-            {"id": tg, "b": bid, "e": f"tg-{tg.hex[-8:]}"},
+                                                     display_name, credential_id, roles)
+                    VALUES (:id, :b, 'telegram', 'telegram', :e, 'TG', :cred, '{customer,owner}')"""),
+            {
+                "id": tg,
+                "b": bid,
+                "e": f"tg-{tg.hex[-8:]}",
+                "cred": await vault_credential(s, bid, "telegram", "REFLEXO_TELEGRAM"),
+            },
         )
         await s.execute(
             text("INSERT INTO team_members (id, business_id, display_name, role) VALUES (:id, :b, 'Meera', 'owner')"),

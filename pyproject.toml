@@ -79,6 +79,7 @@ ignore = ["S101", "S311", "RUF001", "RUF002", "RUF003"]
 "tasks.py" = ["S603", "S607"]
 "src/reflexo/*/api.py" = ["E501"]
 "migrations/**" = ["S608"]
+"src/reflexo/common/enums.py" = ["S105"]  # credential kind names, not secrets
 
 [tool.mypy]
 python_version = "3.12"

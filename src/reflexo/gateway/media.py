@@ -148,7 +148,9 @@ def register_jobs(registry: Registry, adapters: dict[str, ChannelAdapter]) -> No
                     content = resp.content
                     mime = media.mime or resp.headers.get("content-type", "application/octet-stream")
             else:
-                content, mime = await adapters[conn.provider].download_media(credentials(conn), media)
+                content, mime = await adapters[conn.provider].download_media(
+                    await credentials(conn, purpose="download_media"), media
+                )
             media_id = await store_media(
                 business_id, content, mime, source="inbound", provider_media_id=media.provider_media_id
             )
@@ -203,7 +205,9 @@ def register_jobs(registry: Registry, adapters: dict[str, ChannelAdapter]) -> No
             return
         try:
             await adapters[conn.provider].mark_read_and_typing(
-                credentials(conn), job.payload["recipient"], job.payload.get("external_message_id")
+                await credentials(conn, purpose="typing"),
+                job.payload["recipient"],
+                job.payload.get("external_message_id"),
             )
         except httpx.HTTPError as exc:  # best effort: never retry a typing indicator
             log.info("typing_indicator_failed", provider=conn.provider, error=type(exc).__name__)

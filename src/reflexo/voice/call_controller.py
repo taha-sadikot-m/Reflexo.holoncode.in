@@ -139,7 +139,7 @@ class CallController:
                 log.info("call_already_handled", call_id=call_id, status=existing.status)
                 return
             ended = self._pending_end.setdefault(call_id, asyncio.Event())
-            token = gateway.credentials(conn).token
+            token = (await gateway.credentials(conn, purpose="call")).token
             phone_number_id = conn.external_account_id
             caller_wa = str(call.get("caller_wa_id") or "")
             session_id: UUID | None = None
@@ -364,7 +364,11 @@ class CallController:
             if conn is None:
                 continue
             try:
-                await self.meta.terminate(conn.external_account_id, gateway.credentials(conn).token, o.provider_call_id)
+                await self.meta.terminate(
+                    conn.external_account_id,
+                    (await gateway.credentials(conn, purpose="call")).token,
+                    o.provider_call_id,
+                )
             except Exception as exc:
                 log.info("recover_terminate_failed", call_id=o.provider_call_id, error=type(exc).__name__)
             await emit(

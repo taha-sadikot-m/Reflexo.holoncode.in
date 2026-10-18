@@ -42,6 +42,7 @@ class ServiceReason(StrEnum):
     HEALTH = "health"
     ACCOUNTS = "accounts"  # owner sign-up and log-in (owner_accounts is service-only)
     COSTS = "costs"  # BETA_02 §6 uses 11 and 14: the fx rate, the nightly cost rollup, the benchmark runner
+    VAULT = "vault"  # BETA_02 §6 use 10: reading a credential by id for its connection, refresh and rewrap jobs
 
 
 @dataclass

@@ -52,6 +52,7 @@ class CustomerMode(StrEnum):
     TIERED = "tiered"
     DRAFT_ALL = "draft_all"
     OFF = "off"
+    SHADOW = "shadow"  # beta: added in 0009, used from WP-19 (ADR-024)
 
 
 class ConnectionStatus(StrEnum):
@@ -397,6 +398,39 @@ class ModelCallKind(StrEnum):
     VOICE_SESSION = "voice_session"
 
 
+class Edition(StrEnum):
+    OWNER = "owner"
+    TEAM = "team"
+
+
+class CredentialKind(StrEnum):
+    """`credential_vault.kind` (BETA_02 §3)."""
+
+    META_BUSINESS_TOKEN = "meta_business_token"
+    META_PAGE_TOKEN = "meta_page_token"
+    INSTAGRAM_USER_TOKEN = "instagram_user_token"
+    TELEGRAM_BOT_TOKEN = "telegram_bot_token"
+    WEBHOOK_SECRET = "webhook_secret"
+    WHATSAPP_PIN = "whatsapp_pin"
+    RAZORPAY_KEYS = "razorpay_keys"
+    MCP_OAUTH = "mcp_oauth"
+    MCP_STATIC = "mcp_static"
+    STORE_API = "store_api"
+    SHIPPING_API = "shipping_api"
+    GOOGLE_OAUTH = "google_oauth"
+    EMAIL_PROVIDER = "email_provider"
+    SLACK_BOT = "slack_bot"
+
+
+class ConnectFlowStatus(StrEnum):
+    STARTED = "started"
+    AUTHORIZED = "authorized"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
 # Postgres type name → Python enum (used by the enum mirror test)
 PG_ENUMS: dict[str, type[StrEnum]] = {
     "channel_type": ChannelType,
@@ -448,4 +482,7 @@ PG_ENUMS: dict[str, type[StrEnum]] = {
     "integration_provider": IntegrationProvider,
     "pipeline_event_status": PipelineEventStatus,
     "model_call_kind": ModelCallKind,
+    "edition": Edition,
+    "credential_kind": CredentialKind,
+    "connect_flow_status": ConnectFlowStatus,
 }

@@ -159,6 +159,8 @@ async def ingest_webhook(
         return IngestResult(400, "invalid json")
     route_key = adapter.route_key(payload, path_params)
     simulated = lowered.get("x-reflexo-simulated") == "1"
+    # signatures are kept for audit; a shared secret (Telegram's secret token) never is: it was checked just above,
+    # and anyone who could read it could forge webhooks (CHK-DB-7)
     kept_headers = {
         k: v
         for k, v in lowered.items()
@@ -166,7 +168,6 @@ async def ingest_webhook(
         in (
             "content-type",
             "x-hub-signature-256",
-            "x-telegram-bot-api-secret-token",
             "x-reflexo-signature",
             "x-reflexo-simulated",
         )

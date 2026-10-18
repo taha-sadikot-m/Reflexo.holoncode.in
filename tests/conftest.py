@@ -110,6 +110,11 @@ TEST_SECRETS = {
     "REFLEXO_ADMIN_USER": "admin",
     "REFLEXO_ADMIN_PASSWORD": "test-admin-password",
     "REFLEXO_ADMIN_SESSION_SECRET": "test-admin-session-secret-0123456789",
+    # vault: two test keys (rotation tests switch the active one); never used outside tests
+    "REFLEXO_VAULT_KEYS": (
+        "k1:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=,k2:ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8="
+    ),
+    "REFLEXO_VAULT_ACTIVE_KEY_ID": "k1",
 }
 
 
@@ -121,6 +126,9 @@ def _test_settings() -> Iterator[None]:
     saved = {k: os.environ.get(k) for k in TEST_SECRETS}
     os.environ.update(TEST_SECRETS)
     get_settings.cache_clear()
+    from reflexo.vault.api import keyring
+
+    keyring.cache_clear()
     yield
     for k, v in saved.items():
         if v is None:

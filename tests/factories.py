@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -86,3 +87,18 @@ async def make_inbound_message(db: Database, t: Tenant, text_body: str = "hi") -
             {"id": mid, "b": t.business_id, "c": t.conversation_id, "cc": t.connection_id, "txt": text_body},
         )
     return mid
+
+
+async def vault_credential(s: Any, business_id: UUID, provider: str, group: str) -> UUID:
+    """A connection's token in the vault, as seeding stores it (the test settings hold the token values)."""
+    import reflexo.vault.api as vault
+    from reflexo.admin import seeding
+    from reflexo.common.config import get_settings
+
+    return await vault.put(
+        business_id,
+        seeding.CREDENTIAL_KIND[provider],
+        {"token": seeding.env_token(get_settings(), group)},
+        f"{provider}:test",
+        session=s,
+    )

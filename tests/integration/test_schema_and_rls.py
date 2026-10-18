@@ -14,6 +14,7 @@ from tests.factories import make_tenant
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.check("CHK-ARCH-7")
 async def test_every_table_has_forced_rls(db: Database) -> None:
     async with db.service_session(ServiceReason.HEALTH) as s:
         rows = (
@@ -24,12 +25,14 @@ async def test_every_table_has_forced_rls(db: Database) -> None:
             WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'alembic_version'""")
             )
         ).all()
-    assert len(rows) == 60  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
+    assert len(rows) == 65  # 52 baseline + worker_heartbeats (0003) + playbook_rules (0006) + owner_accounts (0007)
     # + model_calls, cost_daily, cost_caps, fx_rates, benchmark_runs (0008)
+    # + organizations, platform_connections, credential_vault, credential_access_log, connect_flows (0009)
     missing = [r.relname for r in rows if not (r.relrowsecurity and r.relforcerowsecurity)]
     assert missing == [], f"tables without forced RLS: {missing}"
 
 
+@pytest.mark.check("CHK-ARCH-7")
 async def test_tenant_tables_have_app_policy(db: Database) -> None:
     async with db.service_session(ServiceReason.HEALTH) as s:
         missing = (

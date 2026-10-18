@@ -28,6 +28,7 @@ from reflexo.common.llm import ToolCall
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.pipeline import api as pipeline_api
 from reflexo.pipeline.turns import _TURN_COLUMNS, PipelineTurnHandle, TurnService, _ref
+from tests.factories import vault_credential
 from tests.integration.test_gateway import deliver, wa_message
 
 pytestmark = pytest.mark.integration
@@ -110,9 +111,14 @@ async def make_bakery(db: Database) -> tuple[UUID, str]:
         )
         await s.execute(
             text("""INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id,
-                                                     display_name, credential_ref, roles)
-                    VALUES (:id, :b, 'whatsapp', 'meta_whatsapp', :e, 'WA', 'REFLEXO_WA', '{customer}')"""),
-            {"id": new_id(), "b": bid, "e": pnid},
+                                                     display_name, credential_id, roles)
+                    VALUES (:id, :b, 'whatsapp', 'meta_whatsapp', :e, 'WA', :cred, '{customer}')"""),
+            {
+                "id": new_id(),
+                "b": bid,
+                "e": pnid,
+                "cred": await vault_credential(s, bid, "meta_whatsapp", "REFLEXO_WA"),
+            },
         )
     changes: list[Any] = []
     for item in SEED["catalog"]:

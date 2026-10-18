@@ -38,7 +38,7 @@ async def test_reset_onboarding_then_full_is_repeatable(db: Database) -> None:
     assert report.seconds < 60
     meera = await _counts(db, "meeras-bakes")
     assert meera["status"] == "onboarding" and meera["offerings"] == 0 and meera["onboarding"] == "sources_requested"
-    assert meera["connections"] == 6 and meera["bindings"] == 3 and meera["qa"] == 3
+    assert meera["connections"] == 7 and meera["bindings"] == 3 and meera["qa"] == 3  # 6 own + the bot mirror
     kurti = await _counts(db, "kurti-kraft")
     assert kurti["status"] == "active" and kurti["offerings"] == 10
 
@@ -50,7 +50,7 @@ async def test_reset_onboarding_then_full_is_repeatable(db: Database) -> None:
     await reset(db, "full")  # idempotent: same shape after a second reset
     assert (await _counts(db, "meeras-bakes"))["offerings"] == 6
     evalb = await _counts(db, "eval-bakes")
-    assert evalb["offerings"] == 6 and evalb["connections"] == 2  # simulator + simulated WhatsApp (benchmark)
+    assert evalb["offerings"] == 6 and evalb["connections"] == 3  # simulator, simulated WhatsApp (benchmark), mirror
 
 
 async def test_seeded_businesses_are_searchable(db: Database) -> None:

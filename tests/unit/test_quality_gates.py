@@ -106,3 +106,20 @@ def test_no_real_personal_data_in_fixtures_or_datasets() -> None:
     assert sorted({x.kind for x in found}) == ["address", "email", "name", "phone"]
     assert {x.value for x in found if x.kind == "phone"} == {"+91 98220 12345"}
     assert [x.value for x in found if x.kind == "name"] == ["Anjali"]
+
+
+@pytest.mark.check("CHK-ARCH-1")
+def test_module_boundaries_follow_beta_01() -> None:
+    b = script("check_boundaries")
+    assert b.check() == []
+    assert b.ALLOWED["gateway"] == {"pipeline", "vault", "common"} and b.ALLOWED["vault"] == {"common"}
+    assert "agent" not in b.ALLOWED["connectors"] and "automations" not in b.ALLOWED["agent"]  # no cycles
+
+
+@pytest.mark.check("CHK-ARCH-2")
+def test_no_business_token_read_from_settings_at_runtime() -> None:
+    g = script("check_guards")
+    assert g.main() == 0
+    assert g.SETTINGS_TOKENS.search("token = s.wa_access_token.get_secret_value()")
+    assert g.SETTINGS_TOKENS.search("get_settings().ig_access_token")
+    assert not g.SETTINGS_TOKENS.search("settings.house_wa_access_token")  # the Reflexo number is a platform secret

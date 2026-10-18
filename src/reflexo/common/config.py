@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     # Simulator (signed provider-shaped payloads from the Simulation Lab)
     simulator_secret: SecretStr = SecretStr("dev-simulator-secret")
 
+    # Credential vault and the legal archive (BETA_10 §3.2, §4): "<key_id>:<base64 32 bytes>[,<key_id>:<key>]"
+    vault_keys: SecretStr = SecretStr("")
+    vault_active_key_id: str = ""
+    archive_keys: SecretStr = SecretStr("")  # a separate key ring, never the vault keys
+    archive_active_key_id: str = ""
+
+    # Platform connections (BETA_03 §3): the Reflexo number; the Reflexo bot is telegram_bot_token
+    house_wa_phone_number_id: str = ""
+    house_wa_access_token: SecretStr = SecretStr("")
+
     # model gateway (POC_04 §2)
     model_provider: Literal["gemini", "fake"] = "gemini"
     google_api_key: SecretStr = SecretStr("")

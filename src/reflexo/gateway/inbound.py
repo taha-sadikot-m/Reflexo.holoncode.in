@@ -402,7 +402,7 @@ class GatewayInbound:
             ack = getattr(self.adapters["telegram"], "acknowledge_interaction", None)
             if ack is not None:
                 try:
-                    await ack(credentials(conn), cq)
+                    await ack(await credentials(conn, purpose="ack"), cq)
                 except Exception as exc:  # best effort UI ack
                     log.info("callback_ack_failed", error=type(exc).__name__)
 

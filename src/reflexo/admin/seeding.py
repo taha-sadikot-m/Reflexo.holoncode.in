@@ -23,6 +23,7 @@ from sqlalchemy import CursorResult, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import reflexo.knowledge.api as knowledge
+import reflexo.vault.api as vault
 from reflexo.common.config import Settings, get_settings
 from reflexo.common.contracts import WorkflowPort
 from reflexo.common.db import Database, ServiceReason
@@ -101,7 +102,7 @@ def simulated_whatsapp(suffix: str, name: str) -> list[dict[str, Any]]:
             "external_account_id": f"sim-wa-{suffix}",
             "display_name": f"{name} (WhatsApp)",
             "roles": ["customer", "owner"],
-            "credential_ref": "REFLEXO_WA",
+            "simulated": True,  # all its traffic is simulated: no credential (BETA_13 §7)
         }
     ]
 
@@ -135,6 +136,69 @@ def _j(value: Any) -> str:
 
 async def _exec(s: AsyncSession, sql: str, **params: Any) -> None:
     await s.execute(text(sql), params)
+
+
+# provider -> vault credential kind (BETA_02 §3); the showcase seeds' tokens come from settings, only here and in
+# scripts/vault_import_env.py (CHK-ARCH-2)
+CREDENTIAL_KIND = {
+    "meta_whatsapp": "meta_business_token",
+    "meta_pages": "meta_page_token",
+    "meta_instagram": "instagram_user_token",
+    "telegram": "telegram_bot_token",
+}
+ENV_TOKENS = {
+    "REFLEXO_WA": "wa_access_token",
+    "REFLEXO_FB": "fb_page_token",
+    "REFLEXO_IG": "ig_access_token",
+    "REFLEXO_TELEGRAM": "telegram_bot_token",
+}
+
+
+def env_token(settings: Settings, group: str) -> str:
+    return str(getattr(settings, ENV_TOKENS[group]).get_secret_value())
+
+
+async def ensure_platform_connections(s: AsyncSession, settings: Settings) -> list[tuple[UUID, str, str, str]]:
+    """The Reflexo number and the Reflexo bot as platform connections (BETA_03 §3), from the platform settings.
+    Returns (id, channel, provider, external id) for each one configured."""
+    wanted = []
+    if settings.house_wa_phone_number_id:
+        wanted.append(("reflexo_whatsapp", "whatsapp", "meta_whatsapp", settings.house_wa_phone_number_id, "Reflexo"))
+    bot_token = settings.telegram_bot_token.get_secret_value()
+    if ":" in bot_token:  # a bot token is "<bot id>:<secret>"; only the id is stored
+        wanted.append(("reflexo_telegram", "telegram", "telegram", bot_token.split(":", 1)[0], "Reflexo bot"))
+    out = []
+    for kind, channel, provider, external, name in wanted:
+        row = (
+            await s.execute(
+                text("""INSERT INTO platform_connections
+                          (id, kind, channel, provider, external_account_id, display_name)
+                        VALUES (:id, :k, CAST(:c AS channel_type), CAST(:p AS channel_provider), :e, :n)
+                        ON CONFLICT (provider, external_account_id) DO UPDATE SET updated_at = now()
+                        RETURNING id"""),
+                {"id": new_id(), "k": kind, "c": channel, "p": provider, "e": external, "n": name},
+            )
+        ).scalar_one()
+        out.append((row, channel, provider, external))
+    return out
+
+
+async def add_mirrors(s: AsyncSession, business_id: UUID, platforms: list[tuple[UUID, str, str, str]]) -> None:
+    """One mirror connection per platform connection for this business (BETA_03 §3.1, step 6)."""
+    for platform_id, channel, provider, external in platforms:
+        await _exec(
+            s,
+            """INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id, display_name,
+                                                roles, platform_connection_id)
+               VALUES (:id, :b, CAST(:c AS channel_type), CAST(:p AS channel_provider), :e, :n, '{owner}', :pc)""",
+            id=new_id(),
+            b=business_id,
+            c=channel,
+            p=provider,
+            e=external,
+            n="Reflexo" if provider == "meta_whatsapp" else "Reflexo bot",
+            pc=platform_id,
+        )
 
 
 async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, settings: Settings) -> UUID:
@@ -208,15 +272,25 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
             sim=simulated,
         )
 
-    # Channel connections
+    # Channel connections: a real one gets its token into the vault (ADR-018); a simulated one needs none
     for conn in seed["connections"]:
         external = conn.get("external_account_id") or getattr(settings, conn["external_account_setting"])
+        simulated = bool(conn.get("simulated")) or conn["provider"] == "simulator"
+        credential_id = None
+        if not simulated:
+            credential_id = await vault.put(
+                bid,
+                CREDENTIAL_KIND[conn["provider"]],
+                {"token": env_token(settings, conn["credential_env"])},
+                f"{conn['provider']}:{conn['display_name']}",
+                session=s,
+            )
         await _exec(
             s,
             """INSERT INTO channel_connections
-               (id, business_id, channel, provider, external_account_id, display_name, roles, credential_ref)
+               (id, business_id, channel, provider, external_account_id, display_name, roles, credential_id, simulated)
                           VALUES (:id, :b, CAST(:c AS channel_type), CAST(:p AS channel_provider), :e, :n,
-                                  CAST(:roles AS participant_role[]), :cred)""",
+                                  CAST(:roles AS participant_role[]), :cred, :sim)""",
             id=new_id(),
             b=bid,
             c=conn["channel"],
@@ -224,8 +298,11 @@ async def _load_business(s: AsyncSession, seed: dict[str, Any], *, full: bool, s
             e=external,
             n=conn["display_name"],
             roles=list(conn["roles"]),
-            cred=conn.get("credential_ref"),
+            cred=credential_id,
+            sim=simulated,
         )
+    if seed.get("platform_mirrors"):
+        await add_mirrors(s, bid, await ensure_platform_connections(s, settings))
 
     for schema in seed.get("order_detail_schemas", []):
         await _exec(
@@ -304,7 +381,7 @@ async def load(
     report = SeedReport()
     meera = read_seed("meeras_bakes")
     seeds: list[tuple[dict[str, Any], bool]] = [
-        (seed, full)
+        ({**seed, "platform_mirrors": True}, full)  # BETA_02 §8: a mirror per platform connection, showcase only
         for seed, full in ((meera, mode == "full"), (read_seed("kurti_kraft"), True), (eval_seed(meera), True))
         if seed["slug"] in slugs
     ]

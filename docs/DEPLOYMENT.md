@@ -119,6 +119,21 @@ sudo docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.l
 
 **Update:** copy the new code the same way and run the same `up -d --build`. Migrations run when the API starts.
 
+**First update to the vault (beta WP-02, once):** the server must have vault keys before it starts, and the
+showcase tokens move from `.env` into the vault before migration `0010` can run.
+
+```bash
+# in /opt/reflexo/.env (chmod 600), new random keys, never reused for the archive:
+#   REFLEXO_VAULT_KEYS=v1:<base64 32 bytes>   REFLEXO_VAULT_ACTIVE_KEY_ID=v1
+#   REFLEXO_ARCHIVE_KEYS=a1:<base64 32 bytes> REFLEXO_ARCHIVE_ACTIVE_KEY_ID=a1
+sudo docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.localdb.yml build
+sudo docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.localdb.yml \
+     run --rm api python scripts/vault_import_env.py               # upgrades to 0009, imports, then to head
+sudo docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.localdb.yml up -d
+```
+
+Keep a copy of the vault keys outside the server: without them no stored credential can be read.
+
 **Domain:** add an A record for the host name pointing at the server, set `REFLEXO_DOMAIN` and
 `REFLEXO_PUBLIC_BASE_URL` in `.env`, and list earlier host names in `REFLEXO_REDIRECT_FROM`. Caddy issues the
 certificate on the first request.

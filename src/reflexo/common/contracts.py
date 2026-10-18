@@ -176,6 +176,8 @@ class JobHandlerRegistry(Protocol):
 
     def register_daily(self, queue: str, handler: JobHandler, at: str) -> None: ...  # at: "HH:MM" IST
 
+    def register_periodic(self, queue: str, handler: JobHandler, every_s: int) -> None: ...
+
     def get(self, queue: str) -> JobHandler | None: ...
 
 

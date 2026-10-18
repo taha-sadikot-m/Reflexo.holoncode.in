@@ -36,6 +36,10 @@ def _local_now() -> datetime:
     return utcnow().astimezone(IST)
 
 
+def _slot(every_s: int) -> int:
+    return int(utcnow().timestamp() // every_s)
+
+
 def _daily_key(queue: str, day: date) -> str:
     return f"{queue}:{day.isoformat()}"
 
@@ -55,6 +59,7 @@ class Jobs:
     def __init__(self) -> None:
         self._handlers: dict[str, JobHandler] = {}
         self._daily: dict[str, time_of_day] = {}  # queue -> local time (IST) of its daily run
+        self._periodic: dict[str, int] = {}  # queue -> seconds between runs
 
     # -- registry
     def register(self, queue: str, handler: JobHandler) -> None:
@@ -78,6 +83,23 @@ class Jobs:
 
         self.register(queue, run_then_schedule)
 
+    def register_periodic(self, queue: str, handler: JobHandler, every_s: int) -> None:
+        """A job that runs every `every_s` seconds (vault refresh, hourly); each run enqueues the next slot."""
+        self._periodic[queue] = every_s
+
+        async def run_then_schedule(job: JobRow) -> None:
+            try:
+                await handler(job)
+            finally:
+                slot = int(job.payload.get("slot", _slot(every_s))) + 1
+                await self._enqueue_slot(queue, every_s, slot)
+
+        self.register(queue, run_then_schedule)
+
+    async def _enqueue_slot(self, queue: str, every_s: int, slot: int) -> None:
+        delay = max(slot * every_s - utcnow().timestamp(), 0.0)
+        await self.enqueue(queue, {"slot": slot}, dedupe_key=f"{queue}:{slot}", delay_s=delay)
+
     async def ensure_daily(self) -> None:
         """At worker start: today's run if it has not happened yet (at once, if its time has passed), else
         tomorrow's. The dedupe key per run date keeps restarts and several workers from doubling a run."""
@@ -94,6 +116,16 @@ class Jobs:
                 await self._enqueue_daily(queue, _next_run(at, after_today=False))
             elif str(status) not in ("pending", "running"):  # today's run is over: tomorrow's
                 await self._enqueue_daily(queue, _next_run(at, after_today=True))
+        for queue, every_s in self._periodic.items():  # one run now unless one is already waiting
+            async with get_db().service_session(ServiceReason.QUEUE_CLAIM) as s:
+                waiting = (
+                    await s.execute(
+                        text("SELECT 1 FROM jobs WHERE queue = :q AND status IN ('pending', 'running') LIMIT 1"),
+                        {"q": queue},
+                    )
+                ).first()
+            if waiting is None:
+                await self._enqueue_slot(queue, every_s, _slot(every_s))
 
     async def _enqueue_daily(self, queue: str, when: datetime) -> None:
         delay = max((when - _local_now()).total_seconds(), 0.0)

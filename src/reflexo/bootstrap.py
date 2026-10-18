@@ -14,6 +14,7 @@ from reflexo.common.tracing import configure_tracing
 
 MODULES = (
     "pipeline",
+    "vault",
     "gateway",
     "agent",
     "voice",
@@ -34,6 +35,7 @@ def bootstrap(service: str) -> Registry:
     settings = get_settings()
     configure_logging(service, settings.log_level)
     configure_tracing(service, settings.otel_exporter_otlp_endpoint, settings.env, settings.otel_sampling_ratio)
+    importlib.import_module("reflexo.vault.api").check_keys(settings)  # BETA_10 §4: no start without a usable key
     registry = reset_registry()
     for name in MODULES:
         module = importlib.import_module(f"reflexo.{name}.api")

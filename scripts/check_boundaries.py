@@ -1,10 +1,11 @@
-"""Module boundary check (POC_01 §4.1).
+"""Module boundary check (BETA_01 §4.2, which replaces the POC table; CHK-ARCH-1).
 
 Rules:
 1. A module may import another reflexo module only if the dependency is allowed in ALLOWED.
 2. Cross-module imports must target `reflexo.<module>.api` exactly (never internals).
 3. `reflexo.common` imports nothing else from reflexo. `bootstrap`, `api` (HTTP), `admin`, `workflows` may import
    any module's api.
+Modules of the table that are not built yet are listed so that their edges are checked from the first file.
 Exit code 1 on violations.
 """
 
@@ -17,6 +18,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent / "src" / "reflexo"
 ALL = {
     "common",
+    "vault",
+    "policy",
+    "domains",
     "pipeline",
     "gateway",
     "agent",
@@ -27,22 +31,59 @@ ALL = {
     "integrations",
     "approvals",
     "owner",
+    "connectors",
+    "screens",
+    "value",
+    "team",
     "admin",
     "workflows",
     "api",
 }
+# BETA_01 §4.2, edge for edge
 ALLOWED: dict[str, set[str]] = {
     "common": set(),
+    "vault": {"common"},
+    "policy": {"common"},
+    "domains": {"commerce", "integrations", "connectors", "vault", "pipeline", "common"},
     "pipeline": {"common"},
-    "gateway": {"pipeline", "common"},
-    "agent": {"knowledge", "commerce", "integrations", "approvals", "owner", "gateway", "common"},
+    "gateway": {"pipeline", "vault", "common"},
+    "agent": {
+        "knowledge",
+        "commerce",
+        "integrations",
+        "approvals",
+        "owner",
+        "gateway",
+        "connectors",
+        "screens",
+        "value",
+        "policy",
+        "domains",
+        "common",
+    },
     "voice": {"agent", "gateway", "commerce", "knowledge", "common"},
-    "knowledge": {"common"},
+    "knowledge": {"policy", "common"},
     "commerce": {"knowledge", "integrations", "common"},
-    "automations": {"gateway", "commerce", "knowledge", "approvals", "agent", "pipeline", "common"},
-    "integrations": {"common"},
+    "automations": {
+        "gateway",
+        "commerce",
+        "knowledge",
+        "approvals",
+        "agent",
+        "pipeline",
+        "connectors",
+        "screens",
+        "policy",
+        "domains",
+        "common",
+    },
+    "integrations": {"vault", "common"},
     "approvals": {"gateway", "common"},
     "owner": {"gateway", "knowledge", "approvals", "common"},
+    "connectors": {"vault", "common"},
+    "screens": {"gateway", "knowledge", "commerce", "pipeline", "connectors", "approvals", "common"},
+    "value": {"commerce", "knowledge", "screens", "pipeline", "common"},
+    "team": {"gateway", "approvals", "owner", "policy", "agent", "common"},
     "admin": ALL - {"admin", "api"},
     "workflows": ALL - {"workflows", "api"},
     "api": ALL - {"api"},

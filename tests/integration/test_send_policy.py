@@ -44,8 +44,9 @@ async def on_provider(db: Database, t: Tenant, provider: str, channel: str) -> N
     cid = new_id()
     await set_(
         db,
-        """INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id, display_name)
-           VALUES (:id, :b, CAST(:ch AS channel_type), CAST(:p AS channel_provider), :e, 'x')""",
+        """INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id, display_name,
+                                           simulated)
+           VALUES (:id, :b, CAST(:ch AS channel_type), CAST(:p AS channel_provider), :e, 'x', true)""",
         id=cid,
         b=t.business_id,
         ch=channel,

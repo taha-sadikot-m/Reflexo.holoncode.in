@@ -69,11 +69,11 @@ owner:
   simulated_whatsapp: "+919999900001"     # Lab owner device (simulated_only binding, POC_07 §3.2)
 
 connections:
-  - {channel: whatsapp, provider: meta_whatsapp, external_account_setting: seed_wa_phone_number_id, display_name: "Meera's Bakes (WhatsApp)", roles: [customer, owner], credential_ref: REFLEXO_WA}
-  - {channel: telegram, provider: telegram, external_account_setting: seed_tg_bot_id, display_name: "Meera's Bakes (Telegram)", roles: [customer, owner], credential_ref: REFLEXO_TELEGRAM}
-  - {channel: facebook_messenger, provider: meta_pages, external_account_setting: seed_fb_page_id, display_name: "Meera's Bakes (Messenger)", roles: [customer], credential_ref: REFLEXO_FB}
-  - {channel: instagram_dm, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram DM)", roles: [customer], credential_ref: REFLEXO_IG}
-  - {channel: instagram_comment, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram comments)", roles: [customer], credential_ref: REFLEXO_IG}
+  - {channel: whatsapp, provider: meta_whatsapp, external_account_setting: seed_wa_phone_number_id, display_name: "Meera's Bakes (WhatsApp)", roles: [customer, owner], credential_env: REFLEXO_WA}
+  - {channel: telegram, provider: telegram, external_account_setting: seed_tg_bot_id, display_name: "Meera's Bakes (Telegram)", roles: [customer, owner], credential_env: REFLEXO_TELEGRAM}
+  - {channel: facebook_messenger, provider: meta_pages, external_account_setting: seed_fb_page_id, display_name: "Meera's Bakes (Messenger)", roles: [customer], credential_env: REFLEXO_FB}
+  - {channel: instagram_dm, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram DM)", roles: [customer], credential_env: REFLEXO_IG}
+  - {channel: instagram_comment, provider: meta_instagram, external_account_setting: seed_ig_account_id, display_name: "Meera's Bakes (Instagram comments)", roles: [customer], credential_env: REFLEXO_IG}
   - {channel: web_widget, provider: simulator, external_account_id: sim-meeras-bakes, display_name: "Meera's Bakes (Simulator)", roles: [customer, owner]}
 
 order_detail_schemas:

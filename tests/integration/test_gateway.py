@@ -26,6 +26,7 @@ from reflexo.gateway import identity
 from reflexo.gateway.adapters import simulator
 from reflexo.gateway.adapters.meta_common import sign
 from reflexo.pipeline import api as pipeline_api
+from tests.factories import vault_credential
 
 pytestmark = pytest.mark.integration
 
@@ -71,9 +72,17 @@ async def make_shop(db: Database) -> Shop:
         ):
             await s.execute(
                 text("""INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id,
-                                                         display_name, credential_ref)
-                        VALUES (:id, :b, CAST(:ch AS channel_type), CAST(:p AS channel_provider), :e, :ch, :cred)"""),
-                {"id": cid, "b": bid, "ch": channel, "p": provider, "e": ext, "cred": cred},
+                                                         display_name, credential_id, roles)
+                        VALUES (:id, :b, CAST(:ch AS channel_type), CAST(:p AS channel_provider), :e, :ch, :cred,
+                                '{customer,owner}')"""),
+                {
+                    "id": cid,
+                    "b": bid,
+                    "ch": channel,
+                    "p": provider,
+                    "e": ext,
+                    "cred": await vault_credential(s, bid, provider, cred) if cred else None,
+                },
             )
         await s.execute(
             text("INSERT INTO team_members (id, business_id, display_name, role) VALUES (:id, :b, 'Meera', 'owner')"),

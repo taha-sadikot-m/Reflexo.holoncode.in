@@ -29,6 +29,7 @@ from reflexo.common.llm import ToolCall
 from reflexo.common.ports import Registry, reset_registry
 from reflexo.integrations.razorpay import PaymentLink
 from reflexo.pipeline import api as pipeline_api
+from tests.factories import vault_credential
 from tests.integration.test_customer_desk import SEED, make_bakery
 
 pytestmark = pytest.mark.integration
@@ -172,9 +173,14 @@ async def shop_with_customer(db: Database) -> dict[str, Any]:
         )
         await s.execute(
             text("""INSERT INTO channel_connections (id, business_id, channel, provider, external_account_id,
-                                display_name, credential_ref)
-                                VALUES (:id, :b, 'telegram', 'telegram', :e, 'TG', 'REFLEXO_TELEGRAM')"""),
-            {"id": tg, "b": bid, "e": f"tg-{tg.hex[-8:]}"},
+                                display_name, credential_id, roles)
+                                VALUES (:id, :b, 'telegram', 'telegram', :e, 'TG', :cred, '{customer,owner}')"""),
+            {
+                "id": tg,
+                "b": bid,
+                "e": f"tg-{tg.hex[-8:]}",
+                "cred": await vault_credential(s, bid, "telegram", "REFLEXO_TELEGRAM"),
+            },
         )
         await s.execute(
             text("""INSERT INTO owner_channel_bindings (id, business_id, member_id, channel, external_id, verified_at)
